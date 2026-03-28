@@ -1,3 +1,5 @@
+'use client';
+
 import { KpiCard } from "@/components/dashboard/kpi-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
@@ -12,6 +14,7 @@ import {
   AreaChart
 } from "recharts"
 import { mockFinancialRecords, mockLocations } from "@/lib/mock-data"
+import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
   // Aggregated data for charts
