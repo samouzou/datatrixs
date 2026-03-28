@@ -1,3 +1,28 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "tire-shop-hero",
+      "description": "Professional tire retail service bay",
+      "imageUrl": "https://picsum.photos/seed/101/1200/600",
+      "imageHint": "tire service"
+    },
+    {
+      "id": "financial-dashboard",
+      "description": "Abstract financial growth data visualization",
+      "imageUrl": "https://picsum.photos/seed/102/800/400",
+      "imageHint": "financial chart"
+    },
+    {
+      "id": "houston-store",
+      "description": "Retail storefront in Houston",
+      "imageUrl": "https://picsum.photos/seed/103/400/300",
+      "imageHint": "storefront retail"
+    },
+    {
+      "id": "dallas-store",
+      "description": "Retail storefront in Dallas",
+      "imageUrl": "https://picsum.photos/seed/104/400/300",
+      "imageHint": "storefront shop"
+    }
+  ]
 }
