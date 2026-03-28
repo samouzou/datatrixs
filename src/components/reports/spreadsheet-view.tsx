@@ -1,0 +1,117 @@
+"use client"
+
+import * as React from "react"
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { Search, Download, FileSpreadsheet } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+
+interface SpreadsheetViewProps {
+  headers: string[];
+  data: string[][];
+  title?: string;
+  className?: string;
+}
+
+export function SpreadsheetView({ headers, data, title, className }: SpreadsheetViewProps) {
+  const [searchTerm, setSearchTerm] = React.useState("");
+
+  const filteredData = React.useMemo(() => {
+    if (!searchTerm) return data;
+    return data.filter(row => 
+      row.some(cell => cell?.toString().toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [data, searchTerm]);
+
+  return (
+    <div className={cn("flex flex-col h-full w-full bg-background border border-white/10 rounded-xl overflow-hidden shadow-2xl", className)}>
+      <div className="flex items-center justify-between p-4 bg-card/50 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/20 rounded-lg">
+            <FileSpreadsheet className="size-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">{title || "Data Explorer"}</h3>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+              {data.length} Rows • Interactive Spreadsheet Mode
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input 
+              placeholder="Filter data..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 w-[200px] bg-muted/30 border-white/5 text-xs focus-visible:ring-primary"
+            />
+          </div>
+          <Button variant="outline" size="sm" className="h-9 border-white/10 text-xs hover:bg-white/5">
+            <Download className="size-3.5 mr-2" /> Export CSV
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto max-h-[60vh]">
+        <Table className="border-collapse">
+          <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur-md shadow-sm">
+            <TableRow className="hover:bg-transparent border-white/10">
+              <TableHead className="w-12 text-center text-[10px] font-bold text-muted-foreground border-r border-white/10 bg-muted/20">#</TableHead>
+              {headers.map((header, i) => (
+                <TableHead 
+                  key={i} 
+                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-white border-r border-white/10 last:border-r-0"
+                >
+                  {header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredData.map((row, rowIndex) => (
+              <TableRow key={rowIndex} className="group hover:bg-primary/5 transition-colors border-white/5">
+                <TableCell className="text-center text-[10px] font-mono text-muted-foreground border-r border-white/5 bg-muted/5">
+                  {rowIndex + 1}
+                </TableCell>
+                {row.map((cell, cellIndex) => (
+                  <TableCell 
+                    key={cellIndex} 
+                    className="px-6 py-3 text-sm text-foreground/80 border-r border-white/5 last:border-r-0 font-medium group-hover:text-white"
+                  >
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {filteredData.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <Search className="size-10 mb-4 opacity-20" />
+            <p className="text-sm italic">No records match your search query.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-muted/10 border-t border-white/10 text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
+        <div className="flex gap-4">
+          <span>Format: Standard Ledger</span>
+          <span>Status: Verified</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="size-2 rounded-full bg-accent animate-pulse" />
+          Live Connection
+        </div>
+      </div>
+    </div>
+  );
+}

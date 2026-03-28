@@ -5,7 +5,6 @@ import {
   FilePieChart, 
   Download, 
   Plus, 
-  Search, 
   FileText, 
   Table as TableIcon, 
   Sparkles,
@@ -27,6 +26,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 
 function MarkdownTable({ content }: { content: string }) {
   const lines = content.trim().split('\n');
@@ -110,7 +110,7 @@ export default function ReportsPage() {
       <Tabs defaultValue="reports" className="space-y-6">
         <TabsList className="bg-card/50 border border-white/5 p-1 h-12">
           <TabsTrigger value="reports" className="px-6 data-[state=active]:bg-primary h-10">AI Report Builder</TabsTrigger>
-          <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Custom Data Exports</TabsTrigger>
+          <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Explorer</TabsTrigger>
           <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary h-10">Saved Library</TabsTrigger>
         </TabsList>
 
@@ -176,10 +176,10 @@ export default function ReportsPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
                 <TableIcon className="size-5 text-primary" />
-                Raw Data Export Generator
+                Raw Data Explorer
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Specify raw datasets for CSV extraction, such as "All revenue transactions for Dallas in Q4".
+                Compile and view raw datasets directly in the browser, such as "All revenue transactions for Dallas in Q4".
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -193,46 +193,20 @@ export default function ReportsPage() {
                 />
                 <Button size="lg" onClick={handleGenerateExport} disabled={loadingExport || !exportQuery.trim()} className="bg-primary hover:bg-primary/90 h-12 px-8">
                   {loadingExport ? <Loader2 className="size-4 animate-spin mr-2" /> : <FileText className="size-4 mr-2" />}
-                  Compile Table
+                  Build Spreadsheet
                 </Button>
               </form>
             </CardContent>
           </Card>
 
           {exportResult && (
-            <Card className="bg-card/30 border-white/5 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
-              <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b border-white/5 py-4">
-                <div className="flex items-center gap-2">
-                  <TableIcon className="size-4 text-primary" />
-                  <CardTitle className="text-base font-medium text-white">{exportResult.tableName}</CardTitle>
-                </div>
-                <Button variant="outline" size="sm" className="h-9 border-white/10 text-xs bg-white/5 hover:bg-white/10">
-                  <Download className="size-3.5 mr-2" /> Export CSV
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/5 bg-muted/10 hover:bg-muted/10">
-                        {exportResult.header.map((h, i) => (
-                          <TableHead key={i} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground h-10 px-6">{h}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {exportResult.data.map((row, i) => (
-                        <TableRow key={i} className="border-white/5 hover:bg-white/5">
-                          {row.map((cell, j) => (
-                            <TableCell key={j} className="text-sm px-6 py-3 text-foreground/90">{cell}</TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+              <SpreadsheetView 
+                title={exportResult.tableName}
+                headers={exportResult.header}
+                data={exportResult.data}
+              />
+            </div>
           )}
         </TabsContent>
 
