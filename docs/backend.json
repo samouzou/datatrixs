@@ -1,0 +1,701 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents an individual user within the Datatrixs application, linked to their external authentication identity and application-specific roles. This entity focuses on application profile and authorization data, not authentication credentials.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "externalAuthIdentifier": {
+          "type": "string",
+          "description": "Unique identifier provided by the external authentication system (e.g., Google, email/password provider's user ID). This links the Datatrixs user profile to their authenticated identity."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for contact and display within the app. It is assumed to be verified by the external authentication system.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The application-specific role assigned to the user (e.g., 'Admin', 'Analyst', 'LocationManager'). This determines authorization and capabilities within Datatrixs."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was created in Datatrixs.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was last updated in Datatrixs.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "externalAuthIdentifier",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Company": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Company",
+      "type": "object",
+      "description": "Represents a private equity holding company, acting as the umbrella organization for multiple retail locations.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Company entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The official name of the holding company."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the holding company."
+        },
+        "userIds": {
+          "type": "array",
+          "description": "References to Users who have access to or manage this company. (Relationship: User N:N Company)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the company record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the company record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Location": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Location",
+      "type": "object",
+      "description": "Represents an individual retail tire shop location managed by a holding company.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Location entity."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to the Company that owns this location. (Relationship: Company 1:N Location)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the retail location."
+        },
+        "addressLine1": {
+          "type": "string",
+          "description": "The primary street address of the location."
+        },
+        "addressLine2": {
+          "type": "string",
+          "description": "Secondary address information for the location (e.g., suite number)."
+        },
+        "city": {
+          "type": "string",
+          "description": "The city where the location is situated."
+        },
+        "state": {
+          "type": "string",
+          "description": "The state or province where the location is situated."
+        },
+        "zipCode": {
+          "type": "string",
+          "description": "The postal code of the location."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The main contact phone number for the location."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the location record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the location record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "addressLine1",
+        "city",
+        "state",
+        "zipCode",
+        "phoneNumber",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChartOfAccounts": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChartOfAccounts",
+      "type": "object",
+      "description": "Defines a standardized set of financial accounts that can be used by a company or a group of locations for consistent financial reporting.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ChartOfAccounts entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the Chart of Accounts (e.g., 'Datatrixs Standard COA', 'Company A Custom COA')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of this Chart of Accounts."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to the Company if this Chart of Accounts is custom for a specific holding company. (Relationship: Company 0..1:N ChartOfAccounts)"
+        },
+        "isStandard": {
+          "type": "boolean",
+          "description": "Indicates if this is a globally standardized Chart of Accounts or a custom one for a specific company."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the Chart of Accounts was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the Chart of Accounts was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "isStandard",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Account": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Account",
+      "type": "object",
+      "description": "Represents an individual financial account within a specific Chart of Accounts (e.g., 'Cash', 'Sales Revenue').",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Account entity."
+        },
+        "chartOfAccountsId": {
+          "type": "string",
+          "description": "Reference to the ChartOfAccounts this account belongs to. (Relationship: ChartOfAccounts 1:N Account)"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "The unique numerical identifier for the account within its Chart of Accounts (e.g., '1000', '4000')."
+        },
+        "name": {
+          "type": "string",
+          "description": "The human-readable name of the account (e.g., 'Cash', 'Accounts Receivable')."
+        },
+        "category": {
+          "type": "string",
+          "description": "The primary financial category of the account (e.g., 'Asset', 'Liability', 'Equity', 'Revenue', 'Expense')."
+        },
+        "subCategory": {
+          "type": "string",
+          "description": "An optional, more specific sub-category for the account (e.g., 'Current Asset', 'Operating Revenue')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the account's purpose or usage."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the account record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the account record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "chartOfAccountsId",
+        "accountNumber",
+        "name",
+        "category",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FinancialDataSource": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialDataSource",
+      "type": "object",
+      "description": "Represents a connection to an external financial system (e.g., QuickBooks) or a record of a specific uploaded file (e.g., Excel/CSV) for a location.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the FinancialDataSource entity."
+        },
+        "locationId": {
+          "type": "string",
+          "description": "Reference to the Location this financial data source is linked to. (Relationship: Location 1:N FinancialDataSource)"
+        },
+        "sourceType": {
+          "type": "string",
+          "description": "The type of the financial data source (e.g., 'QuickBooks', 'ExcelUpload', 'CSVUpload')."
+        },
+        "name": {
+          "type": "string",
+          "description": "A user-friendly name for this data source (e.g., 'QuickBooks Sync for Main Street', 'Q3 2023 Revenue Spreadsheet')."
+        },
+        "connectionDetailsJson": {
+          "type": "string",
+          "description": "A JSON string containing configuration details specific to the source type (e.g., QuickBooks RealmId, file path/name for uploads, mapping configurations)."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the data source (e.g., 'Active', 'Inactive', 'Processing', 'Error')."
+        },
+        "lastIngestedAt": {
+          "type": "string",
+          "description": "Timestamp of the last successful data ingestion or synchronization from this source.",
+          "format": "date-time"
+        },
+        "createdByUserId": {
+          "type": "string",
+          "description": "Reference to the User who set up this data source or performed the manual upload. (Relationship: User 1:N FinancialDataSource)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the data source record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the data source record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "locationId",
+        "sourceType",
+        "name",
+        "status",
+        "createdByUserId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FinancialTransaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialTransaction",
+      "type": "object",
+      "description": "Represents a single consolidated financial transaction, which can consist of multiple financial entries.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the FinancialTransaction entity."
+        },
+        "locationId": {
+          "type": "string",
+          "description": "Reference to the Location where this transaction occurred. (Relationship: Location 1:N FinancialTransaction)"
+        },
+        "financialDataSourceId": {
+          "type": "string",
+          "description": "Reference to the FinancialDataSource from which this transaction originated. (Relationship: FinancialDataSource 1:N FinancialTransaction)"
+        },
+        "transactionDate": {
+          "type": "string",
+          "description": "The date when the financial transaction occurred.",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string",
+          "description": "A descriptive summary of the financial transaction."
+        },
+        "originalTransactionId": {
+          "type": "string",
+          "description": "The original identifier of the transaction from the external accounting system (e.g., QuickBooks transaction ID), if available."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when this financial transaction was first recorded in Datatrixs.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when this financial transaction record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "locationId",
+        "financialDataSourceId",
+        "transactionDate",
+        "description",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FinancialEntry": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialEntry",
+      "type": "object",
+      "description": "Represents a single debit or credit entry associated with a FinancialTransaction, linked to a specific Account.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the FinancialEntry entity."
+        },
+        "financialTransactionId": {
+          "type": "string",
+          "description": "Reference to the FinancialTransaction this entry belongs to. (Relationship: FinancialTransaction 1:N FinancialEntry)"
+        },
+        "accountId": {
+          "type": "string",
+          "description": "Reference to the Account impacted by this entry. (Relationship: Account 1:N FinancialEntry)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary value of the entry."
+        },
+        "entryType": {
+          "type": "string",
+          "description": "Indicates whether the entry is a 'Debit' or a 'Credit'."
+        },
+        "memo": {
+          "type": "string",
+          "description": "An optional, specific memo or note for this individual financial entry."
+        }
+      },
+      "required": [
+        "id",
+        "financialTransactionId",
+        "accountId",
+        "amount",
+        "entryType"
+      ]
+    },
+    "ReportConfiguration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ReportConfiguration",
+      "type": "object",
+      "description": "Stores user-defined settings and parameters for custom financial reports, charts, or spreadsheet exports generated within the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ReportConfiguration entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created or owns this report configuration. (Relationship: User 1:N ReportConfiguration)"
+        },
+        "name": {
+          "type": "string",
+          "description": "A user-defined name for the saved report configuration."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description explaining the purpose or scope of the report."
+        },
+        "reportType": {
+          "type": "string",
+          "description": "The type of report or output this configuration generates (e.g., 'IncomeStatement', 'BalanceSheet', 'CustomChart', 'SpreadsheetExport')."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Optional reference to a specific Company if the report is scoped to a particular holding company. (Relationship: Company 0..1:N ReportConfiguration)"
+        },
+        "locationIds": {
+          "type": "array",
+          "description": "Optional references to specific Locations if the report's scope is limited to a subset of locations. (Relationship: Location N:N ReportConfiguration)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "configurationDetailsJson": {
+          "type": "string",
+          "description": "A JSON string containing all specific parameters for the report, such as date ranges, filters, chart types, selected accounts, etc."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the report configuration was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the report configuration was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "reportType",
+        "configurationDetailsJson",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores individual user profiles. The document ID (`userId`) must match the user's external authentication ID (Firebase Authentication `uid`). Used for personal profile data. Includes the user's `role` for general application roles, though critical global roles are managed separately."
+        }
+      },
+      {
+        "path": "/app_roles_admin/{adminId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "A collection used for defining global application administrators. A document exists here (where `adminId` is a `userId`) if the user is an application administrator. This follows the 'existence over content' model for simple, robust global role checks in security rules.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "The unique identifier of a user who is an application administrator. This ID corresponds to the user's `externalAuthIdentifier` or `request.auth.uid`."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/companies/{companyId}",
+        "definition": {
+          "entityName": "Company",
+          "schema": {
+            "$ref": "#/backend/entities/Company"
+          },
+          "description": "Stores holding company information. The `userIds` array from the schema will be transformed into a `members` map (e.g., `{ [uid: string]: 'role' }` or `{ [uid: string]: true }`) for direct access control checks. This `members` map, along with the `companyId`, will be denormalized into all child/related documents requiring company-level authorization.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "The unique identifier for a specific holding company."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/locations/{locationId}",
+        "definition": {
+          "entityName": "Location",
+          "schema": {
+            "$ref": "#/backend/entities/Location"
+          },
+          "description": "Stores individual retail location information. Includes denormalized 'companyId' and 'companyMembers' map (from the parent company) for authorization independence.",
+          "params": [
+            {
+              "name": "locationId",
+              "description": "The unique identifier for a specific retail location."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/standard_charts_of_accounts/{chartOfAccountsId}",
+        "definition": {
+          "entityName": "ChartOfAccounts",
+          "schema": {
+            "$ref": "#/backend/entities/ChartOfAccounts"
+          },
+          "description": "Stores globally available, standardized Charts of Accounts. These are generally publicly readable but only writable by administrators. The `isStandard` field will be `true`.",
+          "params": [
+            {
+              "name": "chartOfAccountsId",
+              "description": "The unique identifier for a standard Chart of Accounts."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/companies/{companyId}/charts_of_accounts/{chartOfAccountsId}",
+        "definition": {
+          "entityName": "ChartOfAccounts",
+          "schema": {
+            "$ref": "#/backend/entities/ChartOfAccounts"
+          },
+          "description": "Stores Chart of Accounts specific to a holding company. Includes denormalized 'companyId' and 'companyMembers' map (from the parent company) for authorization independence. The `isStandard` field will be `false`.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "The unique identifier for the parent holding company."
+            },
+            {
+              "name": "chartOfAccountsId",
+              "description": "The unique identifier for a company-specific Chart of Accounts."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/standard_charts_of_accounts/{chartOfAccountsId}/accounts/{accountId}",
+        "definition": {
+          "entityName": "Account",
+          "schema": {
+            "$ref": "#/backend/entities/Account"
+          },
+          "description": "Individual financial accounts belonging to a standard Chart of Accounts. These inherit the globally readable security posture of their parent COA.",
+          "params": [
+            {
+              "name": "chartOfAccountsId",
+              "description": "The unique identifier for the parent standard Chart of Accounts."
+            },
+            {
+              "name": "accountId",
+              "description": "The unique identifier for a specific financial account."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/companies/{companyId}/charts_of_accounts/{chartOfAccountsId}/accounts/{accountId}",
+        "definition": {
+          "entityName": "Account",
+          "schema": {
+            "$ref": "#/backend/entities/Account"
+          },
+          "description": "Individual financial accounts belonging to a company-specific Chart of Accounts. Includes denormalized 'companyId' and 'companyMembers' map (from the grandparent company) for authorization independence.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "The unique identifier for the grandparent holding company."
+            },
+            {
+              "name": "chartOfAccountsId",
+              "description": "The unique identifier for the parent company-specific Chart of Accounts."
+            },
+            {
+              "name": "accountId",
+              "description": "The unique identifier for a specific financial account."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/financial_data_sources/{financialDataSourceId}",
+        "definition": {
+          "entityName": "FinancialDataSource",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialDataSource"
+          },
+          "description": "Connections to external financial systems or records of uploaded files. Includes denormalized 'locationId', 'companyId', and 'companyMembers' map (from the company owning the location) for authorization independence.",
+          "params": [
+            {
+              "name": "financialDataSourceId",
+              "description": "The unique identifier for a financial data source."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/financial_transactions/{financialTransactionId}",
+        "definition": {
+          "entityName": "FinancialTransaction",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialTransaction"
+          },
+          "description": "Consolidated financial transactions. Includes denormalized 'locationId', 'companyId', and 'companyMembers' map (from the company owning the location) for authorization independence.",
+          "params": [
+            {
+              "name": "financialTransactionId",
+              "description": "The unique identifier for a financial transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/financial_transactions/{financialTransactionId}/financial_entries/{financialEntryId}",
+        "definition": {
+          "entityName": "FinancialEntry",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialEntry"
+          },
+          "description": "Individual debit/credit entries within a financial transaction. Includes denormalized 'locationId', 'companyId', and 'companyMembers' map (from the company owning the location) for authorization independence.",
+          "params": [
+            {
+              "name": "financialTransactionId",
+              "description": "The unique identifier for the parent financial transaction."
+            },
+            {
+              "name": "financialEntryId",
+              "description": "The unique identifier for a specific financial entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/report_configurations/{reportConfigurationId}",
+        "definition": {
+          "entityName": "ReportConfiguration",
+          "schema": {
+            "$ref": "#/backend/entities/ReportConfiguration"
+          },
+          "description": "User-specific saved report configurations. This path ensures ownership by `userId`. If a `companyId` is specified within the report configuration, the `companyId` and `companyMembers` map from that company will be denormalized into the document for authorization independence. References to `locationIds` are for data filtering, with actual data access determined by the denormalized authorization fields on the respective data entities.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns this report configuration."
+            },
+            {
+              "name": "reportConfigurationId",
+              "description": "The unique identifier for a specific report configuration."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure for Datatrixs prioritizes secure, scalable, and debuggable authorization by strictly adhering to the core design principles and strategy mandates. The central theme is **Authorization Independence via Denormalization** and **Structural Segregation** to simplify security rules and enable Queryable Access Patterns (QAPs).\n\n**Authorization Independence:** To prevent costly and complex `get()` calls in Firestore Security Rules, the authorization context (specifically, membership of a holding company) is denormalized across related documents. The `Company` entity includes a `members` map (derived from the `userIds` array in the schema), which stores the `uid` of each authorized user. This `companyId` and the `members` map are then copied down to all dependent entities such as `Location`, `FinancialDataSource`, `FinancialTransaction`, `FinancialEntry`, and company-specific `ChartOfAccounts` and `Account` documents. For `ReportConfiguration` documents, if they are scoped to a `companyId`, that company's `companyId` and `members` map are also denormalized into the report configuration document itself. This ensures that any document can determine its authorization directly from its own fields, without needing to traverse parent documents.\n\n**Queryable Access Patterns (QAPs):**\n*   **User Profiles:** `users/{userId}` allows direct access for a user to their own profile (`request.auth.uid == userId`). Admins can list all users.\n*   **Global Roles:** `/app_roles_admin/{adminId}` provides an 'existence over content' model for global administrators, enabling efficient checks for elevated privileges without filtering.\n*   **Company and Location-Scoped Data:** For `Company` and all its dependent entities (`Location`, `FinancialDataSource`, `FinancialTransaction`, `FinancialEntry`, and company-specific `ChartOfAccounts`/`Account`s), the denormalized `companyMembers` map enables secure `list` operations. Users can query for documents where `resource.data.companyMembers[request.auth.uid]` is true. This ensures that list results are intrinsically filtered by security rules, fulfilling the QAP requirement without exposing unauthorized data.\n*   **Standard Chart of Accounts:** `/standard_charts_of_accounts` and its subcollection `/accounts` are globally readable, allowing straightforward listing for all users.\n*   **User-Owned Data:** `users/{userId}/report_configurations/{reportConfigurationId}` enforces path-based ownership (`request.auth.uid == userId`) for personal report configurations, and further checks the denormalized `companyMembers` if the report is company-scoped.\n\n**Structural Segregation:** The `ChartOfAccounts` entity is split into two distinct collections: `/standard_charts_of_accounts` for globally accessible accounts and `/companies/{companyId}/charts_of_accounts` for company-specific, restricted accounts. This separation ensures each collection has a homogeneous security posture, simplifying rule definitions. The same segregation applies to their respective `Account` subcollections.\n\nThis design leverages denormalization extensively, standardizes authorization fields, and structurally segregates data based on access needs, resulting in a Firestore structure that is inherently secure, performant for queries, and easy to manage with concise security rules."
+  }
+}

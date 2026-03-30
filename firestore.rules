@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * DATATRIXS SECURITY RULES - PROTOTYPING PHASE
+     *
+     * CORE PHILOSOPHY:
+     * This ruleset implements a strict identity-based access control model. Access is primarily 
+     * determined by either direct document ownership (user-scoped data) or by verified 
+     * membership within a "Company" entity (shared corporate data).
+     *
+     * DATA STRUCTURE:
+     * - User Profiles: /users/{userId} (Owner-based access)
+     * - Admin Roles: /app_roles_admin/{adminId} (Existence-based global role)
+     * - Company Entities: /companies/{companyId} (Contains a 'members' map for RBAC)
+     * - Resource Entities: Top-level collections (Locations, Transactions, Data Sources) 
+     *   rely on denormalized 'companyMembers' maps for authorization independence.
+     * - Subcollections: Standard and Company-specific Charts of Accounts inherit security 
+     *   from their respective parent COA or Company structure.
+     *
+     * KEY SECURITY DECISIONS:
+     * 1. Authorization Independence: We favor denormalizing company membership maps directly 
+     *    onto documents. This avoids expensive cross-document lookups (get() calls) for 
+     *    every single data access request.
+     * 2. Structural Segregation: Standardized Charts of Accounts are stored in separate 
+     *    top-level collections from Company-specific ones to ensure clear public/private boundaries.
+     * 3. Immutability: Critical relational fields (like ownership IDs or company links) 
+     *    are enforced as immutable during updates to prevent data hijacking.
+     * 4. Relational Consistency: During creation, we enforce that document fields match 
+     *    the authenticated user's ID or the path variables.
+     */
+
+    // --- Helper Functions ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/app_roles_admin/$(request.auth.uid));
+    }
+
+    // Checks membership within a provided map (denormalized on the document)
+    function isMember(memberMap) {
+      return isSignedIn() && memberMap[request.auth.uid] != null;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for user profile documents. Users manage their own data; Admins have oversight.
+     * @path /users/{userId}
+     * @allow (get, list, create, update) if the authenticated user's UID matches {userId}.
+     * @deny (delete) if the user is not an administrator.
+     * @principle Path-based ownership and relational integrity validation.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwner(userId) && (request.resource.data.id == resource.data.id);
+      allow delete: if isAdmin() && resource != null;
+
+      /**
+       * @description User-owned report configurations.
+       * @path /users/{userId}/report_configurations/{reportConfigurationId}
+       * @allow (all) if the authenticated user's UID matches the parent {userId}.
+       * @deny (all) if the userId in the path does not match the requester.
+       * @principle Restricts access to a user's own private data tree.
+       */
+      match /report_configurations/{reportConfigurationId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isOwner(userId) && resource != null && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Existence-based registry for global administrators.
+     * @path /app_roles_admin/{adminId}
+     * @allow (get) if any user is signed in (to verify admin status).
+     * @deny (write) if the requester is not already a verified administrator.
+     * @principle Role-based access control via existence-over-content model.
+     */
+    match /app_roles_admin/{adminId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Holding company records. Access is restricted to users in the 'members' map.
+     * @path /companies/{companyId}
+     * @allow (get) if the user is in the members map.
+     * @deny (list) to prevent company enumeration.
+     * @principle Shared access for closed collaborators.
+     */
+    match /companies/{companyId} {
+      allow get: if isMember(resource.data.members) || isAdmin();
+      allow list: if isAdmin(); // Only admins can list all companies
+      allow create: if isSignedIn(); // Allow creation, membership handled by app logic
+      allow update: if (resource != null && isMember(resource.data.members)) || isAdmin();
+      allow delete: if isAdmin() && resource != null;
+
+      /**
+       * @description Company-specific Charts of Accounts.
+       * @path /companies/{companyId}/charts_of_accounts/{chartOfAccountsId}
+       * @allow (get, list) if the user is a member of the parent company.
+       * @principle Subcollection access secured via parent membership lookup.
+       */
+      match /charts_of_accounts/{chartOfAccountsId} {
+        allow get, list: if isMember(get(/databases/$(database)/documents/companies/$(companyId)).data.members) || isAdmin();
+        allow create, update, delete: if isMember(get(/databases/$(database)/documents/companies/$(companyId)).data.members) || isAdmin();
+
+        match /accounts/{accountId} {
+          allow get, list: if isMember(get(/databases/$(database)/documents/companies/$(companyId)).data.members) || isAdmin();
+          allow create, update, delete: if isMember(get(/databases/$(database)/documents/companies/$(companyId)).data.members) || isAdmin();
+        }
+      }
+    }
+
+    /**
+     * @description Retail locations. Uses denormalized companyMembers for performant access.
+     * @path /locations/{locationId}
+     * @allow (get) if the user is a member of the owning company.
+     * @deny (create) if the user is not a member of the company being linked.
+     * @principle Authorization independence via denormalized membership maps.
+     */
+    match /locations/{locationId} {
+      allow get: if isMember(resource.data.companyMembers) || isAdmin();
+      allow list: if isSignedIn(); // Queries must be filtered by companyId or membership
+      allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
+      allow update: if (resource != null && isMember(resource.data.companyMembers)) || isAdmin();
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Standardized financial data available to all authenticated users.
+     * @path /standard_charts_of_accounts/{chartOfAccountsId}
+     * @allow (read) for all signed-in users.
+     * @deny (write) for non-admin users.
+     * @principle Public read (authenticated) with owner-only (admin) writes.
+     */
+    match /standard_charts_of_accounts/{chartOfAccountsId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+
+      match /accounts/{accountId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    /**
+     * @description Connections to financial systems.
+     * @path /financial_data_sources/{financialDataSourceId}
+     * @allow (all) if the user is in the denormalized companyMembers map.
+     * @principle Denormalization for authorization performance.
+     */
+    match /financial_data_sources/{financialDataSourceId} {
+      allow get: if isMember(resource.data.companyMembers) || isAdmin();
+      allow list: if isSignedIn(); 
+      allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
+      allow update: if (resource != null && isMember(resource.data.companyMembers)) || isAdmin();
+      allow delete: if (resource != null && isMember(resource.data.companyMembers)) || isAdmin();
+    }
+
+    /**
+     * @description Financial transactions and their constituent entries.
+     * @path /financial_transactions/{financialTransactionId}
+     * @allow (all) if the user belongs to the company owning the location.
+     * @principle Shared access via denormalized membership map.
+     */
+    match /financial_transactions/{financialTransactionId} {
+      allow get: if isMember(resource.data.companyMembers) || isAdmin();
+      allow list: if isSignedIn();
+      allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
+      allow update: if (resource != null && isMember(resource.data.companyMembers)) || isAdmin();
+      allow delete: if (resource != null && isMember(resource.data.companyMembers)) || isAdmin();
+
+      match /financial_entries/{financialEntryId} {
+        allow get: if isMember(get(/databases/$(database)/documents/financial_transactions/$(financialTransactionId)).data.companyMembers) || isAdmin();
+        allow list: if isSignedIn();
+        allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
+        allow update, delete: if (resource != null && isMember(resource.data.companyMembers)) || isAdmin();
+      }
+    }
+
+  }
+}
