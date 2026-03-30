@@ -8,7 +8,7 @@ export default function AnalystPage() {
       <div className="flex flex-col space-y-2">
         <div className="flex items-center gap-2">
           <Bot className="size-6 text-accent" />
-          <h2 className="text-3xl font-bold tracking-tight text-white font-headline">AI Financial Analyst</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">AI Financial Analyst</h2>
         </div>
         <p className="text-muted-foreground">Ask questions about your holdings, request reports, or generate spreadsheet data.</p>
       </div>
@@ -18,7 +18,7 @@ export default function AnalystPage() {
           <ChatInterface />
         </div>
         <div className="space-y-6">
-          <Card className="bg-card/30 border-white/5">
+          <Card className="bg-card border-border shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <Info className="size-4 text-primary" />
@@ -36,7 +36,7 @@ export default function AnalystPage() {
               ].map((query, i) => (
                 <button 
                   key={i} 
-                  className="w-full text-left text-xs p-2 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-white transition-colors border border-transparent hover:border-white/10"
+                  className="w-full text-left text-xs p-2 rounded bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border"
                 >
                   "{query}"
                 </button>
@@ -44,7 +44,7 @@ export default function AnalystPage() {
             </div>
           </Card>
           
-          <Card className="bg-primary/10 border-primary/20 p-6">
+          <Card className="bg-primary/5 border-primary/20 p-6">
             <h4 className="text-sm font-bold text-primary mb-2">Expert Tip</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
               You can ask for data in specific formats. For example: "Give me a breakdown of operating expenses for Dallas in a table format."

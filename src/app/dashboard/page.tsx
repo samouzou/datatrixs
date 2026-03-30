@@ -13,7 +13,7 @@ import {
   Area,
   AreaChart
 } from "recharts"
-import { mockFinancialRecords, mockLocations } from "@/lib/mock-data"
+import { mockLocations } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
@@ -37,7 +37,7 @@ export default function DashboardPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-white font-headline">Global Dashboard</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Global Dashboard</h2>
         <div className="flex items-center space-x-2">
           <span className="text-sm text-muted-foreground">Datatrixs Holding Co.</span>
         </div>
@@ -51,7 +51,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 bg-card/50 border-white/5">
+        <Card className="col-span-4 bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle>Performance Trends</CardTitle>
             <CardDescription>Aggregate revenue and profit across all locations</CardDescription>
@@ -74,7 +74,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
                     itemStyle={{ color: 'hsl(var(--foreground))' }}
                   />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card className="col-span-3 bg-card/50 border-white/5">
+        <Card className="col-span-3 bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle>Revenue by Location</CardTitle>
             <CardDescription>Current quarter breakdown</CardDescription>
@@ -98,7 +98,7 @@ export default function DashboardPage() {
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} hide />
                   <Tooltip 
                     cursor={{fill: 'transparent'}}
-                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
                   />
                   <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={40} />
                 </BarChart>
@@ -110,7 +110,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {mockLocations.map((loc) => (
-          <Card key={loc.id} className="bg-card/30 border-white/5 overflow-hidden">
+          <Card key={loc.id} className="bg-card/50 border-border overflow-hidden shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
                 <div>
@@ -119,8 +119,8 @@ export default function DashboardPage() {
                 </div>
                 <div className={cn(
                   "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight",
-                  loc.integrationStatus === 'connected' ? "bg-accent/20 text-accent" :
-                  loc.integrationStatus === 'pending' ? "bg-yellow-500/20 text-yellow-500" :
+                  loc.integrationStatus === 'connected' ? "bg-accent/20 text-accent-foreground" :
+                  loc.integrationStatus === 'pending' ? "bg-yellow-500/20 text-yellow-600" :
                   "bg-destructive/20 text-destructive"
                 )}>
                   {loc.integrationStatus}
@@ -131,7 +131,7 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Source</span>
-                  <span className="font-medium text-white">{loc.integrationType}</span>
+                  <span className="font-medium text-foreground">{loc.integrationType}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Last Sync</span>
