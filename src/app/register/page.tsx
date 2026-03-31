@@ -47,7 +47,7 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-6">
             <Image 
-              src="/dx-logo.png" 
+              src="/dx-logo.svg" 
               alt="Datatrixs Logo" 
               width={180} 
               height={50} 

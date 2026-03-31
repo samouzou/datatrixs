@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Github, Mail, Lock, Loader2 } from "lucide-react"
+import { Mail, Lock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -58,7 +58,7 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-6">
             <Image 
-              src="/dx-logo.png" 
+              src="/dx-logo.svg" 
               alt="Datatrixs Logo" 
               width={180} 
               height={50} 

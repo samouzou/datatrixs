@@ -12,8 +12,7 @@ import {
   Settings, 
   LogOut,
   Building2,
-  Database,
-  User as UserIcon
+  Database
 } from "lucide-react"
 
 import {
@@ -83,11 +82,11 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="h-16 flex items-center px-4 overflow-hidden">
-        <Link href="/dashboard" className="flex items-center">
+        <Link href="/dashboard" className="flex items-center w-full">
           {/* Full logo for expanded state */}
           <div className="group-data-[collapsible=icon]:hidden flex items-center">
             <Image 
-              src="/dx-logo.png" 
+              src="/dx-logo.svg" 
               alt="Datatrixs Logo" 
               width={140} 
               height={40} 
@@ -98,7 +97,7 @@ export function AppSidebar() {
           {/* Icon for collapsed state */}
           <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center w-full">
             <Image 
-              src="/dx-icon.png" 
+              src="/dx-icon.svg" 
               alt="Datatrixs Icon" 
               width={28} 
               height={28} 
@@ -157,7 +156,7 @@ export function AppSidebar() {
               <div className="flex items-center gap-3 px-2 py-3 rounded-lg bg-muted/50 border border-white/5">
                 <div className="size-8 rounded-full overflow-hidden flex items-center justify-center bg-primary/10">
                   <Image 
-                    src="/dx-icon.png" 
+                    src="/dx-icon.svg" 
                     alt="User" 
                     width={24} 
                     height={24}
