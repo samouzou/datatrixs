@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { 
   LayoutDashboard, 
@@ -81,11 +82,31 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center px-4">
-        <div className="flex items-center gap-2 font-bold text-xl text-accent">
-          <div className="size-8 bg-primary rounded flex items-center justify-center text-white text-xs">DX</div>
-          <span className="group-data-[collapsible=icon]:hidden font-headline">Datatrixs</span>
-        </div>
+      <SidebarHeader className="h-16 flex items-center px-4 overflow-hidden">
+        <Link href="/dashboard" className="flex items-center">
+          {/* Full logo for expanded state */}
+          <div className="group-data-[collapsible=icon]:hidden flex items-center">
+            <Image 
+              src="/dx-logo.png" 
+              alt="Datatrixs Logo" 
+              width={140} 
+              height={40} 
+              priority 
+              className="object-contain"
+            />
+          </div>
+          {/* Icon for collapsed state */}
+          <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center w-full">
+            <Image 
+              src="/dx-icon.png" 
+              alt="Datatrixs Icon" 
+              width={28} 
+              height={28} 
+              priority 
+              className="object-contain"
+            />
+          </div>
+        </Link>
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>
@@ -134,8 +155,13 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <div className="p-2 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-3 px-2 py-3 rounded-lg bg-muted/50 border border-white/5">
-                <div className="size-8 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-bold">
-                  {user?.email?.substring(0, 2).toUpperCase() || "U"}
+                <div className="size-8 rounded-full overflow-hidden flex items-center justify-center bg-primary/10">
+                  <Image 
+                    src="/dx-icon.png" 
+                    alt="User" 
+                    width={24} 
+                    height={24}
+                  />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-bold truncate text-foreground">{user?.displayName || user?.email?.split('@')[0]}</span>

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Github, Mail, Lock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -30,8 +31,6 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     initiateEmailSignIn(auth, email, password)
-    // We don't await because of non-blocking pattern; 
-    // the useUser hook will pick up the change and redirect.
   }
 
   const handleGoogleLogin = async () => {
@@ -57,7 +56,16 @@ export default function LoginPage() {
     <div className="flex h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-white/5 bg-card/50 backdrop-blur-sm shadow-2xl">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto size-12 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-xl mb-4">DX</div>
+          <div className="mx-auto mb-6">
+            <Image 
+              src="/dx-logo.png" 
+              alt="Datatrixs Logo" 
+              width={180} 
+              height={50} 
+              priority 
+              className="object-contain mx-auto"
+            />
+          </div>
           <CardTitle className="text-2xl font-bold font-headline">Welcome back</CardTitle>
           <CardDescription>Enter your credentials to access your holdings</CardDescription>
         </CardHeader>
@@ -124,7 +132,7 @@ export default function LoginPage() {
                 fill="#FBBC05"
               />
               <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 fill="#EA4335"
               />
             </svg>

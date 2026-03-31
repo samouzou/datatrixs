@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Mail, Lock, User, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -44,7 +45,16 @@ export default function RegisterPage() {
     <div className="flex h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-white/5 bg-card/50 backdrop-blur-sm shadow-2xl">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto size-12 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-xl mb-4">DX</div>
+          <div className="mx-auto mb-6">
+            <Image 
+              src="/dx-logo.png" 
+              alt="Datatrixs Logo" 
+              width={180} 
+              height={50} 
+              priority 
+              className="object-contain mx-auto"
+            />
+          </div>
           <CardTitle className="text-2xl font-bold font-headline">Create an account</CardTitle>
           <CardDescription>Get started with Datatrixs portfolio management</CardDescription>
         </CardHeader>
