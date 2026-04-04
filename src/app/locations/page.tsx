@@ -228,7 +228,11 @@ export default function LocationsPage() {
         suggestedPeriod = h;
       }
       
-      const match = availableMetrics.find(m => lowerH.includes(m.toLowerCase()));
+      const match = availableMetrics.find(m => {
+        const lowerM = m.toLowerCase();
+        return lowerH.includes(lowerM) || lowerM.includes(lowerH);
+      });
+      
       if (match) {
         initialMapping[h] = match;
       } else {
@@ -564,7 +568,7 @@ export default function LocationsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {headers.filter(h => h !== periodColumn && !["ignore"].includes(mapping[h] || "")).map((h) => (
+                        {headers.filter(h => h !== periodColumn).map((h) => (
                           <TableRow key={h} className="group">
                             <TableCell className="text-xs font-medium py-3">{h}</TableCell>
                             <TableCell className="text-right">
