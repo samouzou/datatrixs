@@ -61,6 +61,7 @@ export default function LocationsPage() {
   const [uploadingLocation, setUploadingLocation] = React.useState<Location | null>(null)
   const [csvContent, setCsvContent] = React.useState("")
   const [isUploading, setIsUploading] = React.useState(false)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
   
   // Custom Metrics State
   const [availableMetrics, setAvailableMetrics] = React.useState<string[]>(INITIAL_FINANCIAL_METRICS)
@@ -154,6 +155,22 @@ export default function LocationsPage() {
     setPeriodColumn("");
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setCsvContent(content);
+      toast({
+        title: "File Loaded",
+        description: `${file.name} has been parsed. Click 'Continue' to map columns.`
+      });
+    };
+    reader.readAsText(file);
+  };
+
   const handleAnalyzeCSV = () => {
     if (!csvContent.trim()) return;
     const lines = csvContent.trim().split('\n');
@@ -212,6 +229,7 @@ export default function LocationsPage() {
       let successCount = 0;
       
       for (const line of dataRows) {
+        if (!line.trim()) continue;
         const values = line.split(',').map(s => s.trim());
         const rowObj: Record<string, string> = {};
         headers.forEach((h, i) => {
@@ -369,7 +387,7 @@ export default function LocationsPage() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Ingest Financial Data: {uploadingLocation?.name}</DialogTitle>
-            <DialogDescription>Map your spreadsheet columns to Datatrixs metrics.</DialogDescription>
+            <DialogDescription>Map your spreadsheet columns to internal financial metrics.</DialogDescription>
           </DialogHeader>
 
           {uploadStep === "input" ? (
@@ -394,11 +412,18 @@ export default function LocationsPage() {
                     onChange={(e) => setCsvContent(e.target.value)}
                   />
                 </TabsContent>
-                <TabsContent value="upload" className="py-12 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground">
+                <TabsContent value="upload" className="py-12 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground relative">
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                  />
                   <Upload className="size-8 mb-4 opacity-20" />
-                  <p className="text-sm">Drag and drop your spreadsheet here</p>
-                  <p className="text-[10px] uppercase mt-2">Supports .CSV, .XLSX</p>
-                  <Button variant="outline" size="sm" className="mt-4">Browse Files</Button>
+                  <p className="text-sm">Click or drag a CSV file here</p>
+                  <p className="text-[10px] uppercase mt-2">Supports .CSV only</p>
+                  <Button variant="outline" size="sm" className="mt-4 pointer-events-none">Browse Files</Button>
                 </TabsContent>
               </Tabs>
               <DialogFooter>
@@ -461,7 +486,13 @@ export default function LocationsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {headers.filter(h => h !== periodColumn).map((h) => (
+                        {headers.filter(h => {
+                          const lowerH = h.toLowerCase();
+                          return h !== periodColumn && 
+                                 !lowerH.includes('ai red flag') && 
+                                 !lowerH.includes('sync status') &&
+                                 !lowerH.includes('data source');
+                        }).map((h) => (
                           <TableRow key={h}>
                             <TableCell className="text-xs font-medium">{h}</TableCell>
                             <TableCell>
@@ -489,7 +520,7 @@ export default function LocationsPage() {
                 <Button variant="outline" onClick={() => setUploadStep("input")}>Back</Button>
                 <Button onClick={handleUploadData} disabled={isUploading || !periodColumn}>
                   {isUploading ? <Loader2 className="size-4 animate-spin mr-2" /> : <Check className="size-4 mr-2" />}
-                  Ingest {csvContent.trim().split('\n').length - 1} Records
+                  Ingest {csvContent.trim().split('\n').filter(l => l.trim()).length - 1} Records
                 </Button>
               </DialogFooter>
             </div>
