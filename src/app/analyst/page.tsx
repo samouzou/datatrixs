@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -20,7 +19,7 @@ export default function AnalystPage() {
           <Bot className="size-6 text-accent" />
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">AI Financial Analyst</h2>
         </div>
-        <p className="text-muted-foreground">Ask questions about your holdings, request reports, or generate spreadsheet data.</p>
+        <p className="text-muted-foreground">Ask questions about your holdings, request reports, or generate spreadsheet data based on your normalized records.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -37,15 +36,16 @@ export default function AnalystPage() {
                 <Info className="size-4 text-primary" />
                 <CardTitle className="text-sm">Sample Queries</CardTitle>
               </div>
-              <CardDescription className="text-xs">Try asking these to get started:</CardDescription>
+              <CardDescription className="text-xs">Try asking these to explore your data:</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6 space-y-2">
               {[
-                "Which location had the highest margin in Q4?",
-                "Compare Houston and Dallas revenue trends",
-                "Export a monthly performance table for all stores",
-                "What is our total portfolio profit year-to-date?",
-                "Identify stores with declining revenue"
+                "Which location had the highest margin last period?",
+                "Compare revenue trends across my locations",
+                "Export a performance table for all active stores",
+                "What is the total portfolio profit for the current year?",
+                "Identify any locations with declining revenue",
+                "Breakdown operating expenses by location"
               ].map((query, i) => (
                 <button 
                   key={i} 
@@ -61,7 +61,7 @@ export default function AnalystPage() {
           <Card className="bg-primary/5 border-primary/20 p-6">
             <h4 className="text-sm font-bold text-primary mb-2">Expert Tip</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              You can ask for data in specific formats. For example: "Give me a breakdown of operating expenses for Dallas in a table format."
+              You can ask for data in specific formats. For example: "Give me a breakdown of COGS for my top 3 locations in a table format."
             </p>
           </Card>
         </div>
