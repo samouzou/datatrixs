@@ -13,7 +13,8 @@ import {
   Settings, 
   LogOut,
   Building2,
-  Database
+  Database,
+  Library
 } from "lucide-react"
 
 import {
@@ -48,6 +49,11 @@ const mainNavItems = [
     title: "AI Financial Analyst",
     href: "/analyst",
     icon: MessageSquare,
+  },
+  {
+    title: "Saved Library",
+    href: "/library",
+    icon: Library,
   },
 ]
 
@@ -84,7 +90,6 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="h-16 flex items-center justify-center overflow-hidden bg-sidebar">
         <Link href="/dashboard" className="flex items-center justify-center w-full px-2">
-          {/* Full logo for expanded state - slightly smaller scale for professionalism */}
           <div className="group-data-[collapsible=icon]:hidden flex items-center justify-center w-full">
             <Image 
               src="/dx-logo.svg" 
@@ -95,7 +100,6 @@ export function AppSidebar() {
               className="object-contain"
             />
           </div>
-          {/* Icon for collapsed state - larger for better visibility */}
           <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center">
             <Image 
               src="/dx-icon.svg" 

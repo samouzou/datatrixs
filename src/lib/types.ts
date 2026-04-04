@@ -18,8 +18,8 @@ export type Company = {
   id: string;
   name: string;
   description?: string;
-  members: Record<string, CompanyRole>; // Denormalized for rules: { [uid: string]: 'admin' | 'member' }
-  customMetrics?: string[]; // Shared metrics across the holding
+  members: Record<string, CompanyRole>; 
+  customMetrics?: string[]; 
   createdAt: string;
   updatedAt: string;
 };
@@ -45,7 +45,7 @@ export type Location = {
   state: string;
   zipCode: string;
   phoneNumber: string;
-  companyMembers: Record<string, CompanyRole>; // Denormalized from Company for rules
+  companyMembers: Record<string, CompanyRole>; 
   integrationStatus: 'connected' | 'pending' | 'disconnected';
   integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
   lastSync?: string;
@@ -58,24 +58,40 @@ export type SavedReport = {
   id: string;
   userId: string;
   title: string;
-  type: 'Financial Report' | 'Data Export' | 'Analysis';
+  type: 'Financial Report' | 'Data Export';
   summary: string;
-  content: string; // Markdown or JSON representation
-  companyMembers: Record<string, CompanyRole>; // For secure cross-team visibility
+  content: string; 
+  companyMembers: Record<string, CompanyRole>; 
   metadata?: any;
   createdAt: string;
 };
 
-// Metric is now a flexible string to allow for custom business definitions
+export type SavedAnalysis = {
+  id: string;
+  userId: string;
+  title: string;
+  summary: string;
+  content: string;
+  results?: any[];
+  suggestedChart?: {
+    type: 'bar' | 'line' | 'pie' | 'table';
+    title: string;
+    xAxisLabel?: string;
+    yAxisLabel?: string;
+  };
+  companyMembers: Record<string, CompanyRole>;
+  createdAt: string;
+};
+
 export type FinancialMetric = string;
 
 export type FinancialRecord = {
   id: string;
   locationId: string;
   locationName: string;
-  period: string; // Normalized e.g., "2024-Q1"
+  period: string; 
   metric: FinancialMetric;
   value: number;
-  companyMembers: Record<string, CompanyRole>; // Denormalized for secure cross-collection visibility
+  companyMembers: Record<string, CompanyRole>; 
   createdAt: string;
 };

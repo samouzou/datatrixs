@@ -222,12 +222,12 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "SavedReport",
       "type": "object",
-      "description": "Persistent analysis results or reports saved by users.",
+      "description": "Formal financial reports or data exports saved from the Reports page.",
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
         "title": { "type": "string" },
-        "type": { "type": "string", "enum": ["Financial Report", "Data Export", "Analysis"] },
+        "type": { "type": "string", "enum": ["Financial Report", "Data Export"] },
         "summary": { "type": "string" },
         "content": { "type": "string" },
         "companyMembers": { "type": "object" },
@@ -235,6 +235,24 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "title", "type", "companyMembers", "createdAt"]
+    },
+    "SavedAnalysis": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SavedAnalysis",
+      "type": "object",
+      "description": "Ad-hoc financial analysis and insights saved from the AI Analyst chat.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": { "type": "string", "description": "Markdown text or formatted answer." },
+        "results": { "type": "array", "description": "Structured data points for charts." },
+        "suggestedChart": { "type": "object" },
+        "companyMembers": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "companyMembers", "createdAt"]
     },
     "FinancialRecord": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -309,7 +327,17 @@
           "schema": {
             "$ref": "#/backend/entities/SavedReport"
           },
-          "description": "Stores saved analyst insights and reports."
+          "description": "Stores formal saved financial reports."
+        }
+      },
+      {
+        "path": "/saved_analysis/{analysisId}",
+        "definition": {
+          "entityName": "SavedAnalysis",
+          "schema": {
+            "$ref": "#/backend/entities/SavedAnalysis"
+          },
+          "description": "Stores ad-hoc AI insights and chat analysis."
         }
       },
       {
@@ -319,7 +347,7 @@
           "schema": {
             "$ref": "#/backend/entities/FinancialRecord"
           },
-          "description": "Top-level collection for all financial records, secured by denormalized membership maps."
+          "description": "Top-level collection for all financial records."
         }
       }
     ]

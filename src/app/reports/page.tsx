@@ -10,10 +10,7 @@ import {
   Table as TableIcon, 
   Sparkles,
   Loader2,
-  ArrowRight,
-  Trash2,
-  Save,
-  Check
+  Save
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,11 +28,10 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
-import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { query, collection, where, orderBy, doc } from "firebase/firestore"
-import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase"
+import { query, collection, where, doc } from "firebase/firestore"
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { SavedReport, FinancialRecord, Company } from "@/lib/types"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 
 function MarkdownTable({ content }: { content: string }) {
@@ -76,7 +72,6 @@ export default function ReportsPage() {
   const firestore = useFirestore()
   const { toast } = useToast()
   
-  const [activeTab, setActiveTab] = React.useState("reports")
   const [reportQuery, setReportQuery] = React.useState("")
   const [exportQuery, setExportQuery] = React.useState("")
   const [reportResult, setReportResult] = React.useState<AiAssistedReportGenerationOutput | null>(null)
@@ -112,18 +107,6 @@ export default function ReportsPage() {
       value: r.value
     })));
   }, [records]);
-
-  // DEFERRED QUERY: Only run when history tab is clicked to avoid initial permission noise
-  const savedReportsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || activeTab !== "history") return null;
-    return query(
-      collection(firestore, "saved_reports"),
-      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
-      orderBy("createdAt", "desc")
-    );
-  }, [firestore, user, activeTab]);
-
-  const { data: savedReports, isLoading: isLoadingHistory } = useCollection<SavedReport>(savedReportsQuery);
 
   const handleGenerateReport = async () => {
     if (!reportQuery.trim() || loadingReport || isRecordsLoading) return
@@ -210,14 +193,9 @@ export default function ReportsPage() {
       setIsSaving(null);
       toast({
         title: "Saved to Library",
-        description: `"${savedData.title}" is now shared with your holding.`
+        description: `"${savedData.title}" is now available in your Saved Library.`
       });
     }, 500);
-  }
-
-  const handleDeleteSaved = (id: string) => {
-    if (!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, "saved_reports", id));
   }
 
   return (
@@ -232,11 +210,10 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs defaultValue="reports" className="space-y-6">
         <TabsList className="bg-card/50 border border-border p-1 h-12">
           <TabsTrigger value="reports" className="px-6 data-[state=active]:bg-primary h-10">AI Report Builder</TabsTrigger>
           <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Explorer</TabsTrigger>
-          <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary h-10">Saved Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reports" className="space-y-6 animate-in fade-in duration-300">
@@ -244,16 +221,16 @@ export default function ReportsPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-foreground">
                 <Sparkles className="size-5 text-accent" />
-                Intelligent Report Generation
+                Intelligent Report Builder
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Enter a natural language request like "Summarize Austin's P&L for last quarter" to build a formatted report.
+                Describe the report you need, and our AI will build a professional P&L or executive summary.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={(e) => { e.preventDefault(); handleGenerateReport(); }} className="flex gap-3">
                 <Input 
-                  placeholder={isRecordsLoading ? "Loading financial records..." : "Describe the report you need..."} 
+                  placeholder={isRecordsLoading ? "Grounded data loading..." : "e.g., 'Consolidated P&L for all locations in Q4'"} 
                   className="bg-muted/50 border-border focus-visible:ring-primary h-12"
                   value={reportQuery}
                   onChange={(e) => setReportQuery(e.target.value)}
@@ -307,16 +284,16 @@ export default function ReportsPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-foreground">
                 <TableIcon className="size-5 text-primary" />
-                Raw Data Explorer
+                Custom Data Explorer
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Compile and view raw datasets directly in the browser, such as "All revenue transactions for Dallas in Q4".
+                Compile multi-location datasets into a high-fidelity spreadsheet for external analysis.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={(e) => { e.preventDefault(); handleGenerateExport(); }} className="flex gap-3">
                 <Input 
-                  placeholder={isRecordsLoading ? "Loading financial records..." : "e.g., 'Monthly sales data for all locations in 2023'..."} 
+                  placeholder={isRecordsLoading ? "Grounded data loading..." : "e.g., 'Export revenue and inventory values for all Texas stores'"} 
                   className="bg-muted/50 border-border focus-visible:ring-primary h-12"
                   value={exportQuery}
                   onChange={(e) => setExportQuery(e.target.value)}
@@ -324,7 +301,7 @@ export default function ReportsPage() {
                 />
                 <Button size="lg" onClick={handleGenerateExport} disabled={loadingExport || isRecordsLoading || !exportQuery.trim()} className="bg-primary hover:bg-primary/90 h-12 px-8">
                   {loadingExport ? <Loader2 className="size-4 animate-spin mr-2" /> : <FileText className="size-4 mr-2" />}
-                  Build Spreadsheet
+                  Build Dataset
                 </Button>
               </form>
             </CardContent>
@@ -343,101 +320,6 @@ export default function ReportsPage() {
                 headers={exportResult.header}
                 data={exportResult.data}
               />
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="history" className="animate-in fade-in duration-300">
-          {isLoadingHistory ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="size-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {savedReports?.map((item) => (
-                <Card key={item.id} className="bg-card/20 border-border hover:border-primary/50 hover:bg-card/40 transition-all cursor-pointer group flex flex-col h-full">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <Badge variant="secondary" className="text-[10px] uppercase tracking-tight bg-secondary/30 text-secondary-foreground border-none">
-                        {item.type}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(item.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <CardTitle className="text-sm mt-3 text-foreground font-medium leading-tight group-hover:text-primary transition-colors">
-                      {item.title}
-                    </CardTitle>
-                    <CardDescription className="text-xs pt-1 line-clamp-2">{item.summary}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="mt-auto pt-0 flex justify-between items-center">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="link" size="sm" className="p-0 h-auto text-xs text-primary/80 hover:text-primary">
-                          View Details <ArrowRight className="ml-1 size-3" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-5xl max-h-[90vh] overflow-auto">
-                        <DialogHeader>
-                          <DialogTitle>{item.title}</DialogTitle>
-                          <DialogDescription>
-                            Saved Analysis from {new Date(item.createdAt).toLocaleString()}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-6 py-4">
-                          <div className="p-4 rounded-lg bg-muted/50 border border-border italic text-sm text-muted-foreground">
-                            {item.summary}
-                          </div>
-
-                          {item.type === 'Financial Report' ? (
-                            <div className="space-y-4">
-                              <MarkdownTable content={item.content} />
-                            </div>
-                          ) : (
-                            <div className="rounded-xl border border-border overflow-hidden">
-                              {(() => {
-                                const lines = item.content.split('\n');
-                                if (lines.length === 0) return null;
-                                const headers = lines[0].split(',');
-                                const data = lines.slice(1).map(l => l.split(','));
-                                return (
-                                  <SpreadsheetView 
-                                    title="Saved Dataset"
-                                    headers={headers}
-                                    data={data}
-                                    className="border-none rounded-none shadow-none"
-                                  />
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="size-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSaved(item.id);
-                        }}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                      <Download className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {!savedReports?.length && (
-                <div className="col-span-full text-center py-20 border-2 border-dashed border-border rounded-xl">
-                  <FileText className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-                  <p className="text-muted-foreground italic">No saved reports in your library yet.</p>
-                </div>
-              )}
             </div>
           )}
         </TabsContent>

@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { FinancialRecord, Company, SavedReport } from "@/lib/types"
+import { FinancialRecord, Company, SavedAnalysis } from "@/lib/types"
 
 type Message = {
   id: string
@@ -54,7 +54,6 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   const firestore = useFirestore()
   const { toast } = useToast()
   
-  // Fetch real financial records for the AI context
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -64,7 +63,6 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   }, [firestore, user]);
   const { data: records, isLoading: isRecordsLoading } = useCollection<FinancialRecord>(recordsQuery);
 
-  // Fetch Companies to get a membership map for saving
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -129,7 +127,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       const result = await aiFinancialQueryAnalysis({
         query: input,
         financialData: JSON.stringify(aiData),
-        context: `Current date is ${new Date().toLocaleDateString()}. Data is real-time from your portfolio. Authorized entities: Datatrixs Holding Co. Role: Admin.`
+        context: `Current date is ${new Date().toLocaleDateString()}. Data is real-time from your portfolio.`
       })
 
       const assistantMessage: Message = {
@@ -144,7 +142,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm sorry, I encountered an error while analyzing your live data. Please ensure you have uploaded normalized financials for your locations."
+        content: "I'm sorry, I encountered an error while analyzing your live data. Please ensure you have uploaded normalized financials."
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
@@ -155,41 +153,35 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   const handleSaveResult = (message: Message) => {
     if (!user || !firestore || !message.data || !companies?.length) {
       if (!companies?.length) {
-        toast({ variant: "destructive", title: "Cannot Save", description: "You must be a member of a holding company to save reports." });
+        toast({ variant: "destructive", title: "Cannot Save", description: "You must be a member of a holding company to save insights." });
       }
       return;
     }
 
-    const reportId = doc(collection(firestore, "saved_reports")).id;
-    const reportRef = doc(firestore, "saved_reports", reportId);
+    const analysisId = doc(collection(firestore, "saved_analysis")).id;
+    const analysisRef = doc(firestore, "saved_analysis", analysisId);
     
-    const title = message.data.suggestedChart?.title || `Analysis: ${message.content.substring(0, 30)}...`;
-    const type = message.data.analysisType === 'data_extraction' ? 'Data Export' : 
-                 message.data.analysisType === 'report' ? 'Financial Report' : 'Analysis';
+    const title = message.data.suggestedChart?.title || `Insight: ${message.content.substring(0, 30)}...`;
 
-    const reportData: SavedReport = {
-      id: reportId,
+    const analysisData: SavedAnalysis = {
+      id: analysisId,
       userId: user.uid,
       title,
-      type: type as any,
       summary: message.content,
-      content: message.data.rawSpreadsheetData || "",
-      companyMembers: companies[0].members, // Attach membership map for cross-team sharing
-      metadata: {
-        results: message.data.results || null,
-        chart: message.data.suggestedChart || null,
-        analysisType: message.data.analysisType
-      },
+      content: message.data.answer,
+      results: message.data.results || [],
+      suggestedChart: message.data.suggestedChart,
+      companyMembers: companies[0].members,
       createdAt: new Date().toISOString()
     };
 
-    setDocumentNonBlocking(reportRef, reportData, { merge: true });
+    setDocumentNonBlocking(analysisRef, analysisData, { merge: true });
     
     setMessages(prev => prev.map(m => m.id === message.id ? { ...m, saved: true } : m));
     
     toast({
       title: "Saved to Library",
-      description: `"${title}" has been shared with your holding.`
+      description: `"${title}" has been moved to your Analyst Library.`
     });
   }
 
@@ -285,9 +277,6 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                         <DialogContent className="max-w-6xl max-h-[90vh] bg-background border-border p-0 overflow-hidden">
                           <DialogHeader className="sr-only">
                             <DialogTitle>Data Analysis Result</DialogTitle>
-                            <DialogDescription>
-                              Interactive spreadsheet view of the compiled financial data.
-                            </DialogDescription>
                           </DialogHeader>
                           <div className="p-1">
                             {(() => {
@@ -327,7 +316,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input 
             ref={inputRef}
-            placeholder={isRecordsLoading ? "Loading financial data..." : "e.g., 'Compare revenue for Houston and Dallas across all quarters in a table'"} 
+            placeholder={isRecordsLoading ? "Loading financial data..." : "Ask the analyst a question..."} 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading || isRecordsLoading}

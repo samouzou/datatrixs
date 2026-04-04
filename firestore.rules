@@ -84,10 +84,7 @@ service cloud.firestore {
     }
 
     match /financial_records/{recordId} {
-      // Split list rule to avoid get() call limit during per-document checks
-      allow list: if isSignedIn() && isAppAdmin();
-      allow list: if isSignedIn() && isCompanyMember(resource.data.companyMembers);
-      
+      allow list: if isSignedIn() && (isAppAdmin() || isCompanyMember(resource.data.companyMembers));
       allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow create: if isSignedIn() && (isCompanyMember(request.resource.data.companyMembers) || isAppAdmin());
       allow update: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
@@ -95,10 +92,15 @@ service cloud.firestore {
     }
 
     match /saved_reports/{reportId} {
-      // Split list rule to avoid get() call limit during per-document checks
-      allow list: if isSignedIn() && isAppAdmin();
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers));
+      allow list: if isSignedIn() && (isAppAdmin() || resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers));
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) || isAppAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAppAdmin();
+    }
 
+    match /saved_analysis/{analysisId} {
+      allow list: if isSignedIn() && (isAppAdmin() || resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers));
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
