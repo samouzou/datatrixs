@@ -76,6 +76,7 @@ export default function ReportsPage() {
   const firestore = useFirestore()
   const { toast } = useToast()
   
+  const [activeTab, setActiveTab] = React.useState("reports")
   const [reportQuery, setReportQuery] = React.useState("")
   const [exportQuery, setExportQuery] = React.useState("")
   const [reportResult, setReportResult] = React.useState<AiAssistedReportGenerationOutput | null>(null)
@@ -112,15 +113,15 @@ export default function ReportsPage() {
     })));
   }, [records]);
 
+  // DEFERRED QUERY: Only run when history tab is clicked to avoid initial permission noise
   const savedReportsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    // Query must use the companyMembers map to satisfy the split security rules
+    if (!firestore || !user || activeTab !== "history") return null;
     return query(
       collection(firestore, "saved_reports"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user]);
+  }, [firestore, user, activeTab]);
 
   const { data: savedReports, isLoading: isLoadingHistory } = useCollection<SavedReport>(savedReportsQuery);
 
@@ -231,7 +232,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="reports" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-card/50 border border-border p-1 h-12">
           <TabsTrigger value="reports" className="px-6 data-[state=active]:bg-primary h-10">AI Report Builder</TabsTrigger>
           <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Explorer</TabsTrigger>
