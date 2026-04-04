@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc, setDoc, deleteDoc, updateDoc, getDocs } from "firebase/firestore"
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp } from "firebase/firestore"
 import { 
   Dialog, 
   DialogContent, 
@@ -22,6 +22,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Company, CompanyInvitation, CompanyRole } from "@/lib/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 
 export default function HoldingStructurePage() {
   const { user } = useUser()
@@ -53,7 +56,7 @@ export default function HoldingStructurePage() {
 
   const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
 
-  // Query for pending invitations for current user. Email matching is case-insensitive for safety.
+  // Query for pending invitations for current user. 
   const invitationsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.email) return null;
     return query(
@@ -69,7 +72,7 @@ export default function HoldingStructurePage() {
     if (!firestore || !user || !newCompanyName.trim()) return;
 
     const companyRef = doc(collection(firestore, "companies"));
-    const companyData: Company = {
+    const companyData = {
       id: companyRef.id,
       name: newCompanyName,
       description: newCompanyDesc,
@@ -78,7 +81,7 @@ export default function HoldingStructurePage() {
       updatedAt: new Date().toISOString()
     };
 
-    setDoc(companyRef, companyData);
+    setDocumentNonBlocking(companyRef, companyData, { merge: true });
     
     setIsCreateOpen(false);
     setNewCompanyName("");
@@ -89,7 +92,7 @@ export default function HoldingStructurePage() {
     if (!firestore || !editingCompany) return;
 
     const companyRef = doc(firestore, "companies", editingCompany.id);
-    updateDoc(companyRef, {
+    updateDocumentNonBlocking(companyRef, {
       name: editName,
       description: editDesc,
       updatedAt: new Date().toISOString()
@@ -100,7 +103,7 @@ export default function HoldingStructurePage() {
 
   const handleDeleteCompany = (id: string) => {
     if (!firestore) return;
-    deleteDoc(doc(firestore, "companies", id));
+    deleteDocumentNonBlocking(doc(firestore, "companies", id));
   };
 
   const handleSendInvite = () => {
@@ -118,7 +121,7 @@ export default function HoldingStructurePage() {
       createdAt: new Date().toISOString()
     };
 
-    setDoc(inviteRef, inviteData);
+    setDocumentNonBlocking(inviteRef, inviteData, { merge: true });
     setInviteEmail("");
     setInviteRole("member");
   };
@@ -128,39 +131,49 @@ export default function HoldingStructurePage() {
     setIsProcessingInvite(invite.id);
 
     try {
-      // 1. Update the Company members list
+      // 1. Prepare Batch for synchronization
+      const batch = writeBatch(firestore);
+      const now = new Date().toISOString();
+
+      // 2. Add user to Company members list
       const companyRef = doc(firestore, "companies", invite.companyId);
-      await updateDoc(companyRef, {
+      batch.update(companyRef, {
         [`members.${user.uid}`]: invite.role,
-        updatedAt: new Date().toISOString()
+        updatedAt: now
       });
 
-      // 2. Synchronize Membership to all Locations (Denormalization)
-      // This ensures the user can query locations and passes security rules for them.
+      // 3. Mark the invitation as accepted
+      const inviteRef = doc(firestore, "company_invitations", invite.id);
+      batch.update(inviteRef, { 
+        status: 'accepted',
+        updatedAt: now
+      });
+
+      // 4. Synchronize Membership to all existing Locations (Denormalization)
+      // Since rules allow listing locations if user is a member of parent company,
+      // we query here.
       const locationsQuery = query(
         collection(firestore, "locations"), 
         where("companyId", "==", invite.companyId)
       );
-      const locationsSnap = await getDocs(locationsQuery);
       
-      const syncPromises = locationsSnap.docs.map(locDoc => {
-        return updateDoc(locDoc.ref, {
+      const locationsSnap = await getDocs(locationsQuery);
+      locationsSnap.docs.forEach(locDoc => {
+        batch.update(locDoc.ref, {
           [`companyMembers.${user.uid}`]: invite.role,
-          updatedAt: new Date().toISOString()
+          updatedAt: now
         });
       });
-      
-      await Promise.all(syncPromises);
 
-      // 3. Mark the invitation as accepted
-      const inviteRef = doc(firestore, "company_invitations", invite.id);
-      await updateDoc(inviteRef, { 
-        status: 'accepted',
-        updatedAt: new Date().toISOString()
-      });
+      // 5. Commit all updates as a single job
+      await batch.commit();
 
-    } catch (error) {
-      console.error("Failed to accept invitation:", error);
+    } catch (e: any) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: `companies/${invite.companyId}`,
+        operation: 'update',
+        requestResourceData: { [`members.${user.uid}`]: invite.role }
+      }));
     } finally {
       setIsProcessingInvite(null);
     }
