@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, doc, getDocs, writeBatch } from "firebase/firestore"
 import { 
   Dialog, 
   DialogContent, 
@@ -131,27 +131,24 @@ export default function HoldingStructurePage() {
     setIsProcessingInvite(invite.id);
 
     try {
-      // 1. Prepare Batch for synchronization
       const batch = writeBatch(firestore);
       const now = new Date().toISOString();
 
-      // 2. Add user to Company members list
+      // 1. Add user to Company members list
       const companyRef = doc(firestore, "companies", invite.companyId);
       batch.update(companyRef, {
         [`members.${user.uid}`]: invite.role,
         updatedAt: now
       });
 
-      // 3. Mark the invitation as accepted
+      // 2. Mark the invitation as accepted
       const inviteRef = doc(firestore, "company_invitations", invite.id);
       batch.update(inviteRef, { 
         status: 'accepted',
         updatedAt: now
       });
 
-      // 4. Synchronize Membership to all existing Locations (Denormalization)
-      // Since rules allow listing locations if user is a member of parent company,
-      // we query here.
+      // 3. Synchronize Membership to all existing Locations (Denormalization)
       const locationsQuery = query(
         collection(firestore, "locations"), 
         where("companyId", "==", invite.companyId)
@@ -165,15 +162,17 @@ export default function HoldingStructurePage() {
         });
       });
 
-      // 5. Commit all updates as a single job
+      // 4. Commit all updates as a single job
       await batch.commit();
 
     } catch (e: any) {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
+      // Re-emit specialized permission error if the batch fails due to rules
+      const permissionError = new FirestorePermissionError({
         path: `companies/${invite.companyId}`,
         operation: 'update',
         requestResourceData: { [`members.${user.uid}`]: invite.role }
-      }));
+      });
+      errorEmitter.emit('permission-error', permissionError);
     } finally {
       setIsProcessingInvite(null);
     }
