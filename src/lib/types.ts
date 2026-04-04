@@ -63,7 +63,8 @@ export type SavedReport = {
   createdAt: string;
 };
 
-export type FinancialMetric = 'Revenue' | 'Net Profit' | 'COGS' | 'Operating Expenses' | 'Inventory Value';
+// Metric is now a flexible string to allow for custom business definitions
+export type FinancialMetric = string;
 
 export type FinancialRecord = {
   locationId: string;
@@ -71,4 +72,5 @@ export type FinancialRecord = {
   period: string; // e.g., "Q1 2023", "Oct 2023"
   metric: FinancialMetric;
   value: number;
+  createdAt: string;
 };

@@ -4,7 +4,22 @@
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, MoreVertical, RefreshCw, Upload, FileText, Loader2, Trash2, MapPin, Check, AlertCircle, ClipboardList, Database } from "lucide-react"
+import { 
+  Plus, 
+  MoreVertical, 
+  RefreshCw, 
+  Upload, 
+  FileText, 
+  Loader2, 
+  Trash2, 
+  MapPin, 
+  Check, 
+  AlertCircle, 
+  ClipboardList, 
+  Database,
+  ArrowRight,
+  Settings2
+} from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
 import { cn } from "@/lib/utils"
@@ -33,7 +48,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 
-const FINANCIAL_METRICS: FinancialMetric[] = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
+const INITIAL_FINANCIAL_METRICS = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
 
 export default function LocationsPage() {
   const { user } = useUser()
@@ -47,9 +62,14 @@ export default function LocationsPage() {
   const [csvContent, setCsvContent] = React.useState("")
   const [isUploading, setIsUploading] = React.useState(false)
   
+  // Custom Metrics State
+  const [availableMetrics, setAvailableMetrics] = React.useState<string[]>(INITIAL_FINANCIAL_METRICS)
+  const [isAddingMetric, setIsAddingMetric] = React.useState(false)
+  const [newMetricName, setNewMetricName] = React.useState("")
+
   // Mapping State
   const [headers, setHeaders] = React.useState<string[]>([])
-  const [mapping, setMapping] = React.useState<Record<string, FinancialMetric | "ignore">>({})
+  const [mapping, setMapping] = React.useState<Record<string, string | "ignore">>({})
   const [periodColumn, setPeriodColumn] = React.useState<string>("")
 
   // Create Location Form State
@@ -146,7 +166,7 @@ export default function LocationsPage() {
     setHeaders(firstLine);
     
     // Auto-suggest mappings
-    const initialMapping: Record<string, FinancialMetric | "ignore"> = {};
+    const initialMapping: Record<string, string | "ignore"> = {};
     let suggestedPeriod = "";
     
     firstLine.forEach(h => {
@@ -155,7 +175,7 @@ export default function LocationsPage() {
         suggestedPeriod = h;
       }
       
-      const match = FINANCIAL_METRICS.find(m => lowerH.includes(m.toLowerCase()));
+      const match = availableMetrics.find(m => lowerH.includes(m.toLowerCase()));
       if (match) {
         initialMapping[h] = match;
       } else {
@@ -166,6 +186,17 @@ export default function LocationsPage() {
     setMapping(initialMapping);
     setPeriodColumn(suggestedPeriod);
     setUploadStep("mapping");
+  };
+
+  const handleAddCustomMetric = () => {
+    if (!newMetricName.trim()) return;
+    if (availableMetrics.includes(newMetricName.trim())) {
+      toast({ title: "Metric exists", description: "This metric is already in your list." });
+      return;
+    }
+    setAvailableMetrics(prev => [...prev, newMetricName.trim()]);
+    setNewMetricName("");
+    setIsAddingMetric(false);
   };
 
   const handleUploadData = async () => {
@@ -229,7 +260,7 @@ export default function LocationsPage() {
       }
     } catch (error: any) {
       console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to process data. Check console for details." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to process data." });
     } finally {
       setIsUploading(false);
     }
@@ -392,7 +423,35 @@ export default function LocationsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-tight block">2. Map Financial Metrics</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold uppercase tracking-tight block">2. Map Financial Metrics</Label>
+                    <Dialog open={isAddingMetric} onOpenChange={setIsAddingMetric}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-primary">
+                          <Plus className="size-3 mr-1" /> Add Custom Metric
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Custom Financial Metric</DialogTitle>
+                          <DialogDescription>Define a new metric type for your holding's analysis.</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Label htmlFor="custom-metric">Metric Name</Label>
+                          <Input 
+                            id="custom-metric" 
+                            placeholder="e.g., Marketing ROI, EBITDA, etc." 
+                            value={newMetricName}
+                            onChange={(e) => setNewMetricName(e.target.value)}
+                          />
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsAddingMetric(false)}>Cancel</Button>
+                          <Button onClick={handleAddCustomMetric} disabled={!newMetricName.trim()}>Add Metric</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <div className="rounded-md border border-border overflow-hidden bg-card">
                     <Table>
                       <TableHeader className="bg-muted/50">
@@ -408,14 +467,14 @@ export default function LocationsPage() {
                             <TableCell>
                               <Select 
                                 value={mapping[h] || "ignore"} 
-                                onValueChange={(val) => setMapping(prev => ({ ...prev, [h]: val as FinancialMetric | "ignore" }))}
+                                onValueChange={(val) => setMapping(prev => ({ ...prev, [h]: val }))}
                               >
                                 <SelectTrigger className="h-8 text-xs bg-background">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="ignore" className="text-muted-foreground italic">-- Ignore Column --</SelectItem>
-                                  {FINANCIAL_METRICS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                  {availableMetrics.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                                 </SelectContent>
                               </Select>
                             </TableCell>
@@ -438,11 +497,5 @@ export default function LocationsPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-function ArrowRight(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
   )
 }
