@@ -9,9 +9,10 @@ interface KpiCardProps {
   trend: 'up' | 'down' | 'neutral';
   prefix?: string;
   suffix?: string;
+  secondaryLabel?: string;
 }
 
-export function KpiCard({ label, value, change, trend, prefix = "", suffix = "" }: KpiCardProps) {
+export function KpiCard({ label, value, change, trend, prefix = "", suffix = "", secondaryLabel }: KpiCardProps) {
   const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
   const trendColor = trend === 'up' ? "text-accent" : trend === 'down' ? "text-destructive" : "text-muted-foreground";
 
@@ -29,9 +30,14 @@ export function KpiCard({ label, value, change, trend, prefix = "", suffix = "" 
         <div className="text-2xl font-bold tracking-tight">
           {prefix}{value}{suffix}
         </div>
-        <p className={cn("text-xs mt-1 font-semibold", trendColor)}>
+        {secondaryLabel && (
+          <div className="text-[10px] text-muted-foreground mt-0.5 font-medium uppercase tracking-wider">
+            {secondaryLabel}
+          </div>
+        )}
+        <p className={cn("text-xs mt-2 font-semibold", trendColor)}>
           {trend === 'up' ? "+" : ""}{change}% 
-          <span className="text-muted-foreground font-normal ml-1">from last period</span>
+          <span className="text-muted-foreground font-normal ml-1">vs prev. period</span>
         </p>
       </CardContent>
     </Card>
