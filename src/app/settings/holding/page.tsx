@@ -130,10 +130,10 @@ export default function HoldingStructurePage() {
     if (!firestore || !user) return;
     setIsProcessingInvite(invite.id);
 
-    try {
-      const batch = writeBatch(firestore);
-      const now = new Date().toISOString();
+    const now = new Date().toISOString();
+    const batch = writeBatch(firestore);
 
+    try {
       // 1. Add user to Company members list
       const companyRef = doc(firestore, "companies", invite.companyId);
       batch.update(companyRef, {
@@ -148,7 +148,7 @@ export default function HoldingStructurePage() {
         updatedAt: now
       });
 
-      // 3. Synchronize Membership to all existing Locations (Denormalization)
+      // 3. Synchronize Membership to all existing Locations
       const locationsQuery = query(
         collection(firestore, "locations"), 
         where("companyId", "==", invite.companyId)
@@ -162,15 +162,19 @@ export default function HoldingStructurePage() {
         });
       });
 
-      // 4. Commit all updates as a single job
+      // 4. Commit all updates as a single atomic job
       await batch.commit();
 
     } catch (e: any) {
       // Re-emit specialized permission error if the batch fails due to rules
+      // We focus the error path on the company update as it's the primary join point
       const permissionError = new FirestorePermissionError({
         path: `companies/${invite.companyId}`,
         operation: 'update',
-        requestResourceData: { [`members.${user.uid}`]: invite.role }
+        requestResourceData: { 
+          [`members.${user.uid}`]: invite.role,
+          updatedAt: now
+        }
       });
       errorEmitter.emit('permission-error', permissionError);
     } finally {

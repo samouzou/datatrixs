@@ -29,62 +29,56 @@ service cloud.firestore {
       );
     }
     
-    // Fallback check: pull parent company data to bridge denormalization lag
-    function isMemberOfParentCompany(companyId) {
-       let company = get(/databases/$(database)/documents/companies/$(companyId));
-       return company != null && isCompanyMember(company.data.members);
+    // Check if the current user is an application-level Admin
+    function isAppAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
 
-    function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/app_roles_admin/$(request.auth.uid));
+    // Helper to check if a user is joining by only adding themselves to a membership map
+    function isJoining(oldData, newData, mapField) {
+      let oldMap = oldData[mapField];
+      let newMap = newData[mapField];
+      return isSignedIn() && 
+             newData.diff(oldData).affectedKeys().hasOnly([mapField, 'updatedAt']) &&
+             (oldMap == null || newMap.diff(oldMap).affectedKeys().hasOnly([request.auth.uid]));
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow get: if isOwner(userId) || isAppAdmin();
+      allow list: if isAppAdmin();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isAdmin();
+      allow update: if isOwner(userId) || isAppAdmin();
+      allow delete: if isAppAdmin();
     }
 
     match /companies/{companyId} {
-      allow list: if isSignedIn() && (isCompanyMember(resource.data.members) || isAdmin());
-      allow get: if isSignedIn() && (isCompanyMember(resource.data.members) || isAdmin());
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.members) || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.members) || isAppAdmin());
       allow create: if isSignedIn();
-      // Allow self-join if the user is updating only their own membership status
-      // handles transition from null/empty map
-      allow update: if isCompanyAdmin(resource.data.members) || isAdmin() || 
-        (isSignedIn() && 
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'updatedAt']) &&
-         (resource.data.members == null || request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid])));
-      allow delete: if isAdmin();
+      allow update: if isCompanyAdmin(resource.data.members) || isAppAdmin() || isJoining(resource.data, request.resource.data, 'members');
+      allow delete: if isAppAdmin();
     }
 
     match /company_invitations/{invitationId} {
-      // Ensure case-insensitive email matching for invitations
-      allow list: if isSignedIn() && (resource.data.email == request.auth.token.email.lower() || isAdmin());
-      allow get: if isSignedIn() && (resource.data.email == request.auth.token.email.lower() || isAdmin());
+      allow list: if isSignedIn() && (resource.data.email == request.auth.token.email.lower() || isAppAdmin());
+      allow get: if isSignedIn() && (resource.data.email == request.auth.token.email.lower() || isAppAdmin());
       allow create: if isSignedIn(); 
       allow update: if isSignedIn() && (
         resource.data.email == request.auth.token.email.lower() || 
-        isAdmin() ||
+        isAppAdmin() ||
         isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)
       );
-      allow delete: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAppAdmin();
     }
 
     match /locations/{locationId} {
-      // Prioritize the local map check, fallback to parent company check
-      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isMemberOfParentCompany(resource.data.companyId) || isAdmin());
-      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isMemberOfParentCompany(resource.data.companyId) || isAdmin());
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow create: if isSignedIn();
-      allow update: if isCompanyAdmin(resource.data.companyMembers) || isAdmin() ||
-        (isSignedIn() && 
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['companyMembers', 'updatedAt']) &&
-         (resource.data.companyMembers == null || request.resource.data.companyMembers.diff(resource.data.companyMembers).affectedKeys().hasOnly([request.auth.uid])));
-      allow delete: if isAdmin();
+      allow update: if isCompanyAdmin(resource.data.companyMembers) || isAppAdmin() || isJoining(resource.data, request.resource.data, 'companyMembers');
+      allow delete: if isAppAdmin();
     }
   }
 }
