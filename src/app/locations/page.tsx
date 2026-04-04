@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -35,17 +36,23 @@ export default function LocationsPage() {
   const [zip, setZip] = React.useState("")
   const [phone, setPhone] = React.useState("")
 
-  // Fetch Companies for selection
+  // Fetch Companies for selection. Filtered by membership.
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, "companies"), where(`members.${user.uid}`, "==", true));
+    return query(
+      collection(firestore, "companies"), 
+      where(`members.${user.uid}`, "in", ["admin", "member", true])
+    );
   }, [firestore, user]);
   const { data: companies } = useCollection<Company>(companiesQuery);
 
-  // Fetch Locations
+  // Fetch Locations. Filtered by membership.
   const locationsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, "locations"), where(`companyMembers.${user.uid}`, "==", true));
+    return query(
+      collection(firestore, "locations"), 
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
+    );
   }, [firestore, user]);
   const { data: locations, isLoading } = useCollection<Location>(locationsQuery);
 

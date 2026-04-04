@@ -14,11 +14,17 @@ service cloud.firestore {
     }
 
     function isCompanyMember(members) {
-      return isSignedIn() && members[request.auth.uid] in ['admin', 'member'];
+      return isSignedIn() && (
+        members[request.auth.uid] in ['admin', 'member'] || 
+        members[request.auth.uid] == true
+      );
     }
 
     function isCompanyAdmin(members) {
-      return isSignedIn() && members[request.auth.uid] == 'admin';
+      return isSignedIn() && (
+        members[request.auth.uid] == 'admin' || 
+        members[request.auth.uid] == true
+      );
     }
 
     function isAdmin() {
@@ -36,7 +42,7 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow list: if isSignedIn() && (resource == null || isCompanyMember(resource.data.members)) || isAdmin();
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.members) || isAdmin());
       allow get: if isCompanyMember(resource.data.members) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isCompanyAdmin(resource.data.members) || isAdmin();
@@ -44,14 +50,9 @@ service cloud.firestore {
     }
 
     match /company_invitations/{invitationId} {
-      // Allow user to see invites sent to their email
       allow list: if isSignedIn() && (resource == null || resource.data.email == request.auth.token.email);
       allow get: if isSignedIn() && resource.data.email == request.auth.token.email;
-      
-      // Allow company admins to create invitations
       allow create: if isSignedIn() && isCompanyAdmin(get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.members);
-      
-      // Allow user or company admin to delete/update
       allow update, delete: if isSignedIn() && (
         resource.data.email == request.auth.token.email || 
         isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)
@@ -59,7 +60,7 @@ service cloud.firestore {
     }
 
     match /locations/{locationId} {
-      allow list: if isSignedIn() && (resource == null || isCompanyMember(resource.data.companyMembers)) || isAdmin();
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAdmin());
       allow get: if isCompanyMember(resource.data.companyMembers) || isAdmin();
       allow create: if isCompanyAdmin(request.resource.data.companyMembers) || isAdmin();
       allow update: if isCompanyAdmin(resource.data.companyMembers) || isAdmin();

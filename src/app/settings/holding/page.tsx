@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -41,19 +42,18 @@ export default function HoldingStructurePage() {
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState<CompanyRole>("member")
 
-  // Query for companies. Rules will restrict results to what the user is a member of.
+  // Query for companies. Filtered by membership to satisfy security rules.
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, "companies"));
+    // We check for membership in the company members map.
+    // Supporting both new string roles and legacy boolean values in the query filter.
+    return query(
+      collection(firestore, "companies"),
+      where(`members.${user.uid}`, "in", ["admin", "member", true])
+    );
   }, [firestore, user]);
 
-  const { data: rawCompanies, isLoading } = useCollection<Company>(companiesQuery);
-
-  // Filter companies where user has a role (handles legacy boolean mapping too)
-  const companies = React.useMemo(() => {
-    if (!user || !rawCompanies) return [];
-    return rawCompanies.filter(c => c.members && c.members[user.uid]);
-  }, [user, rawCompanies]);
+  const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
 
   // Query for pending invitations for current user
   const invitationsQuery = useMemoFirebase(() => {
@@ -147,7 +147,7 @@ export default function HoldingStructurePage() {
   const getUserRoleInCompany = (company: Company): CompanyRole => {
     if (!user || !company.members) return 'member';
     const role = company.members[user.uid];
-    // Backward compatibility: If it's a boolean 'true', treat as admin
+    // Backward compatibility for legacy boolean mapping
     if (typeof role === 'boolean' && role === true) return 'admin';
     return (role as CompanyRole) || 'member';
   };
