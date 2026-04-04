@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -20,6 +21,10 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/app_roles_admin/$(request.auth.uid));
     }
 
+    function isEmailInvited(email) {
+      return isSignedIn() && request.auth.token.email == email;
+    }
+
     // --- Collection Rules ---
 
     match /users/{userId} {
@@ -28,33 +33,27 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if isAdmin();
-
-      match /report_configurations/{reportId} {
-        allow read, write: if isOwner(userId);
-      }
-    }
-
-    match /app_roles_admin/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
     }
 
     match /companies/{companyId} {
-      // Allow list if the user is a member of the company. 
-      // This supports the 'Queryable Access Pattern' where we query by membership.
       allow list: if isSignedIn() && (resource == null || isMember(resource.data.members)) || isAdmin();
       allow get: if isMember(resource.data.members) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isMember(resource.data.members) || isAdmin();
       allow delete: if isAdmin();
+    }
 
-      match /charts_of_accounts/{coaId} {
-        allow read, write: if isMember(get(/databases/$(database)/documents/companies/$(companyId)).data.members) || isAdmin();
-        
-        match /accounts/{accountId} {
-          allow read, write: if isMember(get(/databases/$(database)/documents/companies/$(companyId)).data.members) || isAdmin();
-        }
-      }
+    match /company_invitations/{invitationId} {
+      // Allow user to see invites sent to their email
+      allow list: if isSignedIn() && (resource == null || resource.data.email == request.auth.token.email);
+      allow get: if isSignedIn() && resource.data.email == request.auth.token.email;
+      
+      // Allow company members to create and manage invites for their company
+      allow create: if isSignedIn() && isMember(get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.members);
+      allow update, delete: if isSignedIn() && (
+        resource.data.email == request.auth.token.email || 
+        isMember(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)
+      );
     }
 
     match /locations/{locationId} {
@@ -63,30 +62,6 @@ service cloud.firestore {
       allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
       allow update: if isMember(resource.data.companyMembers) || isAdmin();
       allow delete: if isAdmin();
-    }
-
-    match /financial_data_sources/{sourceId} {
-      allow get, list: if isMember(resource.data.companyMembers) || isAdmin();
-      allow create, update, delete: if isMember(resource.data.companyMembers) || isAdmin();
-    }
-
-    match /financial_transactions/{txId} {
-      allow get, list: if isMember(resource.data.companyMembers) || isAdmin();
-      allow create, update, delete: if isMember(resource.data.companyMembers) || isAdmin();
-
-      match /financial_entries/{entryId} {
-        allow read, write: if isMember(get(/databases/$(database)/documents/financial_transactions/$(txId)).data.companyMembers) || isAdmin();
-      }
-    }
-
-    match /standard_charts_of_accounts/{coaId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-
-      match /accounts/{accountId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
-      }
     }
   }
 }

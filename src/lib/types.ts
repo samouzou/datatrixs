@@ -1,3 +1,4 @@
+
 export type UserRole = 'Admin' | 'Analyst' | 'LocationManager';
 
 export type UserProfile = {
@@ -18,6 +19,17 @@ export type Company = {
   members: Record<string, boolean>; // Denormalized for rules: { [uid: string]: true }
   createdAt: string;
   updatedAt: string;
+};
+
+export type CompanyInvitation = {
+  id: string;
+  companyId: string;
+  companyName: string;
+  email: string;
+  role: string;
+  invitedBy: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
 };
 
 export type Location = {
@@ -46,11 +58,4 @@ export type FinancialRecord = {
   period: string; // e.g., "Q1 2023", "Oct 2023"
   metric: FinancialMetric;
   value: number;
-};
-
-export type DashboardKPI = {
-  label: string;
-  value: string | number;
-  change: number; // percentage change
-  trend: 'up' | 'down' | 'neutral';
 };

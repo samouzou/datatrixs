@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X } from "lucide-react"
+import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore"
 import { 
@@ -18,8 +19,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Company } from "@/lib/types"
+import { Company, CompanyInvitation } from "@/lib/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 
 export default function HoldingStructurePage() {
   const { user } = useUser()
@@ -34,6 +36,9 @@ export default function HoldingStructurePage() {
   const [editingCompany, setEditingCompany] = React.useState<Company | null>(null)
   const [editName, setEditName] = React.useState("")
   const [editDesc, setEditDesc] = React.useState("")
+  
+  // Invite State
+  const [inviteEmail, setInviteEmail] = React.useState("")
 
   // Query for companies where user is a member
   const companiesQuery = useMemoFirebase(() => {
@@ -45,6 +50,18 @@ export default function HoldingStructurePage() {
   }, [firestore, user]);
 
   const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
+
+  // Query for pending invitations for current user
+  const invitationsQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.email) return null;
+    return query(
+      collection(firestore, "company_invitations"),
+      where("email", "==", user.email),
+      where("status", "==", "pending")
+    );
+  }, [firestore, user]);
+
+  const { data: invitations } = useCollection<CompanyInvitation>(invitationsQuery);
 
   const handleCreateCompany = () => {
     if (!firestore || !user || !newCompanyName.trim()) return;
@@ -82,6 +99,40 @@ export default function HoldingStructurePage() {
   const handleDeleteCompany = (id: string) => {
     if (!firestore) return;
     deleteDoc(doc(firestore, "companies", id));
+  };
+
+  const handleSendInvite = () => {
+    if (!firestore || !user || !editingCompany || !inviteEmail.trim()) return;
+
+    const inviteRef = doc(collection(firestore, "company_invitations"));
+    const inviteData: CompanyInvitation = {
+      id: inviteRef.id,
+      companyId: editingCompany.id,
+      companyName: editingCompany.name,
+      email: inviteEmail.trim(),
+      role: 'Member',
+      invitedBy: user.uid,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    setDoc(inviteRef, inviteData);
+    setInviteEmail("");
+  };
+
+  const handleAcceptInvite = (invite: CompanyInvitation) => {
+    if (!firestore || !user) return;
+
+    // 1. Update company members
+    const companyRef = doc(firestore, "companies", invite.companyId);
+    updateDoc(companyRef, {
+      [`members.${user.uid}`]: true,
+      updatedAt: new Date().toISOString()
+    });
+
+    // 2. Mark invite as accepted (or delete)
+    const inviteRef = doc(firestore, "company_invitations", invite.id);
+    updateDoc(inviteRef, { status: 'accepted' });
   };
 
   const openManageDialog = (company: Company) => {
@@ -142,6 +193,33 @@ export default function HoldingStructurePage() {
         </Dialog>
       </div>
 
+      {/* Pending Invitations Banner */}
+      {invitations && invitations.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold flex items-center gap-2 text-accent">
+            <Bell className="size-4" /> Pending Invitations
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {invitations.map((invite) => (
+              <Card key={invite.id} className="bg-accent/5 border-accent/20">
+                <CardHeader className="p-4">
+                  <CardTitle className="text-sm font-bold">Join {invite.companyName}</CardTitle>
+                  <CardDescription className="text-xs">You've been invited to join this company.</CardDescription>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 flex gap-2">
+                  <Button size="sm" className="bg-accent text-background hover:bg-accent/90" onClick={() => handleAcceptInvite(invite)}>
+                    <Check className="mr-2 size-3" /> Accept
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10">
+                    Decline
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-20">
           <Loader2 className="size-8 animate-spin text-primary" />
@@ -189,7 +267,7 @@ export default function HoldingStructurePage() {
                     <Shield className="size-4 text-muted-foreground" />
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase font-bold">Access Level</p>
-                      <p className="text-sm font-medium">Standard</p>
+                      <p className="text-sm font-medium">Administrator</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
@@ -200,11 +278,6 @@ export default function HoldingStructurePage() {
                     </div>
                   </div>
                 </div>
-                {entity.description && (
-                  <p className="mt-4 text-sm text-muted-foreground line-clamp-2">
-                    {entity.description}
-                  </p>
-                )}
               </CardContent>
             </Card>
           ))}
@@ -251,21 +324,29 @@ export default function HoldingStructurePage() {
                   onChange={(e) => setEditDesc(e.target.value)}
                 />
               </div>
-              <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Technical ID</p>
-                <code className="text-xs break-all">{editingCompany?.id}</code>
-              </div>
             </TabsContent>
 
-            <TabsContent value="members" className="py-4">
+            <TabsContent value="members" className="py-4 space-y-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Current Access List</p>
-                  <Button size="sm" variant="outline" className="h-8 text-[10px] uppercase font-bold">
-                    <Plus className="mr-1 size-3" /> Add Member
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="invite-email">Invite New Member</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                      <Input 
+                        id="invite-email" 
+                        placeholder="colleague@company.com" 
+                        className="pl-10"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleSendInvite} disabled={!inviteEmail.trim()}>Send Invite</Button>
+                  </div>
                 </div>
+                
                 <div className="space-y-2">
+                  <p className="text-sm font-medium">Current Access List</p>
                   {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => (
                     <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
                       <div className="flex items-center gap-3">
@@ -273,7 +354,7 @@ export default function HoldingStructurePage() {
                           {uid.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-xs font-medium">{uid === user?.uid ? "You (Current Session)" : "Authorized User"}</p>
+                          <p className="text-xs font-medium">{uid === user?.uid ? "You (Admin)" : "Authorized User"}</p>
                           <p className="text-[10px] text-muted-foreground uppercase">{role === true ? "Administrator" : "Member"}</p>
                         </div>
                       </div>
@@ -297,15 +378,6 @@ export default function HoldingStructurePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Card className="bg-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold">Entity Relationships</CardTitle>
-          <CardDescription className="text-xs">
-            These entities serve as the root for your data roll-ups. All business locations and financial transactions are organized under this hierarchy.
-          </CardDescription>
-        </CardHeader>
-      </Card>
     </div>
   )
 }
