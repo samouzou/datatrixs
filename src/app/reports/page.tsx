@@ -114,6 +114,7 @@ export default function ReportsPage() {
 
   const savedReportsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
+    // Query must use the companyMembers map to satisfy the split security rules
     return query(
       collection(firestore, "saved_reports"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
@@ -395,6 +396,7 @@ export default function ReportsPage() {
                             <div className="rounded-xl border border-border overflow-hidden">
                               {(() => {
                                 const lines = item.content.split('\n');
+                                if (lines.length === 0) return null;
                                 const headers = lines[0].split(',');
                                 const data = lines.slice(1).map(l => l.split(','));
                                 return (
