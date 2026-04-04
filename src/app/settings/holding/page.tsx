@@ -3,9 +3,9 @@
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building2, Plus, Users, Shield, MapPin, Loader2, Trash2 } from "lucide-react"
+import { Building2, Plus, Users, Shield, Loader2, Trash2 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc, serverTimestamp, setDoc, deleteDoc } from "firebase/firestore"
+import { collection, query, where, doc, setDoc, deleteDoc } from "firebase/firestore"
 import { 
   Dialog, 
   DialogContent, 
@@ -18,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { Company } from "@/lib/types"
 
 export default function HoldingStructurePage() {
@@ -29,6 +28,7 @@ export default function HoldingStructurePage() {
   const [newCompanyDesc, setNewCompanyDesc] = React.useState("")
 
   // Query for companies where user is a member
+  // Using the denormalized 'members' map for efficient querying
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -43,7 +43,7 @@ export default function HoldingStructurePage() {
     if (!firestore || !user || !newCompanyName.trim()) return;
 
     const companyRef = doc(collection(firestore, "companies"));
-    const companyData = {
+    const companyData: Company = {
       id: companyRef.id,
       name: newCompanyName,
       description: newCompanyDesc,
@@ -52,7 +52,9 @@ export default function HoldingStructurePage() {
       updatedAt: new Date().toISOString()
     };
 
-    setDoc(companyRef, companyData);
+    // Non-blocking write
+    setDoc(companyRef, companyData).catch(err => console.error("Failed to create company", err));
+    
     setIsCreateOpen(false);
     setNewCompanyName("");
     setNewCompanyDesc("");
@@ -60,7 +62,7 @@ export default function HoldingStructurePage() {
 
   const handleDeleteCompany = (id: string) => {
     if (!firestore) return;
-    deleteDoc(doc(firestore, "companies", id));
+    deleteDoc(doc(firestore, "companies", id)).catch(err => console.error("Failed to delete company", err));
   };
 
   return (
@@ -71,37 +73,37 @@ export default function HoldingStructurePage() {
             <Building2 className="size-6 text-primary" />
             <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Holding Structure</h2>
           </div>
-          <p className="text-muted-foreground">Manage your corporate hierarchy and entity relationships.</p>
+          <p className="text-muted-foreground">Manage your parent organizations and corporate entities.</p>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="mr-2 size-4" /> Create New Entity
+              <Plus className="mr-2 size-4" /> Add Parent Entity
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Holding Company</DialogTitle>
+              <DialogTitle>Add Holding Company</DialogTitle>
               <DialogDescription>
-                Add a new parent organization to your portfolio.
+                Define a new parent organization for your portfolio management.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="name">Company Name</Label>
+                <Label htmlFor="name">Entity Name</Label>
                 <Input 
                   id="name" 
-                  placeholder="e.g., Acme Holdings" 
+                  placeholder="e.g., Datatrixs Strategic Holdings" 
                   value={newCompanyName}
                   onChange={(e) => setNewCompanyName(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="desc">Description</Label>
+                <Label htmlFor="desc">Description (Optional)</Label>
                 <Textarea 
                   id="desc" 
-                  placeholder="Describe this entity..." 
+                  placeholder="Briefly describe this organization's focus..." 
                   value={newCompanyDesc}
                   onChange={(e) => setNewCompanyDesc(e.target.value)}
                 />
@@ -109,7 +111,7 @@ export default function HoldingStructurePage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateCompany} disabled={!newCompanyName.trim()}>Create Company</Button>
+              <Button onClick={handleCreateCompany} disabled={!newCompanyName.trim()}>Save Entity</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -122,16 +124,16 @@ export default function HoldingStructurePage() {
       ) : (
         <div className="grid gap-6">
           {companies?.map((entity) => (
-            <Card key={entity.id} className="bg-card/40 border-border backdrop-blur-sm">
+            <Card key={entity.id} className="bg-card/40 border-border backdrop-blur-sm shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="space-y-1">
                   <CardTitle className="text-lg text-foreground">{entity.name}</CardTitle>
-                  <CardDescription className="text-xs uppercase tracking-wider font-bold text-primary/80">
-                    Parent Entity
+                  <CardDescription className="text-[10px] uppercase tracking-wider font-bold text-accent">
+                    Active Portfolio Entity
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-8 text-xs">Manage</Button>
+                  <Button variant="outline" size="sm" className="h-8 text-xs">Manage Structure</Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -147,27 +149,27 @@ export default function HoldingStructurePage() {
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
                     <Users className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Members</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Authorized Users</p>
                       <p className="text-sm font-medium">{Object.keys(entity.members || {}).length}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
                     <Shield className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Security</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Access Level</p>
                       <p className="text-sm font-medium">Standard</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
                     <Building2 className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">ID</p>
-                      <p className="text-[10px] font-mono truncate max-w-[100px]">{entity.id}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Entity Identifier</p>
+                      <p className="text-[10px] font-mono truncate max-w-[120px]">{entity.id}</p>
                     </div>
                   </div>
                 </div>
                 {entity.description && (
-                  <p className="mt-4 text-sm text-muted-foreground">
+                  <p className="mt-4 text-sm text-muted-foreground line-clamp-2">
                     {entity.description}
                   </p>
                 )}
@@ -177,7 +179,7 @@ export default function HoldingStructurePage() {
           {!companies?.length && (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl">
               <Building2 className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-muted-foreground">No holding companies found. Create one to get started.</p>
+              <p className="text-muted-foreground">No holding entities found. Define a parent company to begin organizing your portfolio.</p>
             </div>
           )}
         </div>
@@ -185,9 +187,9 @@ export default function HoldingStructurePage() {
 
       <Card className="bg-primary/5 border-primary/20">
         <CardHeader>
-          <CardTitle className="text-sm font-bold">Hierarchy Visualization</CardTitle>
+          <CardTitle className="text-sm font-bold">Entity Relationships</CardTitle>
           <CardDescription className="text-xs">
-            The structure above represents how data roll-ups are calculated for your global dashboard and AI analyst.
+            These entities serve as the root for your data roll-ups. All business locations and financial transactions are organized under this hierarchy.
           </CardDescription>
         </CardHeader>
       </Card>

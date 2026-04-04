@@ -63,7 +63,6 @@ export function initiateEmailSignUp(
       ensureUserProfile(db, userCredential.user, profileData);
     })
     .catch((error) => {
-      // Handle auth errors locally if needed, but Firebase UI handles most
       console.error("Sign up failed", error);
     });
 }

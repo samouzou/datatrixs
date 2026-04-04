@@ -40,7 +40,10 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow get, list: if isMember(resource.data.members) || isAdmin();
+      // Allow list if the user is a member of the company. 
+      // This supports the 'Queryable Access Pattern' where we query by membership.
+      allow list: if isSignedIn() && (resource == null || isMember(resource.data.members)) || isAdmin();
+      allow get: if isMember(resource.data.members) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isMember(resource.data.members) || isAdmin();
       allow delete: if isAdmin();
@@ -55,7 +58,8 @@ service cloud.firestore {
     }
 
     match /locations/{locationId} {
-      allow get, list: if isMember(resource.data.companyMembers) || isAdmin();
+      allow list: if isSignedIn() && (resource == null || isMember(resource.data.companyMembers)) || isAdmin();
+      allow get: if isMember(resource.data.companyMembers) || isAdmin();
       allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
       allow update: if isMember(resource.data.companyMembers) || isAdmin();
       allow delete: if isAdmin();
