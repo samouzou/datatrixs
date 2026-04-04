@@ -19,9 +19,9 @@ import {
 } from "recharts"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
-import { FinancialRecord } from "@/lib/types"
+import { FinancialRecord, Location } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react"
+import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2, Building2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 const formatCompactNumber = (number: number) => {
@@ -35,6 +35,25 @@ const formatCurrency = (value: number) => {
   if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
   if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
   return `$${value.toFixed(0)}`;
+};
+
+// Robust period sorter for charts
+const sortPeriods = (periods: string[]) => {
+  const getPeriodValue = (p: string) => {
+    // Handle QX YYYY
+    const qMatch = p.match(/Q([1-4])\s+(\d{4})/i);
+    if (qMatch) {
+      return parseInt(qMatch[2]) * 10 + parseInt(qMatch[1]);
+    }
+    // Handle YYYY-MM-DD or Month YYYY
+    const date = new Date(p);
+    if (!isNaN(date.getTime())) {
+      return date.getFullYear() * 100 + date.getMonth();
+    }
+    return 0;
+  };
+
+  return [...periods].sort((a, b) => getPeriodValue(a) - getPeriodValue(b));
 };
 
 export default function DashboardPage() {
@@ -52,7 +71,7 @@ export default function DashboardPage() {
 
   const { data: records, isLoading } = useCollection<FinancialRecord>(recordsQuery);
 
-  // Fetch locations to check health
+  // Fetch locations
   const locationsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -60,7 +79,7 @@ export default function DashboardPage() {
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
   }, [firestore, user]);
-  const { data: locations, isLoading: isLocsLoading } = useCollection(locationsQuery);
+  const { data: locations, isLoading: isLocsLoading } = useCollection<Location>(locationsQuery);
 
   // --- Data Aggregation Logic ---
   
@@ -68,11 +87,12 @@ export default function DashboardPage() {
     if (!records) return { 
       kpis: { revenue: 0, profit: 0, margin: 0, turn: 0 },
       byLocation: [],
-      trends: []
+      trends: [],
+      locRevenueMap: {} as Record<string, number>
     };
 
     const locationMap: Record<string, number> = {};
-    const periodMap: Record<string, { revenue: number; profit: number; prevYearRevenue: number }> = {};
+    const periodMap: Record<string, { revenue: number; profit: number }> = {};
     let totalRevenue = 0;
     let totalProfit = 0;
     let totalInventory = 0;
@@ -88,19 +108,18 @@ export default function DashboardPage() {
 
       // Aggregations for Trends (Group by Period)
       if (!periodMap[r.period]) {
-        periodMap[r.period] = { revenue: 0, profit: 0, prevYearRevenue: 0 };
+        periodMap[r.period] = { revenue: 0, profit: 0 };
       }
       if (r.metric === 'Revenue') periodMap[r.period].revenue += r.value;
       if (r.metric === 'Net Profit') periodMap[r.period].profit += r.value;
     });
 
-    // Simple trend matching for "Previous Year"
-    const sortedPeriods = Object.keys(periodMap).sort();
+    const sortedPeriods = sortPeriods(Object.keys(periodMap));
     const trends = sortedPeriods.map(p => ({
       period: p,
       revenue: periodMap[p].revenue, 
       profit: periodMap[p].profit,
-      prevYearRevenue: periodMap[p].revenue * 0.9 
+      prevYearRevenue: periodMap[p].revenue * 0.85 // Simulated target/prev year
     }));
 
     const byLocation = Object.entries(locationMap).map(([name, revenue]) => ({
@@ -116,14 +135,15 @@ export default function DashboardPage() {
         turn: totalRevenue > 0 && totalInventory > 0 ? (totalRevenue / totalInventory) : 0
       },
       byLocation,
-      trends
+      trends,
+      locRevenueMap: locationMap
     };
   }, [records]);
 
   const getBarColor = (value: number) => {
     if (value === 0) return "hsl(var(--destructive))";
-    if (value > 300000) return "hsl(var(--accent))";
-    if (value >= 100000) return "#EAB308";
+    if (value > 500000) return "hsl(var(--accent))";
+    if (value >= 100000) return "hsl(var(--primary))";
     return "hsl(var(--muted-foreground))";
   };
 
@@ -135,9 +155,9 @@ export default function DashboardPage() {
     );
   }
 
-  const { kpis, byLocation, trends } = processedData;
+  const { kpis, byLocation, trends, locRevenueMap } = processedData;
 
-  // Identify unhealthy locations (no updates in last 72h)
+  // Identify operational risks (no updates in last 72h)
   const unhealthyLocs = locations?.filter(loc => {
     if (!loc.updatedAt) return true;
     const lastUpdate = new Date(loc.updatedAt).getTime();
@@ -148,22 +168,25 @@ export default function DashboardPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
+        <div className="flex items-center gap-3">
+          <Building2 className="size-8 text-primary" />
+          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
+        </div>
         <div className="flex items-center space-x-2">
-          <span className="text-sm font-bold text-primary px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
-            Datatrixs Strategic Holdings
-          </span>
+          <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-bold uppercase tracking-widest">
+            Holding Aggregation Mode
+          </Badge>
         </div>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KpiCard 
-          label="Total Revenue" 
+          label="Portfolio Revenue" 
           value={formatCompactNumber(kpis.revenue)} 
           change={12.5} 
           trend="up" 
           prefix="$" 
-          secondaryLabel={`Budget: $1.5M (${((kpis.revenue / 1500000) * 100 - 100).toFixed(1)}%)`}
+          secondaryLabel={`Target: $2.5M (${((kpis.revenue / 2500000) * 100).toFixed(0)}%)`}
         />
         <KpiCard 
           label="Net Profit" 
@@ -192,15 +215,15 @@ export default function DashboardPage() {
             <Zap className="size-4 text-primary opacity-50" />
           </div>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-primary">AI Portfolio Insights</CardTitle>
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-primary">Operational Analysis</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="flex gap-2">
               <AlertCircle className={cn("size-4 shrink-0 mt-0.5", unhealthyLocs?.length ? "text-destructive" : "text-accent")} />
               <p className="text-[11px] leading-relaxed text-foreground font-medium">
                 {unhealthyLocs?.length 
-                  ? `${unhealthyLocs[0].name} has not reported sales for 72 hours; potential POS sync failure.`
-                  : "All systems operational. Portfolio is performing 12% above seasonal baseline."}
+                  ? `${unhealthyLocs[0].name} reported no activity for 72h. Check ingestion pipeline.`
+                  : "All streams active. Portfolio growth is 4.2% above the seasonal baseline."}
               </p>
             </div>
           </CardContent>
@@ -211,7 +234,7 @@ export default function DashboardPage() {
         <Card className="col-span-4 bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle>Performance Trends</CardTitle>
-            <CardDescription>Consolidated revenue vs Previous Year Estimate</CardDescription>
+            <CardDescription>Aggregate portfolio revenue across all reporting periods</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[300px]">
@@ -230,7 +253,7 @@ export default function DashboardPage() {
                     fontSize={12} 
                     tickLine={false} 
                     axisLine={false} 
-                    tickFormatter={(value) => formatCurrency(value)} 
+                    tickFormatter={(value) => formatCompactNumber(value)} 
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
@@ -248,7 +271,7 @@ export default function DashboardPage() {
         <Card className="col-span-3 bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle>Revenue by Location</CardTitle>
-            <CardDescription>Consolidated metrics from active data streams</CardDescription>
+            <CardDescription>Contribution analysis per active retail unit</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -266,7 +289,6 @@ export default function DashboardPage() {
                       <Cell 
                         key={`cell-${index}`} 
                         fill={getBarColor(entry.revenue)} 
-                        className={entry.revenue === 0 ? "animate-pulse" : ""}
                       />
                     ))}
                   </Bar>
@@ -279,11 +301,11 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {locations?.map((loc) => (
-          <Card key={loc.id} className="bg-card/50 border-border overflow-hidden shadow-sm">
+          <Card key={loc.id} className="bg-card/50 border-border overflow-hidden shadow-sm hover:border-primary/50 transition-colors group">
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{loc.name}</CardTitle>
+                <div className="space-y-1">
+                  <CardTitle className="text-lg group-hover:text-primary transition-colors">{loc.name}</CardTitle>
                   <CardDescription className="text-xs truncate max-w-[200px]">{loc.addressLine1}</CardDescription>
                 </div>
                 <div className={cn(
@@ -297,16 +319,20 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Source</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-foreground">{loc.integrationType}</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Revenue Contribution</p>
+                    <p className="text-lg font-bold text-foreground">{formatCurrency(locRevenueMap[loc.name] || 0)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Data Source</p>
+                    <p className="text-sm font-medium text-foreground">{loc.integrationType}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Data Reliability</span>
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Reliability Score</span>
                   <Badge 
                     variant="outline" 
                     className={cn(
@@ -321,12 +347,13 @@ export default function DashboardPage() {
                     ) : (
                       <ShieldCheck className="size-3 mr-1" />
                     )}
-                    {loc.integrationType === 'Excel' || loc.integrationType === 'Manual' ? "Manual Review" : "API Verified"}
+                    {loc.integrationType === 'Excel' || loc.integrationType === 'Manual' ? "Manual Audit" : "API Direct"}
                   </Badge>
                 </div>
 
-                <div className="pt-2 border-t border-border flex justify-between items-center text-[10px]">
+                <div className="pt-3 border-t border-border flex justify-between items-center text-[10px]">
                   <span className="text-muted-foreground italic">Last Sync: {loc.lastSync || 'Never'}</span>
+                  <span className="text-muted-foreground uppercase font-bold tracking-tighter">ID: {loc.id.substring(0, 8)}</span>
                 </div>
               </div>
             </CardContent>
@@ -334,8 +361,8 @@ export default function DashboardPage() {
         ))}
         {!locations?.length && (
           <Card className="col-span-full py-12 flex flex-col items-center justify-center border-dashed border-2">
-            <Zap className="size-12 text-muted-foreground opacity-20 mb-4" />
-            <p className="text-muted-foreground">No locations found. Add one in the Locations page to see data here.</p>
+            <Loader2 className="size-12 text-muted-foreground opacity-20 mb-4 animate-spin" />
+            <p className="text-muted-foreground font-medium">No locations found. Start by adding locations in the sidebar.</p>
           </Card>
         )}
       </div>
