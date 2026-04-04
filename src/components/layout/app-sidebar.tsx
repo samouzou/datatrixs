@@ -84,24 +84,24 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="h-16 flex items-center justify-center overflow-hidden bg-sidebar">
         <Link href="/dashboard" className="flex items-center justify-center w-full px-2">
-          {/* Full logo for expanded state */}
+          {/* Full logo for expanded state - slightly smaller scale for professionalism */}
           <div className="group-data-[collapsible=icon]:hidden flex items-center justify-center w-full">
             <Image 
               src="/dx-logo.svg" 
               alt="Datatrixs Logo" 
-              width={110} 
-              height={32} 
+              width={100} 
+              height={30} 
               priority 
               className="object-contain"
             />
           </div>
-          {/* Icon for collapsed state */}
+          {/* Icon for collapsed state - larger for better visibility */}
           <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center">
             <Image 
               src="/dx-icon.svg" 
               alt="Datatrixs Icon" 
-              width={24} 
-              height={24} 
+              width={32} 
+              height={32} 
               priority 
               className="object-contain"
             />
