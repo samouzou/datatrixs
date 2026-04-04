@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
-import { updateDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
+import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { cn } from "@/lib/utils"
 import { 
   Dialog, 
@@ -271,6 +271,7 @@ export default function LocationsPage() {
               period,
               metric: metric as FinancialMetric,
               value: valNum,
+              companyMembers: uploadingLocation.companyMembers, // Denormalize membership for Global Search
               createdAt: now
             };
             batch.set(recordRef, record);
@@ -285,7 +286,7 @@ export default function LocationsPage() {
           integrationStatus: 'connected',
           updatedAt: now,
           lastSync: new Date().toLocaleString(),
-          lastRawData: csvContent // Save raw data for persistence
+          lastRawData: csvContent 
         });
         
         await batch.commit();

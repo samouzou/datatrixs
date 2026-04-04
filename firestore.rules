@@ -89,6 +89,11 @@ service cloud.firestore {
       }
     }
 
+    // Collection Group rule for global Portfolio analysis
+    match /{path=**}/financial_records/{recordId} {
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+    }
+
     match /saved_reports/{reportId} {
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());

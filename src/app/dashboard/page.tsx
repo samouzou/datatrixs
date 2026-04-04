@@ -18,7 +18,7 @@ import {
   Line
 } from "recharts"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, collectionGroup, query, where, orderBy } from "firebase/firestore"
+import { collection, collectionGroup, query, where } from "firebase/firestore"
 import { FinancialRecord } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react"
@@ -29,12 +29,12 @@ export default function DashboardPage() {
   const firestore = useFirestore()
 
   // Fetch all financial records across all locations
-  // We use collectionGroup to get a global view
+  // We use denormalized membership on each record to secure the collectionGroup query
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
       collectionGroup(firestore, "financial_records"),
-      orderBy("createdAt", "desc")
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
   }, [firestore, user]);
 
