@@ -17,6 +17,7 @@ const AiDrivenCustomDataExportInputSchema = z.object({
       .describe(
         "The user's natural language request for specific financial data to be compiled into a table."
       ),
+  financialData: z.string().optional().describe('JSON string of normalized financial records.'),
 });
 export type AiDrivenCustomDataExportInput = z.infer<
   typeof AiDrivenCustomDataExportInputSchema
@@ -50,18 +51,21 @@ const aiDrivenCustomDataExportPrompt = ai.definePrompt({
   name: 'aiDrivenCustomDataExportPrompt',
   input: {schema: AiDrivenCustomDataExportInputSchema},
   output: {schema: AiDrivenCustomDataExportOutputSchema},
-  prompt: `You are an expert financial analyst for Datatrixs. Your task is to interpret a user's request for specific financial data and compile a plausible, representative dataset into a tabular JSON format suitable for export.
+  prompt: `You are an expert financial analyst for Datatrixs. Your task is to interpret a user's request for specific financial data and compile a dataset into a tabular JSON format.
+
+{{#if financialData}}
+Base your table on the following normalized records:
+{{{financialData}}}
+{{else}}
+Act as if you have access to historical financial data for a multi-location retail business. Generate realistic-looking data based on the request.
+{{/if}}
 
 Follow these rules:
-1.  **Strictly adhere to the output JSON schema.** Do not include any additional text or formatting outside of the JSON object.
-2.  **Act as if you have access to historical financial data for a multi-location retail or service business.** Generate realistic-looking data based on the request.
-3.  **Identify key metrics, timeframes, locations, and service categories** from the user's query to construct relevant data.
-4.  **Populate the 'tableName' field** with a clear, descriptive title for the generated data.
-5.  **Populate the 'header' field** with an array of string column names.
-6.  **Populate the 'data' field** with an array of arrays of strings. Each inner array represents a row, and its values must correspond to the 'header' columns in order.
-7.  **All data values in the 'data' array must be strings.**
-8.  If the request implies calculation (e.g., "total sales"), include those calculated values in the generated data.
-9.  If the request is vague, make reasonable assumptions to generate representative data.
+1.  **Strictly adhere to the output JSON schema.** 
+2.  **Identify key metrics, timeframes, locations** from the user's query.
+3.  **Populate the 'tableName' field** with a clear title.
+4.  **Populate the 'header' and 'data' fields**.
+5.  **Use compact currency notation ($1.2M, $450K) for all financial values in the data rows.**
 
 User Request: {{{query}}}`,
 });

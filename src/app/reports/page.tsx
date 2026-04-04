@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -12,7 +11,8 @@ import {
   Loader2,
   ArrowRight,
   Trash2,
-  Maximize2
+  Save,
+  Check
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,10 +32,10 @@ import { Badge } from "@/components/ui/badge"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { query, collection, where, orderBy, doc } from "firebase/firestore"
-import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { SavedReport } from "@/lib/types"
+import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
+import { SavedReport, FinancialRecord } from "@/lib/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
-import { ChartView } from "@/components/analyst/chart-view"
+import { useToast } from "@/hooks/use-toast"
 
 function MarkdownTable({ content }: { content: string }) {
   const lines = content.trim().split('\n');
@@ -70,26 +70,38 @@ function MarkdownTable({ content }: { content: string }) {
   );
 }
 
-function parseCSV(csvString: string) {
-  if (!csvString) return { headers: [], data: [] };
-  const lines = csvString.trim().split('\n');
-  if (lines.length === 0) return { headers: [], data: [] };
-  
-  const headers = lines[0].split(',').map(h => h.trim());
-  const data = lines.slice(1).map(line => line.split(',').map(c => c.trim()));
-  
-  return { headers, data };
-}
-
 export default function ReportsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
+  const { toast } = useToast()
+  
   const [reportQuery, setReportQuery] = React.useState("")
   const [exportQuery, setExportQuery] = React.useState("")
   const [reportResult, setReportResult] = React.useState<AiAssistedReportGenerationOutput | null>(null)
   const [exportResult, setExportResult] = React.useState<AiDrivenCustomDataExportOutput | null>(null)
   const [loadingReport, setLoadingReport] = React.useState(false)
   const [loadingExport, setLoadingExport] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState<string | null>(null)
+
+  // Fetch real financial records for context
+  const recordsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, "financial_records"),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user]);
+  const { data: records, isLoading: isRecordsLoading } = useCollection<FinancialRecord>(recordsQuery);
+
+  const aiContext = React.useMemo(() => {
+    if (!records) return "[]";
+    return JSON.stringify(records.map(r => ({
+      location: r.locationName,
+      period: r.period,
+      metric: r.metric,
+      value: r.value
+    })));
+  }, [records]);
 
   // Fetch Saved Library from Firestore
   const savedReportsQuery = useMemoFirebase(() => {
@@ -104,29 +116,85 @@ export default function ReportsPage() {
   const { data: savedReports, isLoading: isLoadingHistory } = useCollection<SavedReport>(savedReportsQuery);
 
   const handleGenerateReport = async () => {
-    if (!reportQuery.trim() || loadingReport) return
+    if (!reportQuery.trim() || loadingReport || isRecordsLoading) return
     setLoadingReport(true)
     try {
-      const result = await aiAssistedReportGeneration({ query: reportQuery })
+      const result = await aiAssistedReportGeneration({ 
+        query: reportQuery,
+        financialData: aiContext
+      })
       setReportResult(result)
     } catch (error) {
       console.error(error)
+      toast({ variant: "destructive", title: "Generation Failed", description: "AI could not process your report request." })
     } finally {
       setLoadingReport(false)
     }
   }
 
   const handleGenerateExport = async () => {
-    if (!exportQuery.trim() || loadingExport) return
+    if (!exportQuery.trim() || loadingExport || isRecordsLoading) return
     setLoadingExport(true)
     try {
-      const result = await aiDrivenCustomDataExport({ query: exportQuery })
+      const result = await aiDrivenCustomDataExport({ 
+        query: exportQuery,
+        financialData: aiContext
+      })
       setExportResult(result)
     } catch (error) {
       console.error(error)
+      toast({ variant: "destructive", title: "Export Failed", description: "AI could not compile the spreadsheet data." })
     } finally {
       setLoadingExport(false)
     }
+  }
+
+  const handleSaveToLibrary = (type: 'report' | 'export') => {
+    if (!user || !firestore) return;
+    setIsSaving(type);
+
+    const reportId = doc(collection(firestore, "saved_reports")).id;
+    const reportRef = doc(firestore, "saved_reports", reportId);
+
+    let savedData: SavedReport;
+
+    if (type === 'report' && reportResult) {
+      savedData = {
+        id: reportId,
+        userId: user.uid,
+        title: `${reportResult.reportType}: ${reportResult.entityName}`,
+        type: 'Financial Report',
+        summary: reportResult.reportSummary,
+        content: reportResult.reportContent,
+        createdAt: new Date().toISOString()
+      };
+    } else if (type === 'export' && exportResult) {
+      // For exports, we save the content as a pseudo-CSV string for storage
+      const csvContent = [
+        exportResult.header.join(','),
+        ...exportResult.data.map(row => row.join(','))
+      ].join('\n');
+
+      savedData = {
+        id: reportId,
+        userId: user.uid,
+        title: exportResult.tableName,
+        type: 'Data Export',
+        summary: `Grounded data export based on: "${exportQuery}"`,
+        content: csvContent,
+        createdAt: new Date().toISOString()
+      };
+    } else return;
+
+    setDocumentNonBlocking(reportRef, savedData, { merge: true });
+    
+    setTimeout(() => {
+      setIsSaving(null);
+      toast({
+        title: "Saved to Library",
+        description: `"${savedData.title}" is now available in your history.`
+      });
+    }, 500);
   }
 
   const handleDeleteSaved = (id: string) => {
@@ -167,13 +235,13 @@ export default function ReportsPage() {
             <CardContent>
               <form onSubmit={(e) => { e.preventDefault(); handleGenerateReport(); }} className="flex gap-3">
                 <Input 
-                  placeholder="Describe the report you need..." 
+                  placeholder={isRecordsLoading ? "Loading financial records..." : "Describe the report you need..."} 
                   className="bg-muted/50 border-border focus-visible:ring-primary h-12"
                   value={reportQuery}
                   onChange={(e) => setReportQuery(e.target.value)}
-                  disabled={loadingReport}
+                  disabled={loadingReport || isRecordsLoading}
                 />
-                <Button size="lg" onClick={handleGenerateReport} disabled={loadingReport || !reportQuery.trim()} className="bg-primary hover:bg-primary/90 h-12 px-8">
+                <Button size="lg" onClick={handleGenerateReport} disabled={loadingReport || isRecordsLoading || !reportQuery.trim()} className="bg-primary hover:bg-primary/90 h-12 px-8">
                   {loadingReport ? <Loader2 className="size-4 animate-spin mr-2" /> : <Plus className="size-4 mr-2" />}
                   Generate
                 </Button>
@@ -192,9 +260,15 @@ export default function ReportsPage() {
                       </Badge>
                       <CardTitle className="text-xl text-foreground">{reportResult.entityName} — {reportResult.period}</CardTitle>
                     </div>
-                    <Button variant="outline" size="sm" className="h-9 border-border text-xs bg-muted/50 hover:bg-muted">
-                      <Download className="size-3.5 mr-2" /> Download PDF
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-9 border-border text-xs bg-muted/50 hover:bg-muted" onClick={() => handleSaveToLibrary('report')} disabled={!!isSaving}>
+                        {isSaving === 'report' ? <Loader2 className="size-3.5 animate-spin mr-2" /> : <Save className="size-3.5 mr-2" />}
+                        Save to Library
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-9 border-border text-xs bg-muted/50 hover:bg-muted">
+                        <Download className="size-3.5 mr-2" /> Download PDF
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
@@ -224,13 +298,13 @@ export default function ReportsPage() {
             <CardContent>
               <form onSubmit={(e) => { e.preventDefault(); handleGenerateExport(); }} className="flex gap-3">
                 <Input 
-                  placeholder="e.g., 'Monthly sales data for all locations in 2023'..." 
+                  placeholder={isRecordsLoading ? "Loading financial records..." : "e.g., 'Monthly sales data for all locations in 2023'..."} 
                   className="bg-muted/50 border-border focus-visible:ring-primary h-12"
                   value={exportQuery}
                   onChange={(e) => setExportQuery(e.target.value)}
-                  disabled={loadingExport}
+                  disabled={loadingExport || isRecordsLoading}
                 />
-                <Button size="lg" onClick={handleGenerateExport} disabled={loadingExport || !exportQuery.trim()} className="bg-primary hover:bg-primary/90 h-12 px-8">
+                <Button size="lg" onClick={handleGenerateExport} disabled={loadingExport || isRecordsLoading || !exportQuery.trim()} className="bg-primary hover:bg-primary/90 h-12 px-8">
                   {loadingExport ? <Loader2 className="size-4 animate-spin mr-2" /> : <FileText className="size-4 mr-2" />}
                   Build Spreadsheet
                 </Button>
@@ -239,7 +313,13 @@ export default function ReportsPage() {
           </Card>
 
           {exportResult && (
-            <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="animate-in fade-in slide-in-from-top-4 duration-500 space-y-4">
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => handleSaveToLibrary('export')} disabled={!!isSaving}>
+                  {isSaving === 'export' ? <Loader2 className="size-3.5 animate-spin mr-2" /> : <Save className="size-3.5 mr-2" />}
+                  Save to Library
+                </Button>
+              </div>
               <SpreadsheetView 
                 title={exportResult.tableName}
                 headers={exportResult.header}
@@ -290,23 +370,17 @@ export default function ReportsPage() {
                           <div className="p-4 rounded-lg bg-muted/50 border border-border italic text-sm text-muted-foreground">
                             {item.summary}
                           </div>
-                          
-                          {item.metadata?.chart && item.metadata?.results && (
-                            <div className="p-6 border border-border rounded-xl bg-card">
-                              <ChartView 
-                                type={item.metadata.chart.type}
-                                title={item.metadata.chart.title}
-                                data={item.metadata.results}
-                                xAxisLabel={item.metadata.chart.xAxisLabel}
-                                yAxisLabel={item.metadata.chart.yAxisLabel}
-                              />
-                            </div>
-                          )}
 
-                          {item.content && (
+                          {item.type === 'Financial Report' ? (
+                            <div className="space-y-4">
+                              <MarkdownTable content={item.content} />
+                            </div>
+                          ) : (
                             <div className="rounded-xl border border-border overflow-hidden">
                               {(() => {
-                                const { headers, data } = parseCSV(item.content);
+                                const lines = item.content.split('\n');
+                                const headers = lines[0].split(',');
+                                const data = lines.slice(1).map(l => l.split(','));
                                 return (
                                   <SpreadsheetView 
                                     title="Saved Dataset"
