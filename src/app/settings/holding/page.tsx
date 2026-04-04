@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -5,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore"
+import { collection, query, where, doc, setDoc, deleteDoc, updateDoc, getDocs } from "firebase/firestore"
 import { 
   Dialog, 
   DialogContent, 
@@ -39,6 +40,7 @@ export default function HoldingStructurePage() {
   // Invite State
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState<CompanyRole>("member")
+  const [isProcessingInvite, setIsProcessingInvite] = React.useState<string | null>(null)
 
   // Query for companies. Filtered by membership to satisfy security rules.
   const companiesQuery = useMemoFirebase(() => {
@@ -51,12 +53,12 @@ export default function HoldingStructurePage() {
 
   const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
 
-  // Query for pending invitations for current user
+  // Query for pending invitations for current user. Email matching is case-insensitive for safety.
   const invitationsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.email) return null;
     return query(
       collection(firestore, "company_invitations"),
-      where("email", "==", user.email),
+      where("email", "==", user.email.toLowerCase()),
       where("status", "==", "pending")
     );
   }, [firestore, user]);
@@ -109,7 +111,7 @@ export default function HoldingStructurePage() {
       id: inviteRef.id,
       companyId: editingCompany.id,
       companyName: editingCompany.name,
-      email: inviteEmail.trim(),
+      email: inviteEmail.trim().toLowerCase(),
       role: inviteRole,
       invitedBy: user.uid,
       status: 'pending',
@@ -121,17 +123,47 @@ export default function HoldingStructurePage() {
     setInviteRole("member");
   };
 
-  const handleAcceptInvite = (invite: CompanyInvitation) => {
+  const handleAcceptInvite = async (invite: CompanyInvitation) => {
     if (!firestore || !user) return;
+    setIsProcessingInvite(invite.id);
 
-    const companyRef = doc(firestore, "companies", invite.companyId);
-    updateDoc(companyRef, {
-      [`members.${user.uid}`]: invite.role,
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      // 1. Update the Company members list
+      const companyRef = doc(firestore, "companies", invite.companyId);
+      await updateDoc(companyRef, {
+        [`members.${user.uid}`]: invite.role,
+        updatedAt: new Date().toISOString()
+      });
 
-    const inviteRef = doc(firestore, "company_invitations", invite.id);
-    updateDoc(inviteRef, { status: 'accepted' });
+      // 2. Synchronize Membership to all Locations (Denormalization)
+      // This ensures the user can query locations and passes security rules for them.
+      const locationsQuery = query(
+        collection(firestore, "locations"), 
+        where("companyId", "==", invite.companyId)
+      );
+      const locationsSnap = await getDocs(locationsQuery);
+      
+      const syncPromises = locationsSnap.docs.map(locDoc => {
+        return updateDoc(locDoc.ref, {
+          [`companyMembers.${user.uid}`]: invite.role,
+          updatedAt: new Date().toISOString()
+        });
+      });
+      
+      await Promise.all(syncPromises);
+
+      // 3. Mark the invitation as accepted
+      const inviteRef = doc(firestore, "company_invitations", invite.id);
+      await updateDoc(inviteRef, { 
+        status: 'accepted',
+        updatedAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error("Failed to accept invitation:", error);
+    } finally {
+      setIsProcessingInvite(null);
+    }
   };
 
   const openManageDialog = (company: Company) => {
@@ -211,16 +243,22 @@ export default function HoldingStructurePage() {
           </h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {invitations.map((invite) => (
-              <Card key={invite.id} className="bg-accent/5 border-accent/20">
+              <Card key={invite.id} className="bg-accent/5 border-accent/20 animate-in fade-in slide-in-from-top-2">
                 <CardHeader className="p-4">
                   <CardTitle className="text-sm font-bold">Join {invite.companyName}</CardTitle>
                   <CardDescription className="text-xs">Invited as: <span className="font-bold uppercase text-accent">{invite.role}</span></CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 flex gap-2">
-                  <Button size="sm" className="bg-accent text-background hover:bg-accent/90" onClick={() => handleAcceptInvite(invite)}>
-                    <Check className="mr-2 size-3" /> Accept
+                  <Button 
+                    size="sm" 
+                    className="bg-accent text-background hover:bg-accent/90" 
+                    onClick={() => handleAcceptInvite(invite)}
+                    disabled={isProcessingInvite === invite.id}
+                  >
+                    {isProcessingInvite === invite.id ? <Loader2 className="size-3 animate-spin mr-2" /> : <Check className="mr-2 size-3" />}
+                    Accept
                   </Button>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10">
+                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" disabled={isProcessingInvite === invite.id}>
                     Decline
                   </Button>
                 </CardContent>

@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -44,26 +45,36 @@ service cloud.firestore {
       allow list: if isSignedIn() && (resource == null || isCompanyMember(resource.data.members) || isAdmin());
       allow get: if isCompanyMember(resource.data.members) || isAdmin();
       allow create: if isSignedIn();
+      // Allow update if user is an admin, OR if the user is accepting an invite 
+      // (only their own key in the members map is being modified along with the timestamp)
       allow update: if isCompanyAdmin(resource.data.members) || isAdmin() || 
-        (isSignedIn() && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]));
+        (isSignedIn() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'updatedAt']) &&
+         request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]));
       allow delete: if isAdmin();
     }
 
     match /company_invitations/{invitationId} {
       allow list: if isSignedIn() && (resource == null || resource.data.email == request.auth.token.email);
-      allow get: if isSignedIn() && resource.data.email == request.auth.token.email;
+      allow get: if isSignedIn() && (resource.data.email == request.auth.token.email || isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members));
       allow create: if isSignedIn() && isCompanyAdmin(get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.members);
-      allow update, delete: if isSignedIn() && (
+      // Allow update for status change (accepting) or admin management
+      allow update: if isSignedIn() && (
         resource.data.email == request.auth.token.email || 
         isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)
       );
+      allow delete: if isSignedIn() && isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members);
     }
 
     match /locations/{locationId} {
       allow list: if isSignedIn() && (resource == null || isCompanyMember(resource.data.companyMembers) || isAdmin());
       allow get: if isCompanyMember(resource.data.companyMembers) || isAdmin();
       allow create: if isCompanyAdmin(request.resource.data.companyMembers) || isAdmin();
-      allow update: if isCompanyAdmin(resource.data.companyMembers) || isAdmin();
+      // Allow update for company members sync (when someone joins the parent company) or admin management
+      allow update: if isCompanyAdmin(resource.data.companyMembers) || isAdmin() ||
+        (isSignedIn() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['companyMembers', 'updatedAt']) &&
+         request.resource.data.companyMembers.diff(resource.data.companyMembers).affectedKeys().hasOnly([request.auth.uid]));
       allow delete: if isAdmin();
     }
   }
