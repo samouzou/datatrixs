@@ -5,7 +5,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents an individual user within the Datatrixs application, linked to their external authentication identity and application-specific roles.",
+      "description": "Represents an individual user within the Datatrixs application.",
       "properties": {
         "id": {
           "type": "string",
@@ -58,23 +58,19 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Company",
       "type": "object",
-      "description": "Represents a private equity holding company, acting as the umbrella organization for multiple retail locations.",
+      "description": "Represents a private equity holding company.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the Company entity."
+          "type": "string"
         },
         "name": {
-          "type": "string",
-          "description": "The official name of the holding company."
+          "type": "string"
         },
         "description": {
-          "type": "string",
-          "description": "A brief description of the holding company."
+          "type": "string"
         },
         "members": {
           "type": "object",
-          "description": "A map of user IDs to roles ('admin' or 'member').",
           "additionalProperties": {
             "type": "string",
             "enum": [
@@ -85,12 +81,10 @@
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the company record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp indicating when the company record was last updated.",
           "format": "date-time"
         }
       },
@@ -160,44 +154,31 @@
       "description": "Represents an individual retail unit managed by a holding company.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the Location entity."
+          "type": "string"
         },
         "companyId": {
-          "type": "string",
-          "description": "Reference to the Company that owns this location."
+          "type": "string"
         },
         "name": {
-          "type": "string",
-          "description": "The name of the retail location."
+          "type": "string"
         },
         "addressLine1": {
-          "type": "string",
-          "description": "The primary street address of the location."
-        },
-        "addressLine2": {
-          "type": "string",
-          "description": "Secondary address information for the location."
+          "type": "string"
         },
         "city": {
-          "type": "string",
-          "description": "The city where the location is situated."
+          "type": "string"
         },
         "state": {
-          "type": "string",
-          "description": "The state or province where the location is situated."
+          "type": "string"
         },
         "zipCode": {
-          "type": "string",
-          "description": "The postal code of the location."
+          "type": "string"
         },
         "phoneNumber": {
-          "type": "string",
-          "description": "The main contact phone number for the location."
+          "type": "string"
         },
         "companyMembers": {
           "type": "object",
-          "description": "Denormalized membership map from the parent company.",
           "additionalProperties": {
             "type": "string",
             "enum": [
@@ -208,12 +189,10 @@
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the location record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp indicating when the location record was last updated.",
           "format": "date-time"
         }
       },
@@ -229,6 +208,23 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "SavedReport": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SavedReport",
+      "type": "object",
+      "description": "Persistent analysis results or reports saved by users.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["Financial Report", "Data Export", "Analysis"] },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "type", "createdAt"]
     }
   },
   "auth": {
@@ -277,6 +273,16 @@
             "$ref": "#/backend/entities/Location"
           },
           "description": "Stores individual retail location information."
+        }
+      },
+      {
+        "path": "/saved_reports/{reportId}",
+        "definition": {
+          "entityName": "SavedReport",
+          "schema": {
+            "$ref": "#/backend/entities/SavedReport"
+          },
+          "description": "Stores saved analyst insights and reports."
         }
       }
     ]

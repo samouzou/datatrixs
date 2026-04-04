@@ -1,7 +1,8 @@
+
 "use client"
 
 import * as React from "react"
-import { Send, Bot, User, Loader2, FileSpreadsheet, BarChart3, Maximize2 } from "lucide-react"
+import { Send, Bot, User, Loader2, FileSpreadsheet, BarChart3, Maximize2, Save, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -11,6 +12,9 @@ import { mockFinancialRecords } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 import { ChartView } from "@/components/analyst/chart-view"
+import { useUser, useFirestore } from "@/firebase"
+import { collection, doc } from "firebase/firestore"
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import {
   Dialog,
   DialogContent,
@@ -19,12 +23,14 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 
 type Message = {
   id: string
   role: "user" | "assistant"
   content: string
   data?: AiFinancialQueryAnalysisOutput
+  saved?: boolean
 }
 
 function parseCSV(csvString: string) {
@@ -44,6 +50,9 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterfaceProps) {
+  const { user } = useUser()
+  const firestore = useFirestore()
+  const { toast } = useToast()
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: "1",
@@ -115,6 +124,41 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     }
   }
 
+  const handleSaveResult = (message: Message) => {
+    if (!user || !firestore || !message.data) return;
+
+    const reportId = doc(collection(firestore, "saved_reports")).id;
+    const reportRef = doc(firestore, "saved_reports", reportId);
+    
+    const title = message.data.suggestedChart?.title || `Analysis: ${message.content.substring(0, 30)}...`;
+    const type = message.data.analysisType === 'data_extraction' ? 'Data Export' : 
+                 message.data.analysisType === 'report' ? 'Financial Report' : 'Analysis';
+
+    const reportData = {
+      id: reportId,
+      userId: user.uid,
+      title,
+      type,
+      summary: message.content,
+      content: message.data.rawSpreadsheetData || "",
+      metadata: {
+        results: message.data.results || null,
+        chart: message.data.suggestedChart || null,
+        analysisType: message.data.analysisType
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    setDocumentNonBlocking(reportRef, reportData, { merge: true });
+    
+    setMessages(prev => prev.map(m => m.id === message.id ? { ...m, saved: true } : m));
+    
+    toast({
+      title: "Saved to Library",
+      description: `"${title}" has been added to your reports history.`
+    });
+  }
+
   return (
     <Card className="flex flex-col h-[calc(100vh-12rem)] bg-card/20 border-border backdrop-blur-md">
       <ScrollArea className="flex-1 p-4">
@@ -135,12 +179,27 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                 m.role === "user" ? "items-end" : "items-start"
               )}>
                 <div className={cn(
-                  "p-4 rounded-2xl text-sm leading-relaxed shadow-sm transition-colors",
+                  "p-4 rounded-2xl text-sm leading-relaxed shadow-sm transition-colors group relative",
                   m.role === "user" 
                     ? "bg-primary text-white rounded-tr-none" 
                     : "bg-muted text-foreground rounded-tl-none border border-border"
                 )}>
                   {m.content}
+                  
+                  {m.role === "assistant" && m.data && (
+                    <Button 
+                      onClick={() => handleSaveResult(m)}
+                      disabled={m.saved}
+                      variant="ghost" 
+                      size="icon" 
+                      className={cn(
+                        "absolute -right-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                        m.saved ? "text-accent" : "text-muted-foreground hover:text-primary"
+                      )}
+                    >
+                      {m.saved ? <Check className="size-4" /> : <Save className="size-4" />}
+                    </Button>
+                  )}
                 </div>
                 
                 <div className="flex flex-wrap gap-2 mt-2">

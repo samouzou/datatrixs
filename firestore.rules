@@ -80,5 +80,13 @@ service cloud.firestore {
       allow update: if isCompanyAdmin(resource.data.companyMembers) || isAppAdmin() || isJoining(resource.data, request.resource.data, 'companyMembers');
       allow delete: if isAppAdmin();
     }
+
+    match /saved_reports/{reportId} {
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) || isAppAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAppAdmin();
+    }
   }
 }

@@ -52,6 +52,17 @@ export type Location = {
   updatedAt: string;
 };
 
+export type SavedReport = {
+  id: string;
+  userId: string;
+  title: string;
+  type: 'Financial Report' | 'Data Export' | 'Analysis';
+  summary: string;
+  content: string; // Markdown or JSON representation
+  metadata?: any;
+  createdAt: string;
+};
+
 export type FinancialMetric = 'Revenue' | 'Net Profit' | 'COGS' | 'Operating Expenses' | 'Inventory Value';
 
 export type FinancialRecord = {
