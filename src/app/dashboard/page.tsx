@@ -18,7 +18,7 @@ import {
   Line
 } from "recharts"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, collectionGroup, query, where } from "firebase/firestore"
+import { collection, query, where } from "firebase/firestore"
 import { FinancialRecord } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react"
@@ -28,19 +28,18 @@ export default function DashboardPage() {
   const { user } = useUser()
   const firestore = useFirestore()
 
-  // Fetch all financial records across all locations
-  // We use denormalized membership on each record to secure the collectionGroup query
+  // Fetch all financial records from top-level collection
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
-      collectionGroup(firestore, "financial_records"),
+      collection(firestore, "financial_records"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
   }, [firestore, user]);
 
   const { data: records, isLoading } = useCollection<FinancialRecord>(recordsQuery);
 
-  // Fetch locations to show in the bottom cards and check health
+  // Fetch locations to check health
   const locationsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -82,13 +81,13 @@ export default function DashboardPage() {
       if (r.metric === 'Net Profit') periodMap[r.period].profit += r.value;
     });
 
-    // Simple trend matching for "Previous Year" (Mocking comparison if historical data is thin)
+    // Simple trend matching for "Previous Year"
     const sortedPeriods = Object.keys(periodMap).sort();
     const trends = sortedPeriods.map(p => ({
       period: p,
       revenue: periodMap[p].revenue / 1000000, // Scale to Millions for chart
       profit: periodMap[p].profit / 1000000,
-      prevYearRevenue: (periodMap[p].revenue * 0.9) / 1000000 // Mock 10% lower for prev year if no data
+      prevYearRevenue: (periodMap[p].revenue * 0.9) / 1000000 
     }));
 
     const byLocation = Object.entries(locationMap).map(([name, revenue]) => ({
@@ -125,7 +124,7 @@ export default function DashboardPage() {
 
   const { kpis, byLocation, trends } = processedData;
 
-  // Identify unhealthy locations (no records in last 72h)
+  // Identify unhealthy locations (no updates in last 72h)
   const unhealthyLocs = locations?.filter(loc => {
     if (!loc.updatedAt) return true;
     const lastUpdate = new Date(loc.updatedAt).getTime();

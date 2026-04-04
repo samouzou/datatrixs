@@ -241,14 +241,16 @@
       "type": "object",
       "description": "A single financial metric record for a specific period and location.",
       "properties": {
+        "id": { "type": "string" },
         "locationId": { "type": "string" },
         "locationName": { "type": "string" },
         "period": { "type": "string", "description": "e.g., 'Q1 2024'" },
         "metric": { "type": "string", "description": "The name of the metric (e.g., 'Revenue', 'EBITDA', 'Custom Metric')" },
         "value": { "type": "number" },
+        "companyMembers": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["locationId", "locationName", "period", "metric", "value", "createdAt"]
+      "required": ["id", "locationId", "locationName", "period", "metric", "value", "companyMembers", "createdAt"]
     }
   },
   "auth": {
@@ -310,13 +312,13 @@
         }
       },
       {
-        "path": "/locations/{locationId}/financial_records/{recordId}",
+        "path": "/financial_records/{recordId}",
         "definition": {
           "entityName": "FinancialRecord",
           "schema": {
             "$ref": "#/backend/entities/FinancialRecord"
           },
-          "description": "Stores time-series financial data for a specific location."
+          "description": "Top-level collection for all financial records, secured by denormalized membership maps."
         }
       }
     ]

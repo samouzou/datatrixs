@@ -256,7 +256,7 @@ export default function LocationsPage() {
         const period = rowObj[periodColumn];
         if (!period) continue;
 
-        // For each mapped metric column, create a record
+        // For each mapped metric column, create a record in top-level collection
         Object.entries(mapping).forEach(([colName, metric]) => {
           if (metric === "ignore" || colName === periodColumn) return;
           
@@ -264,8 +264,9 @@ export default function LocationsPage() {
           const valNum = Number(valStr?.replace(/[^0-9.-]+/g, ""));
           
           if (!isNaN(valNum)) {
-            const recordRef = doc(collection(firestore, "locations", uploadingLocation.id, "financial_records"));
+            const recordRef = doc(collection(firestore, "financial_records"));
             const record: FinancialRecord = {
+              id: recordRef.id,
               locationId: uploadingLocation.id,
               locationName: uploadingLocation.name,
               period,

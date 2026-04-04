@@ -79,19 +79,14 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isCompanyAdmin(resource.data.companyMembers) || isAppAdmin() || isJoining(resource.data, request.resource.data, 'companyMembers');
       allow delete: if isAppAdmin();
-
-      match /financial_records/{recordId} {
-        allow list: if isSignedIn() && (isCompanyMember(get(/databases/$(database)/documents/locations/$(locationId)).data.companyMembers) || isAppAdmin());
-        allow get: if isSignedIn() && (isCompanyMember(get(/databases/$(database)/documents/locations/$(locationId)).data.companyMembers) || isAppAdmin());
-        allow create: if isSignedIn() && (isCompanyAdmin(get(/databases/$(database)/documents/locations/$(locationId)).data.companyMembers) || isAppAdmin());
-        allow update: if isSignedIn() && (isCompanyAdmin(get(/databases/$(database)/documents/locations/$(locationId)).data.companyMembers) || isAppAdmin());
-        allow delete: if isAppAdmin();
-      }
     }
 
-    // Collection Group rule for global Portfolio analysis
-    match /{path=**}/financial_records/{recordId} {
+    match /financial_records/{recordId} {
       allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow create: if isSignedIn() && (isCompanyMember(request.resource.data.companyMembers) || isAppAdmin());
+      allow update: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
+      allow delete: if isAppAdmin();
     }
 
     match /saved_reports/{reportId} {

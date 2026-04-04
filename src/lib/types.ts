@@ -69,11 +69,12 @@ export type SavedReport = {
 export type FinancialMetric = string;
 
 export type FinancialRecord = {
+  id: string;
   locationId: string;
   locationName: string;
   period: string; // e.g., "Q1 2024", "Oct 2023"
   metric: FinancialMetric;
   value: number;
-  companyMembers: Record<string, CompanyRole>; // Denormalized for secure collectionGroup queries
+  companyMembers: Record<string, CompanyRole>; // Denormalized for secure cross-collection visibility
   createdAt: string;
 };
