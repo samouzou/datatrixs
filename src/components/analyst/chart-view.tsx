@@ -37,6 +37,19 @@ const COLORS = [
   'hsl(var(--chart-5))'
 ]
 
+const formatCompactNumber = (number: number) => {
+  if (Math.abs(number) < 1000) return number.toString();
+  if (Math.abs(number) >= 1000000) return (number / 1000000).toFixed(1) + "M";
+  if (Math.abs(number) >= 1000) return (number / 1000).toFixed(1) + "K";
+  return number.toString();
+};
+
+const formatCurrency = (value: number) => {
+  if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
 export function ChartView({ type, title, data, xAxisLabel, yAxisLabel }: ChartViewProps) {
   if (!data || data.length === 0) {
     return (
@@ -82,9 +95,12 @@ export function ChartView({ type, title, data, xAxisLabel, yAxisLabel }: ChartVi
               tickMargin={8} 
               fontSize={10}
               className="fill-muted-foreground"
-              tickFormatter={(value) => `$${value.toLocaleString()}`}
+              tickFormatter={(value) => `$${formatCompactNumber(value)}`}
             />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartTooltip 
+              content={<ChartTooltipContent />} 
+              formatter={(value: number) => [formatCurrency(value), "Value"]}
+            />
             <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]} barSize={40} />
           </BarChart>
         ) : type === 'line' ? (
@@ -104,9 +120,12 @@ export function ChartView({ type, title, data, xAxisLabel, yAxisLabel }: ChartVi
               tickMargin={8} 
               fontSize={10}
               className="fill-muted-foreground"
-              tickFormatter={(value) => `$${value.toLocaleString()}`}
+              tickFormatter={(value) => `$${formatCompactNumber(value)}`}
             />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartTooltip 
+              content={<ChartTooltipContent />} 
+              formatter={(value: number) => [formatCurrency(value), "Value"]}
+            />
             <Line 
               type="monotone" 
               dataKey="value" 
@@ -132,7 +151,10 @@ export function ChartView({ type, title, data, xAxisLabel, yAxisLabel }: ChartVi
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+            <ChartTooltip 
+              content={<ChartTooltipContent hideLabel />} 
+              formatter={(value: number) => formatCurrency(value)}
+            />
           </PieChart>
         )}
       </ChartContainer>
