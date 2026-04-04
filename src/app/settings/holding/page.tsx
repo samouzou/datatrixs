@@ -3,9 +3,9 @@
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building2, Plus, Users, Shield, Loader2, Trash2 } from "lucide-react"
+import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc, setDoc, deleteDoc } from "firebase/firestore"
+import { collection, query, where, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore"
 import { 
   Dialog, 
   DialogContent, 
@@ -19,16 +19,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Company } from "@/lib/types"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function HoldingStructurePage() {
   const { user } = useUser()
   const firestore = useFirestore()
+  
+  // Create Modal State
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [newCompanyName, setNewCompanyName] = React.useState("")
   const [newCompanyDesc, setNewCompanyDesc] = React.useState("")
 
+  // Edit/Manage Modal State
+  const [editingCompany, setEditingCompany] = React.useState<Company | null>(null)
+  const [editName, setEditName] = React.useState("")
+  const [editDesc, setEditDesc] = React.useState("")
+
   // Query for companies where user is a member
-  // Using the denormalized 'members' map for efficient querying
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -52,17 +59,35 @@ export default function HoldingStructurePage() {
       updatedAt: new Date().toISOString()
     };
 
-    // Non-blocking write
-    setDoc(companyRef, companyData).catch(err => console.error("Failed to create company", err));
+    setDoc(companyRef, companyData);
     
     setIsCreateOpen(false);
     setNewCompanyName("");
     setNewCompanyDesc("");
   };
 
+  const handleUpdateCompany = () => {
+    if (!firestore || !editingCompany) return;
+
+    const companyRef = doc(firestore, "companies", editingCompany.id);
+    updateDoc(companyRef, {
+      name: editName,
+      description: editDesc,
+      updatedAt: new Date().toISOString()
+    });
+
+    setEditingCompany(null);
+  };
+
   const handleDeleteCompany = (id: string) => {
     if (!firestore) return;
-    deleteDoc(doc(firestore, "companies", id)).catch(err => console.error("Failed to delete company", err));
+    deleteDoc(doc(firestore, "companies", id));
+  };
+
+  const openManageDialog = (company: Company) => {
+    setEditingCompany(company);
+    setEditName(company.name);
+    setEditDesc(company.description || "");
   };
 
   return (
@@ -133,7 +158,14 @@ export default function HoldingStructurePage() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-8 text-xs">Manage Structure</Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs bg-background/50"
+                    onClick={() => openManageDialog(entity)}
+                  >
+                    <Settings2 className="mr-2 size-3" /> Manage Structure
+                  </Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -184,6 +216,87 @@ export default function HoldingStructurePage() {
           )}
         </div>
       )}
+
+      {/* Manage Structure Dialog */}
+      <Dialog open={!!editingCompany} onOpenChange={(open) => !open && setEditingCompany(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manage Holding Structure</DialogTitle>
+            <DialogDescription>
+              Configure organizational details and access control for this holding entity.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs defaultValue="profile" className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="profile">Entity Profile</TabsTrigger>
+              <TabsTrigger value="members">Authorized Members</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile" className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Legal Entity Name</Label>
+                <Input 
+                  id="edit-name" 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-desc">Business Focus & Description</Label>
+                <Textarea 
+                  id="edit-desc" 
+                  rows={4}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                />
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Technical ID</p>
+                <code className="text-xs break-all">{editingCompany?.id}</code>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="members" className="py-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Current Access List</p>
+                  <Button size="sm" variant="outline" className="h-8 text-[10px] uppercase font-bold">
+                    <Plus className="mr-1 size-3" /> Add Member
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => (
+                    <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
+                          {uid.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium">{uid === user?.uid ? "You (Current Session)" : "Authorized User"}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">{role === true ? "Administrator" : "Member"}</p>
+                        </div>
+                      </div>
+                      {uid !== user?.uid && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                          <X className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setEditingCompany(null)}>Cancel</Button>
+            <Button onClick={handleUpdateCompany} className="bg-primary hover:bg-primary/90">
+              <Save className="mr-2 size-4" /> Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="bg-primary/5 border-primary/20">
         <CardHeader>
