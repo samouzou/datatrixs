@@ -48,7 +48,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm your Datatrixs Financial Analyst. I can help you analyze your portfolio performance, generate spreadsheets, or identify trends. What data can I compile for you today?"
+      content: "Hello! I'm your Datatrixs Financial Analyst. I can help you analyze your portfolio performance through the end of 2025. I can generate spreadsheets, identify trends, or compare margins across your locations. What data can I compile for you today?"
     }
   ])
   const [input, setInput] = React.useState("")
@@ -92,7 +92,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       const result = await aiFinancialQueryAnalysis({
         query: input,
         financialData: JSON.stringify(mockFinancialRecords),
-        context: "Current entity: Datatrixs Holding Co. Retail location manager. Role: Admin."
+        context: "Current date is Jan 15, 2026. Data is complete for full years 2024 and 2025. Current entity: Datatrixs Holding Co. Retail location manager. Role: Admin."
       })
 
       const assistantMessage: Message = {
