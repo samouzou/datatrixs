@@ -19,7 +19,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Company, CompanyInvitation } from "@/lib/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Company, CompanyInvitation, CompanyRole } from "@/lib/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 
@@ -39,17 +40,23 @@ export default function HoldingStructurePage() {
   
   // Invite State
   const [inviteEmail, setInviteEmail] = React.useState("")
+  const [inviteRole, setInviteRole] = React.useState<CompanyRole>("member")
 
-  // Query for companies where user is a member
+  // Query for companies where user is a member or admin
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
-      collection(firestore, "companies"),
-      where(`members.${user.uid}`, "==", true)
+      collection(firestore, "companies")
     );
   }, [firestore, user]);
 
-  const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
+  const { data: rawCompanies, isLoading } = useCollection<Company>(companiesQuery);
+
+  // Filter companies where user has a role
+  const companies = React.useMemo(() => {
+    if (!user || !rawCompanies) return [];
+    return rawCompanies.filter(c => c.members && c.members[user.uid]);
+  }, [user, rawCompanies]);
 
   // Query for pending invitations for current user
   const invitationsQuery = useMemoFirebase(() => {
@@ -71,7 +78,7 @@ export default function HoldingStructurePage() {
       id: companyRef.id,
       name: newCompanyName,
       description: newCompanyDesc,
-      members: { [user.uid]: true },
+      members: { [user.uid]: 'admin' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -110,7 +117,7 @@ export default function HoldingStructurePage() {
       companyId: editingCompany.id,
       companyName: editingCompany.name,
       email: inviteEmail.trim(),
-      role: 'Member',
+      role: inviteRole,
       invitedBy: user.uid,
       status: 'pending',
       createdAt: new Date().toISOString()
@@ -118,6 +125,7 @@ export default function HoldingStructurePage() {
 
     setDoc(inviteRef, inviteData);
     setInviteEmail("");
+    setInviteRole("member");
   };
 
   const handleAcceptInvite = (invite: CompanyInvitation) => {
@@ -126,11 +134,11 @@ export default function HoldingStructurePage() {
     // 1. Update company members
     const companyRef = doc(firestore, "companies", invite.companyId);
     updateDoc(companyRef, {
-      [`members.${user.uid}`]: true,
+      [`members.${user.uid}`]: invite.role,
       updatedAt: new Date().toISOString()
     });
 
-    // 2. Mark invite as accepted (or delete)
+    // 2. Mark invite as accepted
     const inviteRef = doc(firestore, "company_invitations", invite.id);
     updateDoc(inviteRef, { status: 'accepted' });
   };
@@ -140,6 +148,11 @@ export default function HoldingStructurePage() {
     setEditName(company.name);
     setEditDesc(company.description || "");
   };
+
+  const currentUserRole = React.useMemo(() => {
+    if (!user || !editingCompany) return null;
+    return editingCompany.members[user.uid];
+  }, [user, editingCompany]);
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -204,7 +217,7 @@ export default function HoldingStructurePage() {
               <Card key={invite.id} className="bg-accent/5 border-accent/20">
                 <CardHeader className="p-4">
                   <CardTitle className="text-sm font-bold">Join {invite.companyName}</CardTitle>
-                  <CardDescription className="text-xs">You've been invited to join this company.</CardDescription>
+                  <CardDescription className="text-xs">Invited as: <span className="font-bold uppercase text-accent">{invite.role}</span></CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 flex gap-2">
                   <Button size="sm" className="bg-accent text-background hover:bg-accent/90" onClick={() => handleAcceptInvite(invite)}>
@@ -232,7 +245,7 @@ export default function HoldingStructurePage() {
                 <div className="space-y-1">
                   <CardTitle className="text-lg text-foreground">{entity.name}</CardTitle>
                   <CardDescription className="text-[10px] uppercase tracking-wider font-bold text-accent">
-                    Active Portfolio Entity
+                    {entity.members[user?.uid!] === 'admin' ? 'Administrator' : 'Authorized Member'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -242,16 +255,22 @@ export default function HoldingStructurePage() {
                     className="h-8 text-xs bg-background/50"
                     onClick={() => openManageDialog(entity)}
                   >
-                    <Settings2 className="mr-2 size-3" /> Manage Structure
+                    {entity.members[user?.uid!] === 'admin' ? (
+                      <><Settings2 className="mr-2 size-3" /> Manage Structure</>
+                    ) : (
+                      <><Users className="mr-2 size-3" /> View Team</>
+                    )}
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDeleteCompany(entity.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
+                  {entity.members[user?.uid!] === 'admin' && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteCompany(entity.id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -267,7 +286,7 @@ export default function HoldingStructurePage() {
                     <Shield className="size-4 text-muted-foreground" />
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase font-bold">Access Level</p>
-                      <p className="text-sm font-medium">Administrator</p>
+                      <p className="text-sm font-medium capitalize">{entity.members[user?.uid!]}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
@@ -294,9 +313,11 @@ export default function HoldingStructurePage() {
       <Dialog open={!!editingCompany} onOpenChange={(open) => !open && setEditingCompany(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Manage Holding Structure</DialogTitle>
+            <DialogTitle>{currentUserRole === 'admin' ? 'Manage Holding Structure' : 'View Team Structure'}</DialogTitle>
             <DialogDescription>
-              Configure organizational details and access control for this holding entity.
+              {currentUserRole === 'admin' 
+                ? 'Configure organizational details and access control for this holding entity.'
+                : 'View details and active members for this organization.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -313,6 +334,8 @@ export default function HoldingStructurePage() {
                   id="edit-name" 
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
+                  readOnly={currentUserRole !== 'admin'}
+                  className={currentUserRole !== 'admin' ? 'bg-muted' : ''}
                 />
               </div>
               <div className="grid gap-2">
@@ -322,44 +345,59 @@ export default function HoldingStructurePage() {
                   rows={4}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
+                  readOnly={currentUserRole !== 'admin'}
+                  className={currentUserRole !== 'admin' ? 'bg-muted' : ''}
                 />
               </div>
             </TabsContent>
 
             <TabsContent value="members" className="py-4 space-y-6">
               <div className="space-y-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="invite-email">Invite New Member</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                      <Input 
-                        id="invite-email" 
-                        placeholder="colleague@company.com" 
-                        className="pl-10"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                      />
+                {currentUserRole === 'admin' && (
+                  <div className="flex flex-col gap-2 p-4 rounded-lg bg-muted/30 border border-border">
+                    <Label htmlFor="invite-email" className="text-xs font-bold uppercase tracking-wider">Invite New Member</Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                        <Input 
+                          id="invite-email" 
+                          placeholder="colleague@company.com" 
+                          className="pl-10 h-10"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                        />
+                      </div>
+                      <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as CompanyRole)}>
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button onClick={handleSendInvite} disabled={!inviteEmail.trim()}>Send Invite</Button>
                     </div>
-                    <Button onClick={handleSendInvite} disabled={!inviteEmail.trim()}>Send Invite</Button>
                   </div>
-                </div>
+                )}
                 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Current Access List</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Access List</p>
                   {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => (
-                    <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
+                    <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
                       <div className="flex items-center gap-3">
                         <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
                           {uid.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-xs font-medium">{uid === user?.uid ? "You (Admin)" : "Authorized User"}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">{role === true ? "Administrator" : "Member"}</p>
+                          <p className="text-xs font-medium">{uid === user?.uid ? "You" : "Authorized User"}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                            {role}
+                          </p>
                         </div>
                       </div>
-                      {uid !== user?.uid && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                      {currentUserRole === 'admin' && uid !== user?.uid && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
                           <X className="size-4" />
                         </Button>
                       )}
@@ -371,10 +409,14 @@ export default function HoldingStructurePage() {
           </Tabs>
 
           <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setEditingCompany(null)}>Cancel</Button>
-            <Button onClick={handleUpdateCompany} className="bg-primary hover:bg-primary/90">
-              <Save className="mr-2 size-4" /> Save Changes
+            <Button variant="outline" onClick={() => setEditingCompany(null)}>
+              {currentUserRole === 'admin' ? 'Cancel' : 'Close'}
             </Button>
+            {currentUserRole === 'admin' && (
+              <Button onClick={handleUpdateCompany} className="bg-primary hover:bg-primary/90">
+                <Save className="mr-2 size-4" /> Save Changes
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

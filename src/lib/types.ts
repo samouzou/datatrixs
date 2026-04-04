@@ -12,11 +12,13 @@ export type UserProfile = {
   updatedAt: string;
 };
 
+export type CompanyRole = 'admin' | 'member';
+
 export type Company = {
   id: string;
   name: string;
   description?: string;
-  members: Record<string, boolean>; // Denormalized for rules: { [uid: string]: true }
+  members: Record<string, CompanyRole>; // Denormalized for rules: { [uid: string]: 'admin' | 'member' }
   createdAt: string;
   updatedAt: string;
 };
@@ -26,7 +28,7 @@ export type CompanyInvitation = {
   companyId: string;
   companyName: string;
   email: string;
-  role: string;
+  role: CompanyRole;
   invitedBy: string;
   status: 'pending' | 'accepted' | 'declined';
   createdAt: string;
@@ -42,7 +44,7 @@ export type Location = {
   state: string;
   zipCode: string;
   phoneNumber: string;
-  companyMembers: Record<string, boolean>; // Denormalized from Company for rules
+  companyMembers: Record<string, CompanyRole>; // Denormalized from Company for rules
   integrationStatus: 'connected' | 'pending' | 'disconnected';
   integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
   lastSync?: string;

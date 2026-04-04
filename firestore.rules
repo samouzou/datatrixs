@@ -13,16 +13,16 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isMember(memberMap) {
-      return isSignedIn() && memberMap[request.auth.uid] == true;
+    function isCompanyMember(members) {
+      return isSignedIn() && members[request.auth.uid] in ['admin', 'member'];
+    }
+
+    function isCompanyAdmin(members) {
+      return isSignedIn() && members[request.auth.uid] == 'admin';
     }
 
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/app_roles_admin/$(request.auth.uid));
-    }
-
-    function isEmailInvited(email) {
-      return isSignedIn() && request.auth.token.email == email;
     }
 
     // --- Collection Rules ---
@@ -36,10 +36,10 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow list: if isSignedIn() && (resource == null || isMember(resource.data.members)) || isAdmin();
-      allow get: if isMember(resource.data.members) || isAdmin();
+      allow list: if isSignedIn() && (resource == null || isCompanyMember(resource.data.members)) || isAdmin();
+      allow get: if isCompanyMember(resource.data.members) || isAdmin();
       allow create: if isSignedIn();
-      allow update: if isMember(resource.data.members) || isAdmin();
+      allow update: if isCompanyAdmin(resource.data.members) || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -48,19 +48,21 @@ service cloud.firestore {
       allow list: if isSignedIn() && (resource == null || resource.data.email == request.auth.token.email);
       allow get: if isSignedIn() && resource.data.email == request.auth.token.email;
       
-      // Allow company members to create and manage invites for their company
-      allow create: if isSignedIn() && isMember(get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.members);
+      // Allow company admins to create invitations
+      allow create: if isSignedIn() && isCompanyAdmin(get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.members);
+      
+      // Allow user or company admin to delete/update
       allow update, delete: if isSignedIn() && (
         resource.data.email == request.auth.token.email || 
-        isMember(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)
+        isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)
       );
     }
 
     match /locations/{locationId} {
-      allow list: if isSignedIn() && (resource == null || isMember(resource.data.companyMembers)) || isAdmin();
-      allow get: if isMember(resource.data.companyMembers) || isAdmin();
-      allow create: if isMember(request.resource.data.companyMembers) || isAdmin();
-      allow update: if isMember(resource.data.companyMembers) || isAdmin();
+      allow list: if isSignedIn() && (resource == null || isCompanyMember(resource.data.companyMembers)) || isAdmin();
+      allow get: if isCompanyMember(resource.data.companyMembers) || isAdmin();
+      allow create: if isCompanyAdmin(request.resource.data.companyMembers) || isAdmin();
+      allow update: if isCompanyAdmin(resource.data.companyMembers) || isAdmin();
       allow delete: if isAdmin();
     }
   }

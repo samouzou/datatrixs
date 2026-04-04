@@ -74,9 +74,13 @@
         },
         "members": {
           "type": "object",
-          "description": "A map of user IDs to roles or boolean flags for membership.",
+          "description": "A map of user IDs to roles ('admin' or 'member').",
           "additionalProperties": {
-            "type": "boolean"
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
           }
         },
         "createdAt": {
@@ -117,7 +121,11 @@
           "format": "email"
         },
         "role": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "admin",
+            "member"
+          ]
         },
         "invitedBy": {
           "type": "string"
@@ -140,6 +148,7 @@
         "companyId",
         "companyName",
         "email",
+        "role",
         "status",
         "createdAt"
       ]
@@ -190,7 +199,11 @@
           "type": "object",
           "description": "Denormalized membership map from the parent company.",
           "additionalProperties": {
-            "type": "boolean"
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
           }
         },
         "createdAt": {
