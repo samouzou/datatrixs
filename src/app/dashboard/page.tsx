@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -43,15 +42,20 @@ const sortPeriods = (periods: string[]) => {
 };
 
 const displayPeriod = (p: string) => {
+  // Handle YYYY-QN
   if (p.includes('-Q')) {
     const [y, q] = p.split('-');
     return `${q} ${y}`;
   }
+  // Handle YYYY-MM
   if (p.includes('-')) {
     const parts = p.split('-');
     if (parts.length === 2) {
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      return `${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
+      const monthIdx = parseInt(parts[1]) - 1;
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${months[monthIdx]} ${parts[0]}`;
+      }
     }
   }
   return p;
@@ -98,7 +102,6 @@ export default function DashboardPage() {
     let totalInventory = 0;
 
     records.forEach(r => {
-      // Aggregate by Metric (Case-insensitive matching for normalized metrics)
       const metric = r.metric.toLowerCase();
       
       if (metric === 'revenue') {
@@ -108,7 +111,7 @@ export default function DashboardPage() {
       if (metric === 'net profit') totalProfit += r.value;
       if (metric === 'inventory value') totalInventory += r.value;
 
-      // Aggregations for Trends (Group by Normalized Period)
+      // Group by Normalized Period
       if (!periodMap[r.period]) {
         periodMap[r.period] = { revenue: 0, profit: 0 };
       }
@@ -122,7 +125,7 @@ export default function DashboardPage() {
       displayPeriod: displayPeriod(p),
       revenue: periodMap[p].revenue, 
       profit: periodMap[p].profit,
-      prevYearRevenue: periodMap[p].revenue * 0.85 // Simulated target baseline
+      prevYearRevenue: periodMap[p].revenue * 0.85 
     }));
 
     const byLocation = Object.entries(locationMap).map(([name, revenue]) => ({
@@ -160,7 +163,6 @@ export default function DashboardPage() {
 
   const { kpis, byLocation, trends, locRevenueMap } = processedData;
 
-  // Operational Health monitoring (dynamic 72h window)
   const unhealthyLocs = locations?.filter(loc => {
     if (!loc.updatedAt) return true;
     const lastUpdate = new Date(loc.updatedAt).getTime();
@@ -189,7 +191,7 @@ export default function DashboardPage() {
           change={12.5} 
           trend="up" 
           prefix="$" 
-          secondaryLabel={`Target: $2.5M (${((kpis.revenue / 2500000) * 100).toFixed(0)}%)`}
+          secondaryLabel={`Target: $1.5M (${((kpis.revenue / 1500000) * 100).toFixed(0)}%)`}
         />
         <KpiCard 
           label="Net Profit" 
@@ -212,7 +214,6 @@ export default function DashboardPage() {
           trend="down" 
         />
         
-        {/* Dynamic AI Analysis Panel */}
         <Card className="bg-primary/5 border-primary/20 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-2">
             <Zap className="size-4 text-primary opacity-50" />
