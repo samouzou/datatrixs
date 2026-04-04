@@ -49,6 +49,29 @@ import {
 
 const INITIAL_FINANCIAL_METRICS = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
 
+// Normalization Utility for Periods
+const normalizePeriod = (p: string): string => {
+  const trimmed = p.trim();
+  
+  // Try QX YYYY -> YYYY-QN
+  const qMatch = trimmed.match(/Q([1-4])\s+(\d{4})/i);
+  if (qMatch) return `${qMatch[2]}-Q${qMatch[1]}`;
+  
+  // Try YYYY QX
+  const qMatchRev = trimmed.match(/(\d{4})\s+Q([1-4])/i);
+  if (qMatchRev) return `${qMatchRev[1]}-Q${qMatchRev[2]}`;
+
+  // Try Date Parser
+  const date = new Date(trimmed);
+  if (!isNaN(date.getTime())) {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    return `${y}-${m}`;
+  }
+  
+  return trimmed; // Fallback to raw if unparseable
+};
+
 export default function LocationsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
@@ -154,7 +177,7 @@ export default function LocationsPage() {
     setMapping({});
     setPeriodColumn("");
     
-    // Load Company-level custom metrics + default metrics
+    // Load Holding-level normalization catalog
     const companyMetrics = parentCompany?.customMetrics || [];
     setAvailableMetrics([...INITIAL_FINANCIAL_METRICS, ...companyMetrics]);
   };
@@ -169,7 +192,7 @@ export default function LocationsPage() {
       setCsvContent(content);
       toast({
         title: "File Loaded",
-        description: `${file.name} has been parsed. Click 'Continue' to map columns.`
+        description: `${file.name} has been parsed. Proceed to map columns.`
       });
     };
     reader.readAsText(file);
@@ -186,12 +209,21 @@ export default function LocationsPage() {
     const firstLine = lines[0].split(',').map(h => h.trim());
     setHeaders(firstLine);
     
-    // Auto-suggest mappings
+    // Auto-Normalization Suggestions
     const initialMapping: Record<string, string | "ignore"> = {};
     let suggestedPeriod = "";
     
+    const internalFields = ["ai red flag", "sync status", "data source", "location"];
+
     firstLine.forEach(h => {
       const lowerH = h.toLowerCase();
+      
+      // Filter out internal system fields
+      if (internalFields.some(f => lowerH.includes(f))) {
+        initialMapping[h] = "ignore";
+        return;
+      }
+
       if (lowerH.includes('period') || lowerH.includes('date') || lowerH.includes('month') || lowerH.includes('quarter')) {
         suggestedPeriod = h;
       }
@@ -218,16 +250,14 @@ export default function LocationsPage() {
 
     const currentMetrics = parentCompany.customMetrics || [];
     if (currentMetrics.includes(trimmed)) {
-      toast({ title: "Metric exists", description: "This metric is already in your holding's list." });
+      toast({ title: "Metric exists", description: "This metric is already in your global chart of accounts." });
       return;
     }
 
     const updatedMetrics = [...currentMetrics, trimmed];
-    
-    // Update local state
     setAvailableMetrics(prev => [...prev, trimmed]);
     
-    // Persist to Company document (Shared across all locations)
+    // Persist to Holding Company Document (Normalization Catalog)
     const companyRef = doc(firestore, "companies", parentCompany.id);
     updateDocumentNonBlocking(companyRef, {
       customMetrics: updatedMetrics,
@@ -236,10 +266,7 @@ export default function LocationsPage() {
 
     setNewMetricName("");
     setIsAddingMetric(false);
-    toast({ 
-      title: "Metric Added", 
-      description: `"${trimmed}" is now shared across all locations in this holding.` 
-    });
+    toast({ title: "Global Metric Added", description: `"${trimmed}" added to holding COA.` });
   };
 
   const handleUploadData = async () => {
@@ -262,8 +289,11 @@ export default function LocationsPage() {
           rowObj[h] = values[i];
         });
 
-        const period = rowObj[periodColumn];
-        if (!period) continue;
+        const rawPeriod = rowObj[periodColumn];
+        if (!rawPeriod) continue;
+        
+        // --- DATA NORMALIZATION ---
+        const normalizedPeriod = normalizePeriod(rawPeriod);
 
         Object.entries(mapping).forEach(([colName, metric]) => {
           if (metric === "ignore" || colName === periodColumn) return;
@@ -277,7 +307,7 @@ export default function LocationsPage() {
               id: recordRef.id,
               locationId: uploadingLocation.id,
               locationName: uploadingLocation.name,
-              period,
+              period: normalizedPeriod, // Store normalized version
               metric: metric as FinancialMetric,
               value: valNum,
               companyMembers: uploadingLocation.companyMembers,
@@ -299,14 +329,14 @@ export default function LocationsPage() {
         });
         
         await batch.commit();
-        toast({ title: "Data Ingested", description: `Successfully imported ${successCount} data points for ${uploadingLocation.name}.` });
+        toast({ title: "Data Normalized", description: `Ingested ${successCount} records for ${uploadingLocation.name}.` });
         setIsUploadOpen(false);
       } else {
-        toast({ variant: "destructive", title: "Upload Failed", description: "No valid numeric data found in mapped columns." });
+        toast({ variant: "destructive", title: "Upload Failed", description: "No valid numeric data found." });
       }
     } catch (error: any) {
       console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to process data." });
+      toast({ variant: "destructive", title: "Normalization Error", description: "Could not process data." });
     } finally {
       setIsUploading(false);
     }
@@ -317,7 +347,7 @@ export default function LocationsPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage Locations</h2>
-          <p className="text-muted-foreground">Portfolio of retail locations across your holding companies.</p>
+          <p className="text-muted-foreground">Standardizing financials across your private equity portfolio.</p>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -396,26 +426,26 @@ export default function LocationsPage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4">
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Status</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Normalization Status</p>
                     <div className="flex items-center gap-2">
                       <div className={cn("size-2 rounded-full", loc.integrationStatus === 'connected' ? "bg-accent" : "bg-yellow-500")} />
                       <span className="text-sm font-medium capitalize">{loc.integrationStatus}</span>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Last Sync</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Last Standard Sync</p>
                     <div className="flex items-center gap-1.5 text-sm font-medium">
                       <History className="size-3 text-muted-foreground" />
                       {loc.lastSync || "Never"}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Parent Company</p>
-                    <p className="text-sm truncate">{companies?.find(c => c.id === loc.companyId)?.name || 'Unknown'}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Parent Holding</p>
+                    <p className="text-sm truncate font-medium">{companies?.find(c => c.id === loc.companyId)?.name || 'Unknown'}</p>
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" size="sm" className="h-8 text-xs bg-primary/10 text-primary" onClick={() => handleOpenUpload(loc)}>
-                      <Upload className="mr-2 size-3" /> Ingest Financials
+                    <Button variant="outline" size="sm" className="h-8 text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" onClick={() => handleOpenUpload(loc)}>
+                      <Upload className="mr-2 size-3" /> Normalize Data
                     </Button>
                   </div>
                 </div>
@@ -428,8 +458,8 @@ export default function LocationsPage() {
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Ingest Financial Data: {uploadingLocation?.name}</DialogTitle>
-            <DialogDescription>Map your spreadsheet columns to internal financial metrics.</DialogDescription>
+            <DialogTitle>Normalization Engine: {uploadingLocation?.name}</DialogTitle>
+            <DialogDescription>Map disparate spreadsheet columns to your global chart of accounts.</DialogDescription>
           </DialogHeader>
 
           {uploadStep === "input" ? (
@@ -437,29 +467,29 @@ export default function LocationsPage() {
               <Tabs defaultValue="paste" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 bg-muted/50 h-11">
                   <TabsTrigger value="paste" className="h-9"><ClipboardList className="size-4 mr-2" /> Paste CSV</TabsTrigger>
-                  <TabsTrigger value="upload" className="h-9"><Database className="size-4 mr-2" /> Upload File</TabsTrigger>
+                  <TabsTrigger value="upload" className="h-9"><Database className="size-4 mr-2" /> Upload CSV</TabsTrigger>
                 </TabsList>
                 <TabsContent value="paste" className="space-y-4 pt-4">
                   <div className="bg-primary/5 p-3 rounded border border-primary/10 flex justify-between items-center">
                     <p className="text-[11px] text-muted-foreground">
                       <AlertCircle className="size-3 inline mr-1" /> 
-                      Ensure the first row contains headers. Use comma-separated values.
+                      Normalization will automatically detect periods and scale values.
                     </p>
                     {uploadingLocation?.lastRawData && (
                       <span className="text-[10px] font-bold text-primary uppercase flex items-center gap-1">
-                        <FileText className="size-3" /> Showing stored data
+                        <FileText className="size-3" /> Persistent cache available
                       </span>
                     )}
                   </div>
                   <Textarea 
                     placeholder="Period, Revenue, COGS, Net Profit..." 
                     rows={12} 
-                    className="font-mono text-xs"
+                    className="font-mono text-xs border-muted focus-visible:ring-primary"
                     value={csvContent}
                     onChange={(e) => setCsvContent(e.target.value)}
                   />
                 </TabsContent>
-                <TabsContent value="upload" className="py-12 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground relative">
+                <TabsContent value="upload" className="py-12 border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground relative hover:bg-muted/30 transition-colors">
                   <input 
                     type="file" 
                     accept=".csv" 
@@ -468,53 +498,54 @@ export default function LocationsPage() {
                     onChange={handleFileChange}
                   />
                   <Upload className="size-8 mb-4 opacity-20" />
-                  <p className="text-sm">Click or drag a CSV file here</p>
-                  <p className="text-[10px] uppercase mt-2">Supports .CSV only</p>
-                  <Button variant="outline" size="sm" className="mt-4 pointer-events-none">Browse Files</Button>
+                  <p className="text-sm font-medium">Click or drag a CSV file here</p>
+                  <p className="text-[10px] uppercase mt-2 tracking-widest">Supports .CSV UTF-8</p>
+                  <Button variant="outline" size="sm" className="mt-4 pointer-events-none">Select File</Button>
                 </TabsContent>
               </Tabs>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsUploadOpen(false)}>Cancel</Button>
-                <Button onClick={handleAnalyzeCSV} disabled={!csvContent.trim()}>Continue to Mapping <ArrowRight className="ml-2 size-4" /></Button>
+                <Button onClick={handleAnalyzeCSV} disabled={!csvContent.trim()} className="bg-primary">Continue to Mapping <ArrowRight className="ml-2 size-4" /></Button>
               </DialogFooter>
             </div>
           ) : (
             <div className="space-y-6 py-4">
               <div className="grid gap-4">
-                <div className="p-3 bg-muted/30 rounded-lg border border-border">
-                  <Label className="text-xs font-bold uppercase tracking-tight mb-2 block">1. Select Period Column</Label>
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 block">1. Source Period Normalization</Label>
                   <Select value={periodColumn} onValueChange={setPeriodColumn}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Choose the column containing the date/period" />
+                    <SelectTrigger className="bg-background border-border h-11">
+                      <SelectValue placeholder="Select column containing date or fiscal period" />
                     </SelectTrigger>
                     <SelectContent>
                       {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground mt-1 italic">Format: "Q1 2024", "Oct 2023", "2024-01-01"</p>
+                  <p className="text-[10px] text-muted-foreground mt-2 italic">Engine supports: Q1 2024, Jan-24, 2024-01-01, etc.</p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold uppercase tracking-tight block">2. Map Financial Metrics</Label>
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-foreground block">2. Map to Global Chart of Accounts</Label>
                     <Dialog open={isAddingMetric} onOpenChange={setIsAddingMetric}>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-primary">
-                          <Plus className="size-3 mr-1" /> Add Custom Metric
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-primary hover:bg-primary/10">
+                          <Plus className="size-3 mr-1" /> Extend COA
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Add Custom Financial Metric</DialogTitle>
-                          <DialogDescription>Define a new metric type for your holding's analysis.</DialogDescription>
+                          <DialogTitle>Extend Global Chart of Accounts</DialogTitle>
+                          <DialogDescription>Define a new standardized metric for all locations in this holding.</DialogDescription>
                         </DialogHeader>
                         <div className="py-4">
                           <Label htmlFor="custom-metric">Metric Name</Label>
                           <Input 
                             id="custom-metric" 
-                            placeholder="e.g., Marketing ROI, EBITDA, etc." 
+                            placeholder="e.g., Marketing ROI, EBITDA" 
                             value={newMetricName}
                             onChange={(e) => setNewMetricName(e.target.value)}
+                            className="mt-2"
                           />
                         </div>
                         <DialogFooter>
@@ -524,34 +555,28 @@ export default function LocationsPage() {
                       </DialogContent>
                     </Dialog>
                   </div>
-                  <div className="rounded-md border border-border overflow-hidden bg-card">
+                  <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
                     <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="text-[10px] font-bold">CSV Header</TableHead>
-                          <TableHead className="text-[10px] font-bold">Datatrixs Metric</TableHead>
+                          <TableHead className="text-[10px] font-bold uppercase tracking-wider">Source Header</TableHead>
+                          <TableHead className="text-[10px] font-bold uppercase tracking-wider text-right">Standardized Target</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {headers.filter(h => {
-                          const lowerH = h.toLowerCase();
-                          return h !== periodColumn && 
-                                 !lowerH.includes('ai red flag') && 
-                                 !lowerH.includes('sync status') &&
-                                 !lowerH.includes('data source');
-                        }).map((h) => (
-                          <TableRow key={h}>
-                            <TableCell className="text-xs font-medium">{h}</TableCell>
-                            <TableCell>
+                        {headers.filter(h => h !== periodColumn && !["ignore"].includes(mapping[h] || "")).map((h) => (
+                          <TableRow key={h} className="group">
+                            <TableCell className="text-xs font-medium py-3">{h}</TableCell>
+                            <TableCell className="text-right">
                               <Select 
                                 value={mapping[h] || "ignore"} 
                                 onValueChange={(val) => setMapping(prev => ({ ...prev, [h]: val }))}
                               >
-                                <SelectTrigger className="h-8 text-xs bg-background">
+                                <SelectTrigger className="h-8 text-[11px] bg-background border-border w-[180px] ml-auto">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="ignore" className="text-muted-foreground italic">-- Ignore Column --</SelectItem>
+                                  <SelectItem value="ignore" className="text-muted-foreground italic">-- Ignore --</SelectItem>
                                   {availableMetrics.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                                 </SelectContent>
                               </Select>
@@ -565,9 +590,9 @@ export default function LocationsPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setUploadStep("input")}>Back</Button>
-                <Button onClick={handleUploadData} disabled={isUploading || !periodColumn}>
+                <Button onClick={handleUploadData} disabled={isUploading || !periodColumn} className="bg-primary">
                   {isUploading ? <Loader2 className="size-4 animate-spin mr-2" /> : <Check className="size-4 mr-2" />}
-                  Ingest {csvContent.trim().split('\n').filter(l => l.trim()).length - 1} Records
+                  Normalize & Commit
                 </Button>
               </DialogFooter>
             </div>
