@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 
@@ -168,6 +169,12 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-6xl max-h-[90vh] bg-background border-border p-0 overflow-hidden">
+                          <DialogHeader className="sr-only">
+                            <DialogTitle>Data Analysis Result</DialogTitle>
+                            <DialogDescription>
+                              Interactive spreadsheet view of the compiled financial data.
+                            </DialogDescription>
+                          </DialogHeader>
                           <div className="p-1">
                             {(() => {
                               const { headers, data } = parseCSV(m.data.rawSpreadsheetData!);
