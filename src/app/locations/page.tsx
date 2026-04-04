@@ -97,7 +97,7 @@ export default function LocationsPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage Locations</h2>
-          <p className="text-muted-foreground">Portfolio of retail tire shops across your holding companies.</p>
+          <p className="text-muted-foreground">Portfolio of retail locations across your holding companies.</p>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -108,9 +108,9 @@ export default function LocationsPage() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add Retail Location</DialogTitle>
+              <DialogTitle>Add Business Location</DialogTitle>
               <DialogDescription>
-                Register a new tire shop location and link it to a holding company.
+                Register a new retail or service location and link it to a holding company.
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-4">
@@ -129,7 +129,7 @@ export default function LocationsPage() {
               </div>
               <div className="grid gap-2 col-span-2">
                 <Label htmlFor="name">Location Name</Label>
-                <Input id="name" placeholder="e.g., Houston West Tires" value={name} onChange={e => setName(e.target.value)} />
+                <Input id="name" placeholder="e.g., Houston West Branch" value={name} onChange={e => setName(e.target.value)} />
               </div>
               <div className="grid gap-2 col-span-2">
                 <Label htmlFor="address">Address</Label>
@@ -167,7 +167,7 @@ export default function LocationsPage() {
       ) : (
         <div className="grid gap-6">
           {locations?.map((loc) => (
-            <Card key={loc.id} className="bg-card/50 border-border">
+            <Card key={loc.id} className="bg-card/50 border-border shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="space-y-1">
                   <CardTitle className="text-xl">{loc.name}</CardTitle>
@@ -224,7 +224,7 @@ export default function LocationsPage() {
                       <RefreshCw className="mr-2 size-3" /> Sync
                     </Button>
                     <Button variant="outline" size="sm" className="h-8 text-xs bg-muted/50">
-                      <Upload className="mr-2 size-3" /> Upload Excel
+                      <Upload className="mr-2 size-3" /> Upload Data
                     </Button>
                   </div>
                 </div>
@@ -234,7 +234,7 @@ export default function LocationsPage() {
           {!locations?.length && (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl">
               <MapPin className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-muted-foreground">No retail locations found. Start by creating a company, then add locations.</p>
+              <p className="text-muted-foreground">No business locations found. Start by creating a company, then add locations.</p>
             </div>
           )}
         </div>

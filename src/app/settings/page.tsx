@@ -8,12 +8,12 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="space-y-1">
-        <h2 className="text-3xl font-bold tracking-tight text-white font-headline">Global Settings</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Global Settings</h2>
         <p className="text-muted-foreground">Manage your holding company and global financial configurations.</p>
       </div>
       
       <div className="grid gap-6">
-        <Card className="bg-card/50 border-white/5">
+        <Card className="bg-card/50 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Holding Company Profile</CardTitle>
             <CardDescription>Fundamental details about the parent entity.</CardDescription>
@@ -26,7 +26,7 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="industry">Industry Sector</Label>
-                <Input id="industry" defaultValue="Automotive Retail" className="bg-muted border-none" />
+                <Input id="industry" defaultValue="Retail & Services" className="bg-muted border-none" />
               </div>
             </div>
             <div className="space-y-2">
@@ -37,7 +37,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/50 border-white/5">
+        <Card className="bg-card/50 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Financial Normalization</CardTitle>
             <CardDescription>Configure how disparate accounts are mapped to your global chart of accounts.</CardDescription>
@@ -50,7 +50,7 @@ export default function SettingsPage() {
                 <Button variant="ghost" size="sm" className="h-7 text-xs">Change</Button>
               </div>
             </div>
-            <Separator className="bg-white/5" />
+            <Separator className="bg-border" />
             <div className="space-y-2">
               <Label>Auto-Categorization Sensitivity</Label>
               <p className="text-xs text-muted-foreground mb-4">Higher sensitivity means more manual review for edge-case transactions.</p>

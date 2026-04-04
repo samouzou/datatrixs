@@ -54,8 +54,8 @@ const aiDrivenCustomDataExportPrompt = ai.definePrompt({
 
 Follow these rules:
 1.  **Strictly adhere to the output JSON schema.** Do not include any additional text or formatting outside of the JSON object.
-2.  **Act as if you have access to historical financial data for a tire retail business.** Generate realistic-looking data based on the request.
-3.  **Identify key metrics, timeframes, locations, and product categories** from the user's query to construct relevant data.
+2.  **Act as if you have access to historical financial data for a multi-location retail or service business.** Generate realistic-looking data based on the request.
+3.  **Identify key metrics, timeframes, locations, and service categories** from the user's query to construct relevant data.
 4.  **Populate the 'tableName' field** with a clear, descriptive title for the generated data.
 5.  **Populate the 'header' field** with an array of string column names.
 6.  **Populate the 'data' field** with an array of arrays of strings. Each inner array represents a row, and its values must correspond to the 'header' columns in order.
