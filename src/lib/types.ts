@@ -1,17 +1,41 @@
-export type HoldingCompany = {
+export type UserRole = 'Admin' | 'Analyst' | 'LocationManager';
+
+export type UserProfile = {
+  id: string;
+  externalAuthIdentifier: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Company = {
   id: string;
   name: string;
-  industry: string;
+  description?: string;
+  members: Record<string, boolean>; // Denormalized for rules: { [uid: string]: true }
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type Location = {
   id: string;
-  holdingId: string;
+  companyId: string;
   name: string;
-  address: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  phoneNumber: string;
+  companyMembers: Record<string, boolean>; // Denormalized from Company for rules
   integrationStatus: 'connected' | 'pending' | 'disconnected';
   integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
-  lastSync: string;
+  lastSync?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type FinancialMetric = 'Revenue' | 'Net Profit' | 'COGS' | 'Operating Expenses' | 'Inventory Value';
