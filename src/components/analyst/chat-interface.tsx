@@ -8,12 +8,11 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card } from "@/components/ui/card"
 import { aiFinancialQueryAnalysis, type AiFinancialQueryAnalysisOutput } from "@/ai/flows/ai-financial-query-analysis"
-import { mockFinancialRecords } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 import { ChartView } from "@/components/analyst/chart-view"
-import { useUser, useFirestore } from "@/firebase"
-import { collection, doc } from "firebase/firestore"
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { collection, doc, query, where } from "firebase/firestore"
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import {
   Dialog,
@@ -24,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { FinancialRecord } from "@/lib/types"
 
 type Message = {
   id: string
@@ -53,11 +53,23 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   const { user } = useUser()
   const firestore = useFirestore()
   const { toast } = useToast()
+  
+  // Fetch real financial records for the AI context
+  const recordsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, "financial_records"),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user]);
+
+  const { data: records, isLoading: isRecordsLoading } = useCollection<FinancialRecord>(recordsQuery);
+
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm your Datatrixs Financial Analyst. I can help you analyze your portfolio performance through the end of 2025. I can generate spreadsheets, identify trends, or compare margins across your locations. What data can I compile for you today?"
+      content: "Hello! I'm your Datatrixs Financial Analyst. I have access to your normalized portfolio data. I can generate spreadsheets, identify trends, or compare margins across your locations. What data can I compile for you today?"
     }
   ])
   const [input, setInput] = React.useState("")
@@ -85,7 +97,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!input.trim() || loading) return
+    if (!input.trim() || loading || isRecordsLoading) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -97,11 +109,19 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     setInput("")
     setLoading(true)
 
+    // Prepare records for AI by mapping to the schema it expects
+    const aiData = records?.map(r => ({
+      location: r.locationName,
+      period: r.period,
+      metric: r.metric,
+      value: r.value
+    })) || [];
+
     try {
       const result = await aiFinancialQueryAnalysis({
         query: input,
-        financialData: JSON.stringify(mockFinancialRecords),
-        context: "Current date is Jan 15, 2026. Data is complete for full years 2024 and 2025. Current entity: Datatrixs Holding Co. Retail location manager. Role: Admin."
+        financialData: JSON.stringify(aiData),
+        context: `Current date is ${new Date().toLocaleDateString()}. Data is real-time from your portfolio. Authorized entities: Datatrixs Holding Co. Role: Admin.`
       })
 
       const assistantMessage: Message = {
@@ -116,7 +136,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm sorry, I encountered an error while analyzing the data. Please try again."
+        content: "I'm sorry, I encountered an error while analyzing your live data. Please ensure you have uploaded normalized financials for your locations."
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
@@ -293,13 +313,13 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input 
             ref={inputRef}
-            placeholder="e.g., 'Compare revenue for Houston and Dallas across all quarters in a table'" 
+            placeholder={isRecordsLoading ? "Loading financial data..." : "e.g., 'Compare revenue for Houston and Dallas across all quarters in a table'"} 
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={loading}
+            disabled={loading || isRecordsLoading}
             className="bg-muted border-none focus-visible:ring-primary h-12 text-sm"
           />
-          <Button type="submit" size="icon" disabled={loading} className="h-12 w-12 rounded-lg bg-primary hover:bg-primary/90 transition-transform active:scale-95">
+          <Button type="submit" size="icon" disabled={loading || isRecordsLoading || !input.trim()} className="h-12 w-12 rounded-lg bg-primary hover:bg-primary/90 transition-transform active:scale-95">
             <Send className="size-5" />
           </Button>
         </form>
