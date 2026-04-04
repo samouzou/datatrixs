@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -33,7 +34,7 @@ import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { query, collection, where, orderBy, doc } from "firebase/firestore"
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { SavedReport, FinancialRecord } from "@/lib/types"
+import { SavedReport, FinancialRecord, Company } from "@/lib/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 
@@ -93,6 +94,16 @@ export default function ReportsPage() {
   }, [firestore, user]);
   const { data: records, isLoading: isRecordsLoading } = useCollection<FinancialRecord>(recordsQuery);
 
+  // Fetch Companies to get a membership map for saving
+  const companiesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, "companies"),
+      where(`members.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user]);
+  const { data: companies } = useCollection<Company>(companiesQuery);
+
   const aiContext = React.useMemo(() => {
     if (!records) return "[]";
     return JSON.stringify(records.map(r => ({
@@ -106,9 +117,10 @@ export default function ReportsPage() {
   // Fetch Saved Library from Firestore
   const savedReportsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
+    // Allow seeing reports shared with companies user is in
     return query(
       collection(firestore, "saved_reports"),
-      where("userId", "==", user.uid),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
   }, [firestore, user]);
@@ -150,8 +162,11 @@ export default function ReportsPage() {
   }
 
   const handleSaveToLibrary = (type: 'report' | 'export') => {
-    if (!user || !firestore) return;
+    if (!user || !firestore || !companies?.length) return;
     setIsSaving(type);
+
+    // Default to the first company's membership map for cross-team sharing
+    const defaultMembership = companies[0].members;
 
     const reportId = doc(collection(firestore, "saved_reports")).id;
     const reportRef = doc(firestore, "saved_reports", reportId);
@@ -166,10 +181,10 @@ export default function ReportsPage() {
         type: 'Financial Report',
         summary: reportResult.reportSummary,
         content: reportResult.reportContent,
+        companyMembers: defaultMembership,
         createdAt: new Date().toISOString()
       };
     } else if (type === 'export' && exportResult) {
-      // For exports, we save the content as a pseudo-CSV string for storage
       const csvContent = [
         exportResult.header.join(','),
         ...exportResult.data.map(row => row.join(','))
@@ -182,6 +197,7 @@ export default function ReportsPage() {
         type: 'Data Export',
         summary: `Grounded data export based on: "${exportQuery}"`,
         content: csvContent,
+        companyMembers: defaultMembership,
         createdAt: new Date().toISOString()
       };
     } else return;
@@ -192,7 +208,7 @@ export default function ReportsPage() {
       setIsSaving(null);
       toast({
         title: "Saved to Library",
-        description: `"${savedData.title}" is now available in your history.`
+        description: `"${savedData.title}" is now shared with your holding.`
       });
     }, 500);
   }

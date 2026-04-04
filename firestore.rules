@@ -30,7 +30,6 @@ service cloud.firestore {
     }
     
     // Check if the current user is an application-level Admin
-    // Added exists() check to prevent rule evaluation errors when a user profile is still being created
     function isAppAdmin() {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
@@ -93,9 +92,8 @@ service cloud.firestore {
     }
 
     match /saved_reports/{reportId} {
-      // Prioritizing the query-compatible check to ensure list queries work correctly even when isAppAdmin is pending
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
       allow delete: if isOwner(resource.data.userId) || isAppAdmin();

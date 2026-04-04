@@ -230,10 +230,11 @@
         "type": { "type": "string", "enum": ["Financial Report", "Data Export", "Analysis"] },
         "summary": { "type": "string" },
         "content": { "type": "string" },
+        "companyMembers": { "type": "object" },
         "metadata": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "title", "type", "createdAt"]
+      "required": ["id", "userId", "title", "type", "companyMembers", "createdAt"]
     },
     "FinancialRecord": {
       "$schema": "http://json-schema.org/draft-07/schema#",

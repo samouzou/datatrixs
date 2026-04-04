@@ -61,6 +61,7 @@ export type SavedReport = {
   type: 'Financial Report' | 'Data Export' | 'Analysis';
   summary: string;
   content: string; // Markdown or JSON representation
+  companyMembers: Record<string, CompanyRole>; // For secure cross-team visibility
   metadata?: any;
   createdAt: string;
 };
