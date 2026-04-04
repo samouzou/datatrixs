@@ -7,21 +7,18 @@ import { Button } from "@/components/ui/button"
 import { 
   Plus, 
   MoreVertical, 
-  RefreshCw, 
   Upload, 
-  FileText, 
   Loader2, 
   Trash2, 
-  MapPin, 
   Check, 
   AlertCircle, 
   ClipboardList, 
   Database,
-  ArrowRight,
-  Settings2
+  ArrowRight
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { cn } from "@/lib/utils"
 import { 
   Dialog, 
@@ -121,6 +118,7 @@ export default function LocationsPage() {
       companyMembers: selectedCompany.members,
       integrationStatus: 'pending',
       integrationType: 'Manual',
+      customMetrics: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -149,10 +147,12 @@ export default function LocationsPage() {
     setUploadingLocation(location);
     setIsUploadOpen(true);
     setUploadStep("input");
-    setCsvContent("");
+    setCsvContent(location.lastRawData || "");
     setHeaders([]);
     setMapping({});
     setPeriodColumn("");
+    // Load location-specific custom metrics
+    setAvailableMetrics([...INITIAL_FINANCIAL_METRICS, ...(location.customMetrics || [])]);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,8 +174,8 @@ export default function LocationsPage() {
   const handleAnalyzeCSV = () => {
     if (!csvContent.trim()) return;
     const lines = csvContent.trim().split('\n');
-    if (lines.length < 2) {
-      toast({ variant: "destructive", title: "Invalid Data", description: "Need at least a header row and one data row." });
+    if (lines.length < 1) {
+      toast({ variant: "destructive", title: "Invalid Data", description: "Need at least a header row." });
       return;
     }
 
@@ -206,14 +206,29 @@ export default function LocationsPage() {
   };
 
   const handleAddCustomMetric = () => {
-    if (!newMetricName.trim()) return;
-    if (availableMetrics.includes(newMetricName.trim())) {
+    const trimmed = newMetricName.trim();
+    if (!trimmed || !uploadingLocation || !firestore) return;
+    
+    if (availableMetrics.includes(trimmed)) {
       toast({ title: "Metric exists", description: "This metric is already in your list." });
       return;
     }
-    setAvailableMetrics(prev => [...prev, newMetricName.trim()]);
+
+    const updatedCustomMetrics = [...(uploadingLocation.customMetrics || []), trimmed];
+    
+    // Update local state
+    setAvailableMetrics(prev => [...prev, trimmed]);
+    
+    // Persist to Firestore
+    const locRef = doc(firestore, "locations", uploadingLocation.id);
+    updateDocumentNonBlocking(locRef, {
+      customMetrics: updatedCustomMetrics,
+      updatedAt: new Date().toISOString()
+    });
+
     setNewMetricName("");
     setIsAddingMetric(false);
+    toast({ title: "Metric Added", description: `"${trimmed}" is now available for mapping.` });
   };
 
   const handleUploadData = async () => {
@@ -267,7 +282,8 @@ export default function LocationsPage() {
         batch.update(locRef, {
           integrationStatus: 'connected',
           updatedAt: now,
-          lastSync: new Date().toLocaleString()
+          lastSync: new Date().toLocaleString(),
+          lastRawData: csvContent // Save raw data for persistence
         });
         
         await batch.commit();

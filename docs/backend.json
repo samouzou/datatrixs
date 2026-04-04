@@ -187,6 +187,15 @@
             ]
           }
         },
+        "customMetrics": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Persistent custom metrics defined for this location."
+        },
+        "lastRawData": {
+          "type": "string",
+          "description": "The raw CSV or text data from the most recent ingestion."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"

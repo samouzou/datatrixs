@@ -48,6 +48,8 @@ export type Location = {
   integrationStatus: 'connected' | 'pending' | 'disconnected';
   integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
   lastSync?: string;
+  customMetrics?: string[];
+  lastRawData?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -69,7 +71,7 @@ export type FinancialMetric = string;
 export type FinancialRecord = {
   locationId: string;
   locationName: string;
-  period: string; // e.g., "Q1 2023", "Oct 2023"
+  period: string; // e.g., "Q1 2024", "Oct 2023"
   metric: FinancialMetric;
   value: number;
   createdAt: string;
