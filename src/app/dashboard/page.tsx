@@ -24,6 +24,19 @@ import { cn } from "@/lib/utils"
 import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
+const formatCompactNumber = (number: number) => {
+  if (number < 1000) return number.toString();
+  if (number >= 1000000) return (number / 1000000).toFixed(1) + "M";
+  if (number >= 1000) return (number / 1000).toFixed(1) + "K";
+  return number.toString();
+};
+
+const formatCurrency = (value: number) => {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
 export default function DashboardPage() {
   const { user } = useUser()
   const firestore = useFirestore()
@@ -85,9 +98,9 @@ export default function DashboardPage() {
     const sortedPeriods = Object.keys(periodMap).sort();
     const trends = sortedPeriods.map(p => ({
       period: p,
-      revenue: periodMap[p].revenue / 1000000, // Scale to Millions for chart
-      profit: periodMap[p].profit / 1000000,
-      prevYearRevenue: (periodMap[p].revenue * 0.9) / 1000000 
+      revenue: periodMap[p].revenue, 
+      profit: periodMap[p].profit,
+      prevYearRevenue: periodMap[p].revenue * 0.9 
     }));
 
     const byLocation = Object.entries(locationMap).map(([name, revenue]) => ({
@@ -146,15 +159,15 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KpiCard 
           label="Total Revenue" 
-          value={(kpis.revenue / 1000000).toFixed(2) + "M"} 
+          value={formatCompactNumber(kpis.revenue)} 
           change={12.5} 
           trend="up" 
           prefix="$" 
-          secondaryLabel={`Budget: $1.50M (${((kpis.revenue / 1500000) * 100 - 100).toFixed(1)}%)`}
+          secondaryLabel={`Budget: $1.5M (${((kpis.revenue / 1500000) * 100 - 100).toFixed(1)}%)`}
         />
         <KpiCard 
           label="Net Profit" 
-          value={(kpis.profit / 1000).toFixed(1) + "K"} 
+          value={formatCompactNumber(kpis.profit)} 
           change={8.2} 
           trend="up" 
           prefix="$" 
@@ -198,7 +211,7 @@ export default function DashboardPage() {
         <Card className="col-span-4 bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle>Performance Trends</CardTitle>
-            <CardDescription>Consolidated revenue (M) vs Previous Year Estimate</CardDescription>
+            <CardDescription>Consolidated revenue vs Previous Year Estimate</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[300px]">
@@ -217,11 +230,12 @@ export default function DashboardPage() {
                     fontSize={12} 
                     tickLine={false} 
                     axisLine={false} 
-                    tickFormatter={(value) => `$${value}M`} 
+                    tickFormatter={(value) => formatCurrency(value)} 
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
                     itemStyle={{ color: 'hsl(var(--foreground))' }}
+                    formatter={(value: number) => [formatCurrency(value), "Revenue"]}
                   />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />
                   <Line type="monotone" dataKey="prevYearRevenue" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={1.5} dot={false} />
@@ -245,7 +259,7 @@ export default function DashboardPage() {
                   <Tooltip 
                     cursor={{fill: 'transparent'}}
                     contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
-                    formatter={(value: number) => `$${value.toLocaleString()}`}
+                    formatter={(value: number) => formatCurrency(value)}
                   />
                   <Bar dataKey="revenue" radius={[4, 4, 0, 0]} barSize={40}>
                     {byLocation.map((entry, index) => (
