@@ -57,14 +57,14 @@ export default function LoginPage() {
     <div className="flex h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-white/5 bg-card/50 backdrop-blur-sm shadow-2xl">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto mb-6">
+          <div className="mx-auto mb-6 flex justify-center">
             <Image 
               src="/dx-logo.svg" 
               alt="Datatrixs Logo" 
-              width={180} 
-              height={50} 
+              width={200} 
+              height={60} 
               priority 
-              className="object-contain mx-auto"
+              className="object-contain"
             />
           </div>
           <CardTitle className="text-2xl font-bold font-headline">Welcome back</CardTitle>

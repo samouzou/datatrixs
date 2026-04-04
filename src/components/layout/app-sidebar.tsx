@@ -82,7 +82,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center px-4 overflow-hidden">
+      <SidebarHeader className="h-16 flex items-center px-4 overflow-hidden bg-sidebar">
         <Link href="/dashboard" className="flex items-center w-full">
           {/* Full logo for expanded state */}
           <div className="group-data-[collapsible=icon]:hidden flex items-center">
@@ -156,12 +156,14 @@ export function AppSidebar() {
             <div className="p-2 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-3 px-2 py-3 rounded-lg bg-muted/50 border border-white/5">
                 <div className="size-8 rounded-full overflow-hidden flex items-center justify-center bg-primary/10">
-                  <Image 
-                    src="/dx-icon.svg" 
-                    alt="User" 
-                    width={24} 
-                    height={24}
-                  />
+                  <div className="size-6 relative">
+                    <Image 
+                      src="/dx-icon.svg" 
+                      alt="User" 
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-bold truncate text-foreground">{user?.displayName || user?.email?.split('@')[0]}</span>
