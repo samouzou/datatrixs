@@ -21,6 +21,20 @@ interface SpreadsheetViewProps {
   className?: string;
 }
 
+const formatCompactValue = (val: string) => {
+  if (!val) return "";
+  // If it's already formatted (contains K, M, or $), return as is
+  if (/[KkMm$]/.test(val)) return val;
+  
+  const num = Number(val.replace(/[^0-9.-]+/g, ""));
+  if (isNaN(num)) return val;
+
+  const absNum = Math.abs(num);
+  if (absNum >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+  if (absNum >= 1000) return `$${(num / 1000).toFixed(1)}K`;
+  return `$${num.toLocaleString()}`;
+};
+
 export function SpreadsheetView({ headers, data, title, className }: SpreadsheetViewProps) {
   const [searchTerm, setSearchTerm] = React.useState("");
 
@@ -82,14 +96,22 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
                 <TableCell className="text-center text-[10px] font-mono text-muted-foreground border-r border-border bg-muted/5">
                   {rowIndex + 1}
                 </TableCell>
-                {row.map((cell, cellIndex) => (
-                  <TableCell 
-                    key={cellIndex} 
-                    className="px-6 py-3 text-sm text-foreground/80 border-r border-border last:border-r-0 font-medium group-hover:text-foreground"
-                  >
-                    {cell}
-                  </TableCell>
-                ))}
+                {row.map((cell, cellIndex) => {
+                  const formatted = formatCompactValue(cell);
+                  const isNumeric = formatted !== cell || /^[0-9.-]+$/.test(cell);
+                  
+                  return (
+                    <TableCell 
+                      key={cellIndex} 
+                      className={cn(
+                        "px-6 py-3 text-sm text-foreground/80 border-r border-border last:border-r-0 font-medium group-hover:text-foreground",
+                        isNumeric && "text-right font-mono"
+                      )}
+                    >
+                      {formatted}
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))}
           </TableBody>
