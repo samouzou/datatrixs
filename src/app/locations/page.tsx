@@ -14,7 +14,9 @@ import {
   AlertCircle, 
   ClipboardList, 
   Database,
-  ArrowRight
+  ArrowRight,
+  History,
+  FileText
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
@@ -366,7 +368,14 @@ export default function LocationsPage() {
             <Card key={loc.id} className="bg-card/50 border-border shadow-sm group">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="space-y-1">
-                  <CardTitle className="text-xl">{loc.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-xl">{loc.name}</CardTitle>
+                    {loc.lastRawData && (
+                      <div className="flex items-center text-primary" title="Persistent data available">
+                        <FileText className="size-4" />
+                      </div>
+                    )}
+                  </div>
                   <CardDescription>{loc.addressLine1}, {loc.city}, {loc.state} {loc.zipCode}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -384,10 +393,17 @@ export default function LocationsPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Last Sync</p>
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      <History className="size-3 text-muted-foreground" />
+                      {loc.lastSync || "Never"}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase font-bold">Parent Company</p>
                     <p className="text-sm truncate">{companies?.find(c => c.id === loc.companyId)?.name || 'Unknown'}</p>
                   </div>
-                  <div className="flex items-center justify-end gap-2 md:col-span-2">
+                  <div className="flex items-center justify-end gap-2">
                     <Button variant="outline" size="sm" className="h-8 text-xs bg-primary/10 text-primary" onClick={() => handleOpenUpload(loc)}>
                       <Upload className="mr-2 size-3" /> Ingest Financials
                     </Button>
@@ -414,11 +430,16 @@ export default function LocationsPage() {
                   <TabsTrigger value="upload" className="h-9"><Database className="size-4 mr-2" /> Upload File</TabsTrigger>
                 </TabsList>
                 <TabsContent value="paste" className="space-y-4 pt-4">
-                  <div className="bg-primary/5 p-3 rounded border border-primary/10">
+                  <div className="bg-primary/5 p-3 rounded border border-primary/10 flex justify-between items-center">
                     <p className="text-[11px] text-muted-foreground">
                       <AlertCircle className="size-3 inline mr-1" /> 
                       Ensure the first row contains headers. Use comma-separated values.
                     </p>
+                    {uploadingLocation?.lastRawData && (
+                      <span className="text-[10px] font-bold text-primary uppercase flex items-center gap-1">
+                        <FileText className="size-3" /> Showing stored data
+                      </span>
+                    )}
                   </div>
                   <Textarea 
                     placeholder="Period, Revenue, COGS, Net Profit..." 
