@@ -30,8 +30,11 @@ service cloud.firestore {
     }
     
     // Check if the current user is an application-level Admin
+    // Added exists() check to prevent rule evaluation errors when a user profile is still being created
     function isAppAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
 
     // Helper to check if a user is joining by only adding themselves to a membership map
@@ -90,6 +93,7 @@ service cloud.firestore {
     }
 
     match /saved_reports/{reportId} {
+      // Prioritizing the query-compatible check to ensure list queries work correctly even when isAppAdmin is pending
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
