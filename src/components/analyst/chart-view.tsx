@@ -18,6 +18,8 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart"
 
@@ -155,6 +157,7 @@ export function ChartView({ type, title, data, xAxisLabel, yAxisLabel }: ChartVi
               content={<ChartTooltipContent hideLabel />} 
               formatter={(value: number) => formatCurrency(value)}
             />
+            <ChartLegend content={<ChartLegendContent nameKey="label" />} className="-translate-y-2 flex-wrap" />
           </PieChart>
         )}
       </ChartContainer>
