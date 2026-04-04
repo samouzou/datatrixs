@@ -24,6 +24,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Company, Location, FinancialRecord, FinancialMetric } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table"
 
 const FINANCIAL_METRICS: FinancialMetric[] = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
 
