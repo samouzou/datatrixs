@@ -1,8 +1,18 @@
+
+'use client';
+
+import * as React from "react"
 import { ChatInterface } from "@/components/analyst/chat-interface"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Bot, Info } from "lucide-react"
 
 export default function AnalystPage() {
+  const [selectedQuery, setSelectedQuery] = React.useState<string | undefined>();
+
+  const handleQueryClick = (query: string) => {
+    setSelectedQuery(query);
+  };
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex flex-col space-y-2">
@@ -15,7 +25,10 @@ export default function AnalystPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <ChatInterface />
+          <ChatInterface 
+            externalQuery={selectedQuery} 
+            onQueryProcessed={() => setSelectedQuery(undefined)} 
+          />
         </div>
         <div className="space-y-6">
           <Card className="bg-card border-border shadow-sm">
@@ -36,6 +49,7 @@ export default function AnalystPage() {
               ].map((query, i) => (
                 <button 
                   key={i} 
+                  onClick={() => handleQueryClick(query)}
                   className="w-full text-left text-xs p-2 rounded bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border"
                 >
                   "{query}"

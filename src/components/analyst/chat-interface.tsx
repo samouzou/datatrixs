@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -36,7 +37,12 @@ function parseCSV(csvString: string) {
   return { headers, data };
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  externalQuery?: string;
+  onQueryProcessed?: () => void;
+}
+
+export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterfaceProps) {
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: "1",
@@ -47,6 +53,7 @@ export function ChatInterface() {
   const [input, setInput] = React.useState("")
   const [loading, setLoading] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -58,8 +65,17 @@ export function ChatInterface() {
     scrollToBottom()
   }, [messages])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Handle external query input (e.g. from sample query buttons)
+  React.useEffect(() => {
+    if (externalQuery) {
+      setInput(externalQuery);
+      inputRef.current?.focus();
+      onQueryProcessed?.();
+    }
+  }, [externalQuery, onQueryProcessed]);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (!input.trim() || loading) return
 
     const userMessage: Message = {
@@ -190,6 +206,7 @@ export function ChatInterface() {
       <div className="p-4 border-t border-white/5 bg-background/50 backdrop-blur-sm">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input 
+            ref={inputRef}
             placeholder="e.g., 'Compare revenue for Houston and Dallas across all quarters in a table'" 
             value={input}
             onChange={(e) => setInput(e.target.value)}
