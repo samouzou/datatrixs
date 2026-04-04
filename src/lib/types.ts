@@ -19,6 +19,7 @@ export type Company = {
   name: string;
   description?: string;
   members: Record<string, CompanyRole>; // Denormalized for rules: { [uid: string]: 'admin' | 'member' }
+  customMetrics?: string[]; // Shared metrics across the holding
   createdAt: string;
   updatedAt: string;
 };
@@ -48,7 +49,6 @@ export type Location = {
   integrationStatus: 'connected' | 'pending' | 'disconnected';
   integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
   lastSync?: string;
-  customMetrics?: string[];
   lastRawData?: string;
   createdAt: string;
   updatedAt: string;

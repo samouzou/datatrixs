@@ -79,6 +79,11 @@
             ]
           }
         },
+        "customMetrics": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shared financial metrics defined at the holding level."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -186,11 +191,6 @@
               "member"
             ]
           }
-        },
-        "customMetrics": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Persistent custom metrics defined for this location."
         },
         "lastRawData": {
           "type": "string",

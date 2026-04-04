@@ -62,7 +62,7 @@ export default function LocationsPage() {
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   
-  // Custom Metrics State
+  // Custom Metrics State (Shared at Company Level)
   const [availableMetrics, setAvailableMetrics] = React.useState<string[]>(INITIAL_FINANCIAL_METRICS)
   const [isAddingMetric, setIsAddingMetric] = React.useState(false)
   const [newMetricName, setNewMetricName] = React.useState("")
@@ -120,7 +120,6 @@ export default function LocationsPage() {
       companyMembers: selectedCompany.members,
       integrationStatus: 'pending',
       integrationType: 'Manual',
-      customMetrics: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -146,6 +145,7 @@ export default function LocationsPage() {
   };
 
   const handleOpenUpload = (location: Location) => {
+    const parentCompany = companies?.find(c => c.id === location.companyId);
     setUploadingLocation(location);
     setIsUploadOpen(true);
     setUploadStep("input");
@@ -153,8 +153,10 @@ export default function LocationsPage() {
     setHeaders([]);
     setMapping({});
     setPeriodColumn("");
-    // Load location-specific custom metrics
-    setAvailableMetrics([...INITIAL_FINANCIAL_METRICS, ...(location.customMetrics || [])]);
+    
+    // Load Company-level custom metrics + default metrics
+    const companyMetrics = parentCompany?.customMetrics || [];
+    setAvailableMetrics([...INITIAL_FINANCIAL_METRICS, ...companyMetrics]);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -211,26 +213,33 @@ export default function LocationsPage() {
     const trimmed = newMetricName.trim();
     if (!trimmed || !uploadingLocation || !firestore) return;
     
-    if (availableMetrics.includes(trimmed)) {
-      toast({ title: "Metric exists", description: "This metric is already in your list." });
+    const parentCompany = companies?.find(c => c.id === uploadingLocation.companyId);
+    if (!parentCompany) return;
+
+    const currentMetrics = parentCompany.customMetrics || [];
+    if (currentMetrics.includes(trimmed)) {
+      toast({ title: "Metric exists", description: "This metric is already in your holding's list." });
       return;
     }
 
-    const updatedCustomMetrics = [...(uploadingLocation.customMetrics || []), trimmed];
+    const updatedMetrics = [...currentMetrics, trimmed];
     
     // Update local state
     setAvailableMetrics(prev => [...prev, trimmed]);
     
-    // Persist to Firestore
-    const locRef = doc(firestore, "locations", uploadingLocation.id);
-    updateDocumentNonBlocking(locRef, {
-      customMetrics: updatedCustomMetrics,
+    // Persist to Company document (Shared across all locations)
+    const companyRef = doc(firestore, "companies", parentCompany.id);
+    updateDocumentNonBlocking(companyRef, {
+      customMetrics: updatedMetrics,
       updatedAt: new Date().toISOString()
     });
 
     setNewMetricName("");
     setIsAddingMetric(false);
-    toast({ title: "Metric Added", description: `"${trimmed}" is now available for mapping.` });
+    toast({ 
+      title: "Metric Added", 
+      description: `"${trimmed}" is now shared across all locations in this holding.` 
+    });
   };
 
   const handleUploadData = async () => {
@@ -256,7 +265,6 @@ export default function LocationsPage() {
         const period = rowObj[periodColumn];
         if (!period) continue;
 
-        // For each mapped metric column, create a record in top-level collection
         Object.entries(mapping).forEach(([colName, metric]) => {
           if (metric === "ignore" || colName === periodColumn) return;
           
@@ -272,7 +280,7 @@ export default function LocationsPage() {
               period,
               metric: metric as FinancialMetric,
               value: valNum,
-              companyMembers: uploadingLocation.companyMembers, // Denormalize membership for Global Search
+              companyMembers: uploadingLocation.companyMembers,
               createdAt: now
             };
             batch.set(recordRef, record);
