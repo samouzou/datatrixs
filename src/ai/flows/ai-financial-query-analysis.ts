@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for an AI financial analyst that answers natural language queries about financial performance.
@@ -15,7 +16,7 @@ const AiFinancialQueryAnalysisInputSchema = z.object({
   financialData: z
     .string()
     .describe(
-      'A JSON string representing an array of financial records. Each object in the array should contain at least \'location\', \'period\', \'metric\', and \'value\' fields. Example: [{ "location": "Houston", "period": "Q1 2023", "metric": "Net Profit", "value": 150000 }]'
+      'A JSON string representing an array of financial records. Each object in the array should contain at least \'location\', \'period\', \'metric\', and \'value\' fields. Example: [{ "location": "Houston", "period": "2024-Q1", "metric": "Net Profit", "value": 150000 }]'
     ),
   context: z
     .string()

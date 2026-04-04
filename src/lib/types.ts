@@ -72,7 +72,7 @@ export type FinancialRecord = {
   id: string;
   locationId: string;
   locationName: string;
-  period: string; // e.g., "Q1 2024", "Oct 2023"
+  period: string; // Normalized e.g., "2024-Q1"
   metric: FinancialMetric;
   value: number;
   companyMembers: Record<string, CompanyRole>; // Denormalized for secure cross-collection visibility
