@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -22,7 +21,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Company, CompanyInvitation, CompanyRole } from "@/lib/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 
 export default function HoldingStructurePage() {
   const { user } = useUser()
@@ -45,8 +43,6 @@ export default function HoldingStructurePage() {
   // Query for companies. Filtered by membership to satisfy security rules.
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // We check for membership in the company members map.
-    // Supporting both new string roles and legacy boolean values in the query filter.
     return query(
       collection(firestore, "companies"),
       where(`members.${user.uid}`, "in", ["admin", "member", true])
@@ -147,7 +143,6 @@ export default function HoldingStructurePage() {
   const getUserRoleInCompany = (company: Company): CompanyRole => {
     if (!user || !company.members) return 'member';
     const role = company.members[user.uid];
-    // Backward compatibility for legacy boolean mapping
     if (typeof role === 'boolean' && role === true) return 'admin';
     return (role as CompanyRole) || 'member';
   };

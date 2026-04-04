@@ -1,7 +1,6 @@
 'use client';
 import {
   Auth,
-  signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   User,
@@ -62,11 +61,6 @@ export function ensureUserProfile(db: Firestore, user: User, additionalData: any
       }
     }
   });
-}
-
-/** Initiate anonymous sign-in (non-blocking). */
-export function initiateAnonymousSignIn(authInstance: Auth): void {
-  signInAnonymously(authInstance);
 }
 
 /** Initiate email/password sign-up (non-blocking). */

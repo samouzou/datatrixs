@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -246,38 +245,6 @@ export default function LocationsPage() {
           )}
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-secondary/20 border-secondary/30">
-          <CardHeader>
-            <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-              <RefreshCw className="size-5 text-primary" />
-            </div>
-            <CardTitle>Automatic Ingestion</CardTitle>
-            <CardDescription>
-              Connect your locations' QuickBooks or NetSuite accounts for real-time financial normalization and categorization.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="link" className="text-primary p-0">Learn about our standardized schema →</Button>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-accent/5 border-accent/20">
-          <CardHeader>
-            <div className="size-10 rounded-full bg-accent/20 flex items-center justify-center mb-2">
-              <FileText className="size-5 text-accent" />
-            </div>
-            <CardTitle>Legacy Data Upload</CardTitle>
-            <CardDescription>
-              Locations using Excel or manual accounting can upload CSV files. Our AI will automatically map headers to your global metrics.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="link" className="text-accent p-0">Download upload template →</Button>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }
