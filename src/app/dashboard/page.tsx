@@ -18,7 +18,7 @@ import {
   Line
 } from "recharts"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collectionGroup, query, where, orderBy } from "firebase/firestore"
+import { collection, collectionGroup, query, where, orderBy } from "firebase/firestore"
 import { FinancialRecord } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react"
