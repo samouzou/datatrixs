@@ -84,7 +84,6 @@ export default function ReportsPage() {
   const [loadingExport, setLoadingExport] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState<string | null>(null)
 
-  // Fetch real financial records for context
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -94,7 +93,6 @@ export default function ReportsPage() {
   }, [firestore, user]);
   const { data: records, isLoading: isRecordsLoading } = useCollection<FinancialRecord>(recordsQuery);
 
-  // Fetch Companies to get a membership map for saving
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -114,10 +112,8 @@ export default function ReportsPage() {
     })));
   }, [records]);
 
-  // Fetch Saved Library from Firestore
   const savedReportsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // Allow seeing reports shared with companies user is in
     return query(
       collection(firestore, "saved_reports"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
@@ -162,12 +158,16 @@ export default function ReportsPage() {
   }
 
   const handleSaveToLibrary = (type: 'report' | 'export') => {
-    if (!user || !firestore || !companies?.length) return;
+    if (!user || !firestore || !companies?.length) {
+      if (!companies?.length) {
+        toast({ variant: "destructive", title: "Cannot Save", description: "You must be a member of a holding company to save reports." });
+      }
+      return;
+    }
+    
     setIsSaving(type);
 
-    // Default to the first company's membership map for cross-team sharing
     const defaultMembership = companies[0].members;
-
     const reportId = doc(collection(firestore, "saved_reports")).id;
     const reportRef = doc(firestore, "saved_reports", reportId);
 

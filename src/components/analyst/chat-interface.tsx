@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { FinancialRecord } from "@/lib/types"
+import { FinancialRecord, Company, SavedReport } from "@/lib/types"
 
 type Message = {
   id: string
@@ -62,8 +62,17 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
   }, [firestore, user]);
-
   const { data: records, isLoading: isRecordsLoading } = useCollection<FinancialRecord>(recordsQuery);
+
+  // Fetch Companies to get a membership map for saving
+  const companiesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, "companies"),
+      where(`members.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user]);
+  const { data: companies } = useCollection<Company>(companiesQuery);
 
   const [messages, setMessages] = React.useState<Message[]>([
     {
@@ -109,7 +118,6 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     setInput("")
     setLoading(true)
 
-    // Prepare records for AI by mapping to the schema it expects
     const aiData = records?.map(r => ({
       location: r.locationName,
       period: r.period,
@@ -145,7 +153,12 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   }
 
   const handleSaveResult = (message: Message) => {
-    if (!user || !firestore || !message.data) return;
+    if (!user || !firestore || !message.data || !companies?.length) {
+      if (!companies?.length) {
+        toast({ variant: "destructive", title: "Cannot Save", description: "You must be a member of a holding company to save reports." });
+      }
+      return;
+    }
 
     const reportId = doc(collection(firestore, "saved_reports")).id;
     const reportRef = doc(firestore, "saved_reports", reportId);
@@ -154,13 +167,14 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     const type = message.data.analysisType === 'data_extraction' ? 'Data Export' : 
                  message.data.analysisType === 'report' ? 'Financial Report' : 'Analysis';
 
-    const reportData = {
+    const reportData: SavedReport = {
       id: reportId,
       userId: user.uid,
       title,
-      type,
+      type: type as any,
       summary: message.content,
       content: message.data.rawSpreadsheetData || "",
+      companyMembers: companies[0].members, // Attach membership map for cross-team sharing
       metadata: {
         results: message.data.results || null,
         chart: message.data.suggestedChart || null,
@@ -175,7 +189,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     
     toast({
       title: "Saved to Library",
-      description: `"${title}" has been added to your reports history.`
+      description: `"${title}" has been shared with your holding.`
     });
   }
 
