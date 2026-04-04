@@ -5,11 +5,12 @@ import { Send, Bot, User, Loader2, FileSpreadsheet, BarChart3, Maximize2 } from 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { aiFinancialQueryAnalysis, type AiFinancialQueryAnalysisOutput } from "@/ai/flows/ai-financial-query-analysis"
 import { mockFinancialRecords } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
+import { ChartView } from "@/components/analyst/chart-view"
 import {
   Dialog,
   DialogContent,
@@ -65,7 +66,6 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     scrollToBottom()
   }, [messages])
 
-  // Handle external query input (e.g. from sample query buttons)
   React.useEffect(() => {
     if (externalQuery) {
       setInput(externalQuery);
@@ -135,23 +135,44 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                 m.role === "user" ? "items-end" : "items-start"
               )}>
                 <div className={cn(
-                  "p-4 rounded-2xl text-sm leading-relaxed",
+                  "p-4 rounded-2xl text-sm leading-relaxed shadow-sm transition-colors",
                   m.role === "user" 
                     ? "bg-primary text-white rounded-tr-none" 
-                    : "bg-muted text-foreground rounded-tl-none shadow-lg"
+                    : "bg-muted text-foreground rounded-tl-none border border-border"
                 )}>
                   {m.content}
                 </div>
                 
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {m.data?.suggestedChart && (
+                  {m.data?.suggestedChart && m.data.results && (
                     <div className="bg-popover/80 p-3 rounded-xl border border-border flex items-center gap-3 shadow-md backdrop-blur-sm">
                       <BarChart3 className="size-5 text-accent" />
                       <div className="flex-1">
                         <p className="text-xs font-semibold">{m.data.suggestedChart.title}</p>
-                        <p className="text-[10px] text-muted-foreground">Visualization ready</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Visualization ready</p>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-7 text-[10px]">View</Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-7 text-[10px] hover:bg-accent hover:text-accent-foreground">
+                            View
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl bg-background border-border p-6 overflow-hidden">
+                          <DialogHeader>
+                            <DialogTitle>{m.data.suggestedChart.title}</DialogTitle>
+                            <DialogDescription className="sr-only">
+                              Visual representation of financial data analysis.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <ChartView 
+                            type={m.data.suggestedChart.type}
+                            title={m.data.suggestedChart.title}
+                            data={m.data.results}
+                            xAxisLabel={m.data.suggestedChart.xAxisLabel}
+                            yAxisLabel={m.data.suggestedChart.yAxisLabel}
+                          />
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   )}
 
@@ -160,7 +181,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                       <FileSpreadsheet className="size-5 text-primary" />
                       <div className="flex-1">
                         <p className="text-xs font-semibold">Spreadsheet Data</p>
-                        <p className="text-[10px] text-muted-foreground">Interactive grid available</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Interactive grid available</p>
                       </div>
                       <Dialog>
                         <DialogTrigger asChild>
@@ -201,7 +222,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
               <div className="size-8 rounded-full bg-accent flex items-center justify-center shrink-0">
                 <Loader2 className="size-5 text-background animate-spin" />
               </div>
-              <div className="bg-muted p-4 rounded-2xl rounded-tl-none text-sm text-muted-foreground italic shadow-inner">
+              <div className="bg-muted p-4 rounded-2xl rounded-tl-none text-sm text-muted-foreground italic border border-border shadow-inner">
                 Analyzing financial datasets and compiling interactive grids...
               </div>
             </div>
