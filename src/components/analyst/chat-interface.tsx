@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -116,7 +115,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   }
 
   return (
-    <Card className="flex flex-col h-[calc(100vh-12rem)] bg-card/20 border-white/5 backdrop-blur-md">
+    <Card className="flex flex-col h-[calc(100vh-12rem)] bg-card/20 border-border backdrop-blur-md">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-6">
           {messages.map((m) => (
@@ -145,7 +144,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                 
                 <div className="flex flex-wrap gap-2 mt-2">
                   {m.data?.suggestedChart && (
-                    <div className="bg-popover/80 p-3 rounded-xl border border-white/5 flex items-center gap-3 shadow-md backdrop-blur-sm">
+                    <div className="bg-popover/80 p-3 rounded-xl border border-border flex items-center gap-3 shadow-md backdrop-blur-sm">
                       <BarChart3 className="size-5 text-accent" />
                       <div className="flex-1">
                         <p className="text-xs font-semibold">{m.data.suggestedChart.title}</p>
@@ -156,7 +155,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                   )}
 
                   {m.data?.rawSpreadsheetData && (
-                    <div className="bg-popover/80 p-3 rounded-xl border border-white/5 flex items-center gap-3 shadow-md backdrop-blur-sm">
+                    <div className="bg-popover/80 p-3 rounded-xl border border-border flex items-center gap-3 shadow-md backdrop-blur-sm">
                       <FileSpreadsheet className="size-5 text-primary" />
                       <div className="flex-1">
                         <p className="text-xs font-semibold">Spreadsheet Data</p>
@@ -168,7 +167,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                             <Maximize2 className="size-3 mr-1" /> Explore
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-6xl max-h-[90vh] bg-background border-white/10 p-0 overflow-hidden">
+                        <DialogContent className="max-w-6xl max-h-[90vh] bg-background border-border p-0 overflow-hidden">
                           <div className="p-1">
                             {(() => {
                               const { headers, data } = parseCSV(m.data.rawSpreadsheetData!);
@@ -203,7 +202,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
-      <div className="p-4 border-t border-white/5 bg-background/50 backdrop-blur-sm">
+      <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input 
             ref={inputRef}

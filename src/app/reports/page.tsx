@@ -38,18 +38,18 @@ function MarkdownTable({ content }: { content: string }) {
   if (headers.length === 0) return <pre className="text-xs p-4 bg-muted rounded whitespace-pre-wrap">{content}</pre>;
 
   return (
-    <div className="rounded-md border border-white/5 overflow-hidden">
+    <div className="rounded-md border border-border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50 border-white/5 hover:bg-muted/50">
+          <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
             {headers.map((h, i) => (
-              <TableHead key={i} className="text-xs font-bold uppercase tracking-wider text-white h-10">{h}</TableHead>
+              <TableHead key={i} className="text-xs font-bold uppercase tracking-wider text-foreground h-10">{h}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row, i) => (
-            <TableRow key={i} className="border-white/5 hover:bg-white/5">
+            <TableRow key={i} className="border-border hover:bg-muted/50">
               {row.map((cell, j) => (
                 <TableCell key={j} className="text-sm py-3">{cell}</TableCell>
               ))}
@@ -101,23 +101,23 @@ export default function ReportsPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <FilePieChart className="size-6 text-accent" />
-            <h2 className="text-3xl font-bold tracking-tight text-white font-headline">Reports & Exports</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Reports & Exports</h2>
           </div>
           <p className="text-muted-foreground">Generate tailored financial documentation and structured data for your portfolio.</p>
         </div>
       </div>
 
       <Tabs defaultValue="reports" className="space-y-6">
-        <TabsList className="bg-card/50 border border-white/5 p-1 h-12">
+        <TabsList className="bg-card/50 border border-border p-1 h-12">
           <TabsTrigger value="reports" className="px-6 data-[state=active]:bg-primary h-10">AI Report Builder</TabsTrigger>
           <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Explorer</TabsTrigger>
           <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary h-10">Saved Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reports" className="space-y-6 animate-in fade-in duration-300">
-          <Card className="bg-card/40 border-white/5 backdrop-blur-sm">
+          <Card className="bg-card/40 border-border backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2 text-white">
+              <CardTitle className="text-lg flex items-center gap-2 text-foreground">
                 <Sparkles className="size-5 text-accent" />
                 Intelligent Report Generation
               </CardTitle>
@@ -129,7 +129,7 @@ export default function ReportsPage() {
               <form onSubmit={(e) => { e.preventDefault(); handleGenerateReport(); }} className="flex gap-3">
                 <Input 
                   placeholder="Describe the report you need..." 
-                  className="bg-muted/50 border-white/10 focus-visible:ring-primary h-12"
+                  className="bg-muted/50 border-border focus-visible:ring-primary h-12"
                   value={reportQuery}
                   onChange={(e) => setReportQuery(e.target.value)}
                   disabled={loadingReport}
@@ -144,16 +144,16 @@ export default function ReportsPage() {
 
           {reportResult && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-              <Card className="bg-card/30 border-white/5 overflow-hidden">
-                <CardHeader className="bg-muted/20 border-b border-white/5">
+              <Card className="bg-card/30 border-border overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-accent border-accent/30 bg-accent/5">
                         {reportResult.reportType}
                       </Badge>
-                      <CardTitle className="text-xl text-white">{reportResult.entityName} — {reportResult.period}</CardTitle>
+                      <CardTitle className="text-xl text-foreground">{reportResult.entityName} — {reportResult.period}</CardTitle>
                     </div>
-                    <Button variant="outline" size="sm" className="h-9 border-white/10 text-xs bg-white/5 hover:bg-white/10">
+                    <Button variant="outline" size="sm" className="h-9 border-border text-xs bg-muted/50 hover:bg-muted">
                       <Download className="size-3.5 mr-2" /> Download PDF
                     </Button>
                   </div>
@@ -172,9 +172,9 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="exports" className="space-y-6 animate-in fade-in duration-300">
-           <Card className="bg-card/40 border-white/5 backdrop-blur-sm">
+           <Card className="bg-card/40 border-border backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2 text-white">
+              <CardTitle className="text-lg flex items-center gap-2 text-foreground">
                 <TableIcon className="size-5 text-primary" />
                 Raw Data Explorer
               </CardTitle>
@@ -186,7 +186,7 @@ export default function ReportsPage() {
               <form onSubmit={(e) => { e.preventDefault(); handleGenerateExport(); }} className="flex gap-3">
                 <Input 
                   placeholder="e.g., 'Monthly sales data for all locations in 2023'..." 
-                  className="bg-muted/50 border-white/10 focus-visible:ring-primary h-12"
+                  className="bg-muted/50 border-border focus-visible:ring-primary h-12"
                   value={exportQuery}
                   onChange={(e) => setExportQuery(e.target.value)}
                   disabled={loadingExport}
@@ -218,7 +218,7 @@ export default function ReportsPage() {
               { title: "Dallas Central Opex Breakdown", date: "Oct 24, 2023", type: "Financial Report", size: "890 KB" },
               { title: "2023 Year-End Projection", date: "Oct 15, 2023", type: "Analysis", size: "2.1 MB" }
             ].map((item, i) => (
-              <Card key={i} className="bg-card/20 border-white/5 hover:border-primary/50 hover:bg-card/40 transition-all cursor-pointer group">
+              <Card key={i} className="bg-card/20 border-border hover:border-primary/50 hover:bg-card/40 transition-all cursor-pointer group">
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <Badge variant="secondary" className="text-[10px] uppercase tracking-tight bg-secondary/30 text-secondary-foreground border-none">
@@ -226,7 +226,7 @@ export default function ReportsPage() {
                     </Badge>
                     <span className="text-[10px] text-muted-foreground">{item.size}</span>
                   </div>
-                  <CardTitle className="text-sm mt-3 text-white font-medium leading-tight group-hover:text-primary transition-colors">
+                  <CardTitle className="text-sm mt-3 text-foreground font-medium leading-tight group-hover:text-primary transition-colors">
                     {item.title}
                   </CardTitle>
                   <CardDescription className="text-xs pt-1">{item.date}</CardDescription>
@@ -235,7 +235,7 @@ export default function ReportsPage() {
                   <Button variant="link" size="sm" className="p-0 h-auto text-xs text-primary/80 hover:text-primary">
                     View Details <ArrowRight className="ml-1 size-3" />
                   </Button>
-                  <Download className="size-3.5 text-muted-foreground group-hover:text-white transition-colors" />
+                  <Download className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </CardContent>
               </Card>
             ))}
