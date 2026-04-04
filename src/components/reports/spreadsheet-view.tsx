@@ -47,7 +47,7 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
 
   return (
     <div className={cn("flex flex-col h-full w-full bg-background border border-border rounded-xl overflow-hidden shadow-2xl", className)}>
-      <div className="flex items-center justify-between p-4 bg-card/50 border-b border-border">
+      <div className="flex items-center justify-between p-4 bg-card/50 border-b border-border flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/20 rounded-lg">
             <FileSpreadsheet className="size-5 text-primary" />
@@ -59,11 +59,11 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 ml-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input 
-              placeholder="Filter data..." 
+              placeholder="Filter locations, periods..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-9 w-[200px] bg-muted/30 border-border text-xs focus-visible:ring-primary"
@@ -75,15 +75,15 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto max-h-[60vh]">
-        <Table className="border-collapse">
+      <div className="flex-1 overflow-auto max-h-[60vh] relative">
+        <Table className="border-collapse min-w-full">
           <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur-md shadow-sm">
             <TableRow className="hover:bg-transparent border-border">
               <TableHead className="w-12 text-center text-[10px] font-bold text-muted-foreground border-r border-border bg-muted/20">#</TableHead>
               {headers.map((header, i) => (
                 <TableHead 
                   key={i} 
-                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-foreground border-r border-border last:border-r-0"
+                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-foreground border-r border-border last:border-r-0 whitespace-nowrap"
                 >
                   {header}
                 </TableHead>
@@ -104,7 +104,7 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
                     <TableCell 
                       key={cellIndex} 
                       className={cn(
-                        "px-6 py-3 text-sm text-foreground/80 border-r border-border last:border-r-0 font-medium group-hover:text-foreground",
+                        "px-6 py-3 text-sm text-foreground/80 border-r border-border last:border-r-0 font-medium group-hover:text-foreground whitespace-nowrap",
                         isNumeric && "text-right font-mono"
                       )}
                     >
@@ -124,7 +124,7 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
         )}
       </div>
 
-      <div className="flex items-center justify-between p-3 bg-muted/10 border-t border-border text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
+      <div className="flex items-center justify-between p-3 bg-muted/10 border-t border-border text-[10px] text-muted-foreground font-medium uppercase tracking-widest flex-wrap gap-2">
         <div className="flex gap-4">
           <span>Format: Standard Ledger</span>
           <span>Status: Verified</span>

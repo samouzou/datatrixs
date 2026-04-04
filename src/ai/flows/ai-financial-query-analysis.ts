@@ -78,27 +78,31 @@ Financial Data: {{{financialData}}}
 User Query: {{{query}}}
 {{#if context}}Context: {{{context}}}{{/if}}
 
-CRITICAL FORMATTING RULES:
+CRITICAL FORMATTING & STRUCTURE RULES:
 1. Always use compact currency notation in your 'answer' and 'rawSpreadsheetData'. 
    - Use 'K' for thousands (e.g., $450K)
    - Use 'M' for millions (e.g., $1.2M)
 2. In the 'results' array, provide raw numeric values (no suffixes) for chart processing.
-3. Be professional and objective.
+3. Multi-Location Handling: If the query compares locations or asks for portfolio-wide data, the 'rawSpreadsheetData' CSV MUST include a "Location" column to differentiate between entities.
+4. Be professional and objective.
 
 Follow these steps:
 1. **Analyze the data** to directly answer the user's query.
 2. **Determine the primary analysis type**.
 3. **Extract structured data points** for the 'results' array (using raw numbers).
 4. **Suggest a chart type** (bar, line, pie, table) if quantifiable.
-5. **Provide raw CSV data** in 'rawSpreadsheetData' with formatted currency values.
+5. **Provide raw CSV data** in 'rawSpreadsheetData' with formatted currency values. Ensure Location is a column for multi-location queries.
 6. **Provide recommendations** based on the analysis.
 
-Example Output format for 'What was the profit?':
+Example Output format for 'Compare profit for Houston and Dallas':
 {
-  "answer": "The net profit for the portfolio was $1.1M, representing an 8% increase.",
-  "analysisType": "summary",
-  "results": [{ "label": "Total", "value": 1100000, "metric": "Net Profit" }],
-  "rawSpreadsheetData": "Metric,Value\nNet Profit,$1.1M"
+  "answer": "Houston's profit was $1.1M while Dallas reported $845K.",
+  "analysisType": "comparison",
+  "results": [
+    { "label": "Houston", "value": 1100000, "metric": "Net Profit" },
+    { "label": "Dallas", "value": 845000, "metric": "Net Profit" }
+  ],
+  "rawSpreadsheetData": "Location,Metric,Value\nHouston,Net Profit,$1.1M\nDallas,Net Profit,$845K"
 }
 
 Strictly adhere to the output JSON schema.`,
