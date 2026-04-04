@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth, useUser } from "@/firebase"
+import { useAuth, useUser, useFirestore } from "@/firebase"
 import { initiateEmailSignUp } from "@/firebase/non-blocking-login"
 
 export default function RegisterPage() {
@@ -19,6 +18,7 @@ export default function RegisterPage() {
   const [password, setPassword] = React.useState("")
   const [loading, setLoading] = React.useState(false)
   const auth = useAuth()
+  const db = useFirestore()
   const { user, isUserLoading } = useUser()
   const router = useRouter()
 
@@ -31,7 +31,12 @@ export default function RegisterPage() {
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    initiateEmailSignUp(auth, email, password)
+    
+    const nameParts = name.trim().split(' ')
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ') || ''
+
+    initiateEmailSignUp(auth, db, email, password, { firstName, lastName })
   }
 
   if (isUserLoading || user) {
@@ -56,7 +61,7 @@ export default function RegisterPage() {
               className="object-contain mx-auto"
             />
           </div>
-          <CardTitle className="text-2xl font-bold font-headline">Create an account</CardTitle>
+          <CardTitle className="text-2xl font-bold font-headline text-foreground">Create an account</CardTitle>
           <CardDescription>Get started with Datatrixs portfolio management</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

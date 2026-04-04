@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -10,8 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth, useUser } from "@/firebase"
-import { initiateEmailSignIn } from "@/firebase/non-blocking-login"
+import { useAuth, useUser, useFirestore } from "@/firebase"
+import { initiateEmailSignIn, ensureUserProfile } from "@/firebase/non-blocking-login"
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 
 export default function LoginPage() {
@@ -19,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState("")
   const [loading, setLoading] = React.useState(false)
   const auth = useAuth()
+  const db = useFirestore()
   const { user, isUserLoading } = useUser()
   const router = useRouter()
 
@@ -38,7 +38,12 @@ export default function LoginPage() {
     setLoading(true)
     const provider = new GoogleAuthProvider()
     try {
-      await signInWithPopup(auth, provider)
+      const result = await signInWithPopup(auth, provider)
+      // Ensure profile exists for social login users
+      const nameParts = result.user.displayName?.split(' ') || []
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+      ensureUserProfile(db, result.user, { firstName, lastName })
     } catch (error) {
       console.error("Google login failed", error)
       setLoading(false)
@@ -67,7 +72,7 @@ export default function LoginPage() {
               className="object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold font-headline">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold font-headline text-foreground">Welcome back</CardTitle>
           <CardDescription>Enter your credentials to access your holdings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
