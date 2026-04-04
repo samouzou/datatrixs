@@ -6,18 +6,19 @@ import {
   signInWithEmailAndPassword,
   User,
 } from 'firebase/auth';
-import { doc, setDoc, Firestore, getDoc } from 'firebase/firestore';
+import { doc, setDoc, Firestore, getDoc, updateDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { UserRole } from '@/lib/types';
 
 /**
  * Ensures a user profile exists in Firestore.
- * If it doesn't exist, it creates one with the provided data.
+ * If it doesn't exist, it creates one.
+ * If it exists but is missing a role (legacy account), it updates it.
  */
 export function ensureUserProfile(db: Firestore, user: User, additionalData: any = {}): void {
   const userRef = doc(db, 'users', user.uid);
   
-  // Check if doc exists first to avoid overwriting existing metadata on every login
   getDoc(userRef).then((docSnap) => {
     if (!docSnap.exists()) {
       const userData = {
@@ -26,7 +27,7 @@ export function ensureUserProfile(db: Firestore, user: User, additionalData: any
         email: user.email,
         firstName: additionalData.firstName || '',
         lastName: additionalData.lastName || '',
-        role: additionalData.role || 'Admin', // Default to Admin for prototype simplicity
+        role: (additionalData.role as UserRole) || 'Admin',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -41,6 +42,24 @@ export function ensureUserProfile(db: Firestore, user: User, additionalData: any
           })
         );
       });
+    } else {
+      const existingData = docSnap.data();
+      // Self-heal: If existing user has no role, provide one
+      if (!existingData.role) {
+        updateDoc(userRef, {
+          role: 'Admin' as UserRole,
+          updatedAt: new Date().toISOString()
+        }).catch((error) => {
+          errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: userRef.path,
+              operation: 'update',
+              requestResourceData: { role: 'Admin' },
+            })
+          );
+        });
+      }
     }
   });
 }

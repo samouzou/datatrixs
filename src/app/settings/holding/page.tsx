@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -42,17 +41,15 @@ export default function HoldingStructurePage() {
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState<CompanyRole>("member")
 
-  // Query for companies where user is a member or admin
+  // Query for companies. Rules will restrict results to what the user is a member of.
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(
-      collection(firestore, "companies")
-    );
+    return query(collection(firestore, "companies"));
   }, [firestore, user]);
 
   const { data: rawCompanies, isLoading } = useCollection<Company>(companiesQuery);
 
-  // Filter companies where user has a role
+  // Filter companies where user has a role (handles legacy boolean mapping too)
   const companies = React.useMemo(() => {
     if (!user || !rawCompanies) return [];
     return rawCompanies.filter(c => c.members && c.members[user.uid]);
@@ -131,14 +128,12 @@ export default function HoldingStructurePage() {
   const handleAcceptInvite = (invite: CompanyInvitation) => {
     if (!firestore || !user) return;
 
-    // 1. Update company members
     const companyRef = doc(firestore, "companies", invite.companyId);
     updateDoc(companyRef, {
       [`members.${user.uid}`]: invite.role,
       updatedAt: new Date().toISOString()
     });
 
-    // 2. Mark invite as accepted
     const inviteRef = doc(firestore, "company_invitations", invite.id);
     updateDoc(inviteRef, { status: 'accepted' });
   };
@@ -149,9 +144,17 @@ export default function HoldingStructurePage() {
     setEditDesc(company.description || "");
   };
 
+  const getUserRoleInCompany = (company: Company): CompanyRole => {
+    if (!user || !company.members) return 'member';
+    const role = company.members[user.uid];
+    // Backward compatibility: If it's a boolean 'true', treat as admin
+    if (typeof role === 'boolean' && role === true) return 'admin';
+    return (role as CompanyRole) || 'member';
+  };
+
   const currentUserRole = React.useMemo(() => {
     if (!user || !editingCompany) return null;
-    return editingCompany.members[user.uid];
+    return getUserRoleInCompany(editingCompany);
   }, [user, editingCompany]);
 
   return (
@@ -206,7 +209,6 @@ export default function HoldingStructurePage() {
         </Dialog>
       </div>
 
-      {/* Pending Invitations Banner */}
       {invitations && invitations.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-bold flex items-center gap-2 text-accent">
@@ -239,67 +241,70 @@ export default function HoldingStructurePage() {
         </div>
       ) : (
         <div className="grid gap-6">
-          {companies?.map((entity) => (
-            <Card key={entity.id} className="bg-card/40 border-border backdrop-blur-sm shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg text-foreground">{entity.name}</CardTitle>
-                  <CardDescription className="text-[10px] uppercase tracking-wider font-bold text-accent">
-                    {entity.members[user?.uid!] === 'admin' ? 'Administrator' : 'Authorized Member'}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 text-xs bg-background/50"
-                    onClick={() => openManageDialog(entity)}
-                  >
-                    {entity.members[user?.uid!] === 'admin' ? (
-                      <><Settings2 className="mr-2 size-3" /> Manage Structure</>
-                    ) : (
-                      <><Users className="mr-2 size-3" /> View Team</>
-                    )}
-                  </Button>
-                  {entity.members[user?.uid!] === 'admin' && (
+          {companies?.map((entity) => {
+            const role = getUserRoleInCompany(entity);
+            return (
+              <Card key={entity.id} className="bg-card/40 border-border backdrop-blur-sm shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg text-foreground">{entity.name}</CardTitle>
+                    <CardDescription className="text-[10px] uppercase tracking-wider font-bold text-accent">
+                      {role === 'admin' ? 'Administrator' : 'Authorized Member'}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDeleteCompany(entity.id)}
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 text-xs bg-background/50"
+                      onClick={() => openManageDialog(entity)}
                     >
-                      <Trash2 className="size-4" />
+                      {role === 'admin' ? (
+                        <><Settings2 className="mr-2 size-3" /> Manage Structure</>
+                      ) : (
+                        <><Users className="mr-2 size-3" /> View Team</>
+                      )}
                     </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                    <Users className="size-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Authorized Users</p>
-                      <p className="text-sm font-medium">{Object.keys(entity.members || {}).length}</p>
+                    {role === 'admin' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteCompany(entity.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                      <Users className="size-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Authorized Users</p>
+                        <p className="text-sm font-medium">{Object.keys(entity.members || {}).length}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                      <Shield className="size-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Access Level</p>
+                        <p className="text-sm font-medium capitalize">{role}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                      <Building2 className="size-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Entity Identifier</p>
+                        <p className="text-[10px] font-mono truncate max-w-[120px]">{entity.id}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                    <Shield className="size-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Access Level</p>
-                      <p className="text-sm font-medium capitalize">{entity.members[user?.uid!]}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                    <Building2 className="size-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Entity Identifier</p>
-                      <p className="text-[10px] font-mono truncate max-w-[120px]">{entity.id}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
           {!companies?.length && (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl">
               <Building2 className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
@@ -309,7 +314,6 @@ export default function HoldingStructurePage() {
         </div>
       )}
 
-      {/* Manage Structure Dialog */}
       <Dialog open={!!editingCompany} onOpenChange={(open) => !open && setEditingCompany(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -383,26 +387,29 @@ export default function HoldingStructurePage() {
                 
                 <div className="space-y-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Access List</p>
-                  {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => (
-                    <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-                      <div className="flex items-center gap-3">
-                        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
-                          {uid.substring(0, 2).toUpperCase()}
+                  {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => {
+                    const displayRole = typeof role === 'boolean' ? (role ? 'admin' : 'member') : role;
+                    return (
+                      <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
+                            {uid.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium">{uid === user?.uid ? "You" : "Authorized User"}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                              {displayRole}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-medium">{uid === user?.uid ? "You" : "Authorized User"}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                            {role}
-                          </p>
-                        </div>
+                        {currentUserRole === 'admin' && uid !== user?.uid && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                            <X className="size-4" />
+                          </Button>
+                        )}
                       </div>
-                      {currentUserRole === 'admin' && uid !== user?.uid && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
-                          <X className="size-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </TabsContent>
