@@ -82,26 +82,26 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center px-4 overflow-hidden bg-sidebar">
-        <Link href="/dashboard" className="flex items-center w-full">
+      <SidebarHeader className="h-16 flex items-center justify-center overflow-hidden bg-sidebar">
+        <Link href="/dashboard" className="flex items-center justify-center w-full px-2">
           {/* Full logo for expanded state */}
-          <div className="group-data-[collapsible=icon]:hidden flex items-center">
+          <div className="group-data-[collapsible=icon]:hidden flex items-center justify-center w-full">
             <Image 
               src="/dx-logo.svg" 
               alt="Datatrixs Logo" 
-              width={140} 
-              height={40} 
+              width={110} 
+              height={32} 
               priority 
               className="object-contain"
             />
           </div>
           {/* Icon for collapsed state */}
-          <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center w-full">
+          <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center">
             <Image 
               src="/dx-icon.svg" 
               alt="Datatrixs Icon" 
-              width={28} 
-              height={28} 
+              width={24} 
+              height={24} 
               priority 
               className="object-contain"
             />
@@ -150,7 +150,7 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border/50">
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="p-2 group-data-[collapsible=icon]:hidden">
