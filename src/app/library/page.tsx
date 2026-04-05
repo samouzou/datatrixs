@@ -64,26 +64,27 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = React.useState("reports")
 
   // Query formal reports & exports
-  // Filtered by company membership to ensure results match security rules
+  // Deferred until tab is active (reports or exports) to avoid initial permission noise
   const reportsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports')) return null;
     return query(
       collection(firestore, "saved_reports"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user?.uid]); 
+  }, [firestore, user?.uid, activeTab]); 
   const { data: reports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
 
   // Query ad-hoc analyses
+  // Deferred until analysis tab is active
   const analysesQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user || activeTab !== 'analysis') return null;
     return query(
       collection(firestore, "saved_analysis"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user?.uid]); 
+  }, [firestore, user?.uid, activeTab]); 
   const { data: analyses, isLoading: isLoadingAnalyses } = useCollection<SavedAnalysis>(analysesQuery);
 
   const handleDelete = (collectionName: string, id: string) => {
@@ -120,7 +121,7 @@ export default function LibraryPage() {
                 onDelete={() => handleDelete("saved_reports", item.id)}
               />
             ))}
-            {!isLoadingReports && !reports?.some(r => r.type === 'Financial Report') && <EmptyState text="No formal reports saved yet." />}
+            {!isLoadingReports && activeTab === 'reports' && !reports?.some(r => r.type === 'Financial Report') && <EmptyState text="No formal reports saved yet." />}
             {isLoadingReports && <LoadingState />}
           </div>
         </TabsContent>
@@ -135,7 +136,7 @@ export default function LibraryPage() {
                 onDelete={() => handleDelete("saved_reports", item.id)}
               />
             ))}
-            {!isLoadingReports && !reports?.some(r => r.type === 'Data Export') && <EmptyState text="No data exports compiled yet." />}
+            {!isLoadingReports && activeTab === 'exports' && !reports?.some(r => r.type === 'Data Export') && <EmptyState text="No data exports compiled yet." />}
             {isLoadingReports && <LoadingState />}
           </div>
         </TabsContent>
@@ -149,7 +150,7 @@ export default function LibraryPage() {
                 onDelete={() => handleDelete("saved_analysis", item.id)}
               />
             ))}
-            {!isLoadingAnalyses && !analyses?.length && <EmptyState text="No analyst insights saved from chat yet." />}
+            {!isLoadingAnalyses && activeTab === 'analysis' && !analyses?.length && <EmptyState text="No analyst insights saved from chat yet." />}
             {isLoadingAnalyses && <LoadingState />}
           </div>
         </TabsContent>
