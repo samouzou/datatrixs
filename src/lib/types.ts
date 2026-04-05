@@ -18,6 +18,7 @@ export type Company = {
   id: string;
   name: string;
   description?: string;
+  ein?: string;
   sector?: string;
   reportingCurrency?: string;
   members: Record<string, CompanyRole>; 

@@ -69,6 +69,18 @@
         "description": {
           "type": "string"
         },
+        "ein": {
+          "type": "string",
+          "description": "Employer Identification Number (Tax ID)."
+        },
+        "sector": {
+          "type": "string",
+          "description": "The business sector the holding company operates in."
+        },
+        "reportingCurrency": {
+          "type": "string",
+          "description": "The global reporting currency for the portfolio."
+        },
         "members": {
           "type": "object",
           "additionalProperties": {

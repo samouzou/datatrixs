@@ -78,6 +78,7 @@ export default function SettingsPage() {
 
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [ein, setEin] = React.useState("")
   const [sector, setSector] = React.useState("")
   const [currency, setCurrency] = React.useState("USD")
   const [isSaving, setIsSaving] = React.useState(false)
@@ -86,6 +87,7 @@ export default function SettingsPage() {
     if (company) {
       setName(company.name || "")
       setDescription(company.description || "")
+      setEin(company.ein || "")
       setSector(company.sector || "")
       setCurrency(company.reportingCurrency || "USD")
     }
@@ -99,6 +101,7 @@ export default function SettingsPage() {
     updateDocumentNonBlocking(companyRef, {
       name,
       description,
+      ein,
       sector,
       reportingCurrency: currency,
       updatedAt: new Date().toISOString()
@@ -147,18 +150,30 @@ export default function SettingsPage() {
                     className="bg-muted border-none focus-visible:ring-primary" 
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sector">Business Sector</Label>
-                  <Select value={sector} onValueChange={setSector}>
-                    <SelectTrigger className="bg-muted border-none h-11">
-                      <SelectValue placeholder="Select Sector" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BUSINESS_SECTORS.map(s => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sector">Business Sector</Label>
+                    <Select value={sector} onValueChange={setSector}>
+                      <SelectTrigger className="bg-muted border-none h-11">
+                        <SelectValue placeholder="Select Sector" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BUSINESS_SECTORS.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ein">Tax ID / EIN</Label>
+                    <Input 
+                      id="ein" 
+                      placeholder="00-0000000"
+                      value={ein} 
+                      onChange={(e) => setEin(e.target.value)}
+                      className="bg-muted border-none focus-visible:ring-primary h-11" 
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Business Focus / Description</Label>
