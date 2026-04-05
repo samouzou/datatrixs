@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -20,8 +21,15 @@ import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebas
 import { collection, query, where } from "firebase/firestore"
 import { FinancialRecord, Location } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2, Building2 } from "lucide-react"
+import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2, Building2, Calendar as CalendarIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const formatCompactNumber = (number: number) => {
   if (Math.abs(number) < 1000) return number.toString();
@@ -41,6 +49,7 @@ const sortPeriods = (periods: string[]) => {
 };
 
 const displayPeriod = (p: string) => {
+  if (p === 'all') return "Portfolio View (All Time)";
   if (p.includes('-Q')) {
     const [y, q] = p.split('-');
     return `${q} ${y}`;
@@ -61,6 +70,7 @@ const displayPeriod = (p: string) => {
 export default function DashboardPage() {
   const { user } = useUser()
   const firestore = useFirestore()
+  const [selectedPeriod, setSelectedPeriod] = React.useState<string>("latest")
 
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -94,7 +104,8 @@ export default function DashboardPage() {
       locRevenueMap: {} as Record<string, number>,
       revenueTarget: 0,
       targetProgress: 0,
-      latestPeriodLabel: ""
+      latestPeriodLabel: "",
+      availablePeriods: []
     };
 
     const periodMap: Record<string, { revenue: number; profit: number; inventory: number; locRevenues: Record<string, number> }> = {};
@@ -119,7 +130,17 @@ export default function DashboardPage() {
 
     const sortedPeriods = sortPeriods(Object.keys(periodMap));
     const latestPeriod = sortedPeriods[sortedPeriods.length - 1];
-    const prevPeriod = sortedPeriods[sortedPeriods.length - 2];
+    
+    // Determine target period and its previous counterpart
+    let targetPeriod = selectedPeriod === "latest" ? latestPeriod : selectedPeriod;
+    let prevPeriod = "";
+    
+    if (targetPeriod !== "all") {
+      const targetIdx = sortedPeriods.indexOf(targetPeriod);
+      if (targetIdx > 0) {
+        prevPeriod = sortedPeriods[targetIdx - 1];
+      }
+    }
 
     const calculateMetrics = (curr: number, prev: number) => {
       if (!prev || prev === 0) return { change: 0, trend: 'neutral' as const };
@@ -130,8 +151,26 @@ export default function DashboardPage() {
       };
     };
 
-    const latestData = latestPeriod ? periodMap[latestPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
-    const prevData = prevPeriod ? periodMap[prevPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
+    let latestData;
+    let prevData;
+
+    if (targetPeriod === "all") {
+      // Aggregate everything
+      latestData = records.reduce((acc, r) => {
+        const metric = r.metric.toLowerCase();
+        if (metric === 'revenue' || metric.includes('revenue')) {
+          acc.revenue += r.value;
+          acc.locRevenues[r.locationName] = (acc.locRevenues[r.locationName] || 0) + r.value;
+        }
+        if (metric === 'net profit' || metric === 'profit') acc.profit += r.value;
+        if (metric === 'inventory value' || metric.includes('inventory')) acc.inventory += r.value;
+        return acc;
+      }, { revenue: 0, profit: 0, inventory: 0, locRevenues: {} as Record<string, number> });
+      prevData = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} }; // No comparison for all-time
+    } else {
+      latestData = targetPeriod ? periodMap[targetPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
+      prevData = prevPeriod ? periodMap[prevPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
+    }
 
     // EBITDA Margin latest and prev
     const latestMargin = latestData.revenue > 0 ? (latestData.profit / latestData.revenue) * 100 : 0;
@@ -142,7 +181,7 @@ export default function DashboardPage() {
     const latestTurn = latestData.revenue > 0 && latestData.inventory > 0 ? (latestData.revenue / latestData.inventory) : 0;
     const prevTurn = prevData.revenue > 0 && prevData.inventory > 0 ? (prevData.revenue / prevData.inventory) : 0;
 
-    const revenueTarget = (locations?.length || 1) * 500000; // $500k target per location for the period
+    const revenueTarget = (locations?.length || 1) * 500000; 
     const targetProgress = revenueTarget > 0 ? Math.min((latestData.revenue / revenueTarget) * 100, 1000) : 0;
 
     const trends = sortedPeriods.map((p, idx) => {
@@ -175,9 +214,10 @@ export default function DashboardPage() {
       locRevenueMap: latestData.locRevenues,
       revenueTarget,
       targetProgress,
-      latestPeriodLabel: latestPeriod ? displayPeriod(latestPeriod) : "No Data"
+      latestPeriodLabel: displayPeriod(targetPeriod || "No Data"),
+      availablePeriods: sortedPeriods
     };
-  }, [records, locations]);
+  }, [records, locations, selectedPeriod]);
 
   const getBarColor = (value: number) => {
     if (value === 0) return "hsl(var(--destructive))";
@@ -194,7 +234,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { kpis, byLocation, trends, locRevenueMap, revenueTarget, targetProgress, latestPeriodLabel } = processedData;
+  const { kpis, byLocation, trends, locRevenueMap, revenueTarget, targetProgress, latestPeriodLabel, availablePeriods } = processedData;
 
   const unhealthyLocs = locations?.filter(loc => {
     if (!loc.updatedAt) return true;
@@ -210,12 +250,30 @@ export default function DashboardPage() {
           <Building2 className="size-8 text-primary" />
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">Current Period: {latestPeriodLabel}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <CalendarIcon className="size-3 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{latestPeriodLabel}</p>
+            </div>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest">
-            {records?.length ? 'Grounded Aggregation Active' : 'Waiting for Data Ingestion'}
+        <div className="flex items-center space-x-4">
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fiscal Period</span>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger className="w-[200px] h-9 bg-card border-border">
+                <SelectValue placeholder="Select Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="latest">Latest Period (Auto)</SelectItem>
+                <SelectItem value="all">Portfolio View (All Time)</SelectItem>
+                {availablePeriods.slice().reverse().map(p => (
+                  <SelectItem key={p} value={p}>{displayPeriod(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-4 py-2 text-[10px] font-bold uppercase tracking-widest h-9">
+            {records?.length ? 'Live Aggregation' : 'Waiting for Data'}
           </Badge>
         </div>
       </div>
@@ -255,15 +313,15 @@ export default function DashboardPage() {
             <Zap className="size-4 text-primary opacity-50" />
           </div>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary">Standardized Insight</CardTitle>
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary">Holding Insight</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="flex gap-2">
               <AlertCircle className={cn("size-4 shrink-0 mt-0.5", unhealthyLocs?.length ? "text-destructive" : "text-accent")} />
               <p className="text-[11px] leading-relaxed text-foreground font-medium">
                 {unhealthyLocs?.length 
-                  ? `${unhealthyLocs[0].name} reported no normalized data for 72h. Check ingestion logs.`
-                  : "All streams normalized. Portfolio margin is optimized against sector baseline."}
+                  ? `${unhealthyLocs[0].name} reporting delay (>72h).`
+                  : `Portfolio optimized. Current ${selectedPeriod === 'all' ? 'All-Time' : 'Period'} targets are tracking against plan.`}
               </p>
             </div>
           </CardContent>
@@ -273,8 +331,8 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4 bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle>Performance Trends</CardTitle>
-            <CardDescription>Consolidated portfolio performance by fiscal period</CardDescription>
+            <CardTitle>Historical Performance</CardTitle>
+            <CardDescription>Fiscal trend comparison (Revenue vs Forecast)</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[300px]">
@@ -310,8 +368,8 @@ export default function DashboardPage() {
         
         <Card className="col-span-3 bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle>Revenue by Location ({latestPeriodLabel})</CardTitle>
-            <CardDescription>Contribution per unit for current reporting period</CardDescription>
+            <CardTitle>Unit Contribution ({selectedPeriod === 'latest' ? 'Current' : displayPeriod(selectedPeriod)})</CardTitle>
+            <CardDescription>Revenue share per authorized location</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -362,7 +420,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Period Contribution</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Period Share</p>
                     <p className="text-lg font-bold text-foreground">{formatCurrency(locRevenueMap[loc.name] || 0)}</p>
                   </div>
                   <div className="text-right">
@@ -392,7 +450,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="pt-3 border-t border-border flex justify-between items-center text-[10px]">
-                  <span className="text-muted-foreground italic">Standardized Sync: {loc.lastSync || 'Never'}</span>
+                  <span className="text-muted-foreground italic">Sync: {loc.lastSync || 'Never'}</span>
                   <span className="text-muted-foreground uppercase font-bold tracking-tighter">REF: {loc.id.substring(0, 8)}</span>
                 </div>
               </div>
@@ -402,7 +460,7 @@ export default function DashboardPage() {
         {!locations?.length && (
           <Card className="col-span-full py-12 flex flex-col items-center justify-center border-dashed border-2">
             <Loader2 className="size-12 text-muted-foreground opacity-20 mb-4 animate-spin" />
-            <p className="text-muted-foreground font-medium">No normalized locations found. Check Holding Structure or Ingest Data.</p>
+            <p className="text-muted-foreground font-medium">No normalized locations found.</p>
           </Card>
         )}
       </div>
