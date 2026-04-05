@@ -30,7 +30,6 @@ service cloud.firestore {
     }
     
     // Check if the current user is an application-level Admin
-    // Safely handles cases where the user profile might be pending creation
     function isAppAdmin() {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
@@ -93,16 +92,34 @@ service cloud.firestore {
     }
 
     match /saved_reports/{reportId} {
-      allow list: if isSignedIn() && (isAppAdmin() || resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers));
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      // Simplified list rule to ensure Firestore can prove query safety
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isCompanyMember(resource.data.companyMembers) || 
+        isAppAdmin()
+      );
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isCompanyMember(resource.data.companyMembers) || 
+        isAppAdmin()
+      );
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
       allow delete: if isOwner(resource.data.userId) || isAppAdmin();
     }
 
     match /saved_analysis/{analysisId} {
-      allow list: if isSignedIn() && (isAppAdmin() || resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers));
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      // Simplified list rule to ensure Firestore can prove query safety
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isCompanyMember(resource.data.companyMembers) || 
+        isAppAdmin()
+      );
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isCompanyMember(resource.data.companyMembers) || 
+        isAppAdmin()
+      );
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
       allow delete: if isOwner(resource.data.userId) || isAppAdmin();

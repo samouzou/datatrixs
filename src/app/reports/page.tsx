@@ -143,16 +143,15 @@ export default function ReportsPage() {
   }
 
   const handleSaveToLibrary = (type: 'report' | 'export') => {
-    if (!user || !firestore || !companies?.length) {
-      if (!companies?.length) {
-        toast({ variant: "destructive", title: "Cannot Save", description: "You must be a member of a holding company to save reports." });
-      }
-      return;
-    }
+    if (!user || !firestore) return;
     
     setIsSaving(type);
 
-    const defaultMembership = companies[0].members;
+    // Default to the user's primary holding or just themselves if no companies found
+    const defaultMembership = (companies && companies.length > 0) 
+      ? companies[0].members 
+      : { [user.uid]: 'admin' };
+
     const reportId = doc(collection(firestore, "saved_reports")).id;
     const reportRef = doc(firestore, "saved_reports", reportId);
 
@@ -259,9 +258,6 @@ export default function ReportsPage() {
                       <Button variant="outline" size="sm" className="h-9 border-border text-xs bg-muted/50 hover:bg-muted" onClick={() => handleSaveToLibrary('report')} disabled={!!isSaving}>
                         {isSaving === 'report' ? <Loader2 className="size-3.5 animate-spin mr-2" /> : <Save className="size-3.5 mr-2" />}
                         Save to Library
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-9 border-border text-xs bg-muted/50 hover:bg-muted">
-                        <Download className="size-3.5 mr-2" /> Download PDF
                       </Button>
                     </div>
                   </div>

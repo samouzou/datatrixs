@@ -72,11 +72,10 @@ export default function LibraryPage() {
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user?.uid]); // Use uid specifically to ensure stability
+  }, [firestore, user?.uid]); 
   const { data: reports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
 
   // Query ad-hoc analyses
-  // Filtered by company membership to ensure results match security rules
   const analysesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -84,7 +83,7 @@ export default function LibraryPage() {
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user?.uid]); // Use uid specifically to ensure stability
+  }, [firestore, user?.uid]); 
   const { data: analyses, isLoading: isLoadingAnalyses } = useCollection<SavedAnalysis>(analysesQuery);
 
   const handleDelete = (collectionName: string, id: string) => {

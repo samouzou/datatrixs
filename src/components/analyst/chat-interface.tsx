@@ -151,12 +151,12 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   }
 
   const handleSaveResult = (message: Message) => {
-    if (!user || !firestore || !message.data || !companies?.length) {
-      if (!companies?.length) {
-        toast({ variant: "destructive", title: "Cannot Save", description: "You must be a member of a holding company to save insights." });
-      }
-      return;
-    }
+    if (!user || !firestore || !message.data) return;
+
+    // Use primary company membership or just the user if no companies found
+    const membership = (companies && companies.length > 0) 
+      ? companies[0].members 
+      : { [user.uid]: 'admin' };
 
     const analysisId = doc(collection(firestore, "saved_analysis")).id;
     const analysisRef = doc(firestore, "saved_analysis", analysisId);
@@ -171,7 +171,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       content: message.data.answer,
       results: message.data.results || [],
       suggestedChart: message.data.suggestedChart,
-      companyMembers: companies[0].members,
+      companyMembers: membership,
       createdAt: new Date().toISOString()
     };
 
