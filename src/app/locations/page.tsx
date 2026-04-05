@@ -16,7 +16,9 @@ import {
   Database,
   ArrowRight,
   History,
-  FileText
+  FileText,
+  Cloud,
+  Link2
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
@@ -49,6 +51,12 @@ import {
 
 const INITIAL_FINANCIAL_METRICS = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
 
+// Mock Ledger Data for API Simulations
+const MOCK_LEDGERS = {
+  QuickBooks: ["Sales: Retail", "Cost of Goods Sold", "Gross Profit", "Total Expenses", "Warehouse Inventory", "Operating Income"],
+  NetSuite: ["Total Revenue (USD)", "Cost of Sales", "Net Income", "SG&A Expenses", "On-Hand Inventory", "EBITDA"]
+};
+
 // Normalization Utility for Periods
 const normalizePeriod = (p: string): string => {
   const trimmed = p.trim();
@@ -69,7 +77,7 @@ const normalizePeriod = (p: string): string => {
     return `${y}-${m}`;
   }
   
-  return trimmed; // Fallback to raw if unparseable
+  return trimmed; 
 };
 
 // Robust numeric parser for accounting data
@@ -91,9 +99,11 @@ export default function LocationsPage() {
   
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [isUploadOpen, setIsUploadOpen] = React.useState(false)
-  const [uploadStep, setUploadStep] = React.useState<"input" | "mapping">("input")
+  const [uploadStep, setUploadStep] = React.useState<"source" | "input" | "mapping">("source")
   const [uploadingLocation, setUploadingLocation] = React.useState<Location | null>(null)
+  const [selectedSource, setSelectedSource] = React.useState<'Manual' | 'QuickBooks' | 'NetSuite' | 'Excel'>('Manual')
   const [csvContent, setCsvContent] = React.useState("")
+  const [isConnecting, setIsConnecting] = React.useState(false)
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   
@@ -183,15 +193,50 @@ export default function LocationsPage() {
     const parentCompany = companies?.find(c => c.id === location.companyId);
     setUploadingLocation(location);
     setIsUploadOpen(true);
-    setUploadStep("input");
+    setUploadStep("source");
+    setSelectedSource(location.integrationType === 'Manual' ? 'Manual' : location.integrationType);
     setCsvContent(location.lastRawData || "");
     setHeaders([]);
     setMapping({});
     setPeriodColumn("");
     
-    // Load Holding-level normalization catalog
     const companyMetrics = parentCompany?.customMetrics || [];
     setAvailableMetrics([...INITIAL_FINANCIAL_METRICS, ...companyMetrics]);
+  };
+
+  const handleSourceSelect = (source: 'Manual' | 'QuickBooks' | 'NetSuite' | 'Excel') => {
+    setSelectedSource(source);
+    if (source === 'Manual' || source === 'Excel') {
+      setUploadStep("input");
+    } else {
+      // API Direct Simulation
+      setIsConnecting(true);
+      setTimeout(() => {
+        setIsConnecting(false);
+        const mockHeaders = ["Period", ...MOCK_LEDGERS[source as 'QuickBooks' | 'NetSuite']];
+        setHeaders(mockHeaders);
+        setPeriodColumn("Period");
+        
+        // Auto-Normalization Logic
+        const initialMapping: Record<string, string | "ignore"> = {};
+        mockHeaders.forEach(h => {
+          if (h === "Period") return;
+          const lowerH = h.toLowerCase();
+          const match = availableMetrics.find(m => {
+            const lowerM = m.toLowerCase();
+            return lowerH.includes(lowerM) || lowerM.includes(lowerH);
+          });
+          initialMapping[h] = match || "ignore";
+        });
+        setMapping(initialMapping);
+        setUploadStep("mapping");
+        
+        toast({
+          title: `${source} Connected`,
+          description: `Fetched ${mockHeaders.length} account headers from the cloud ledger.`
+        });
+      }, 1500);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,7 +249,7 @@ export default function LocationsPage() {
       setCsvContent(content);
       toast({
         title: "File Loaded",
-        description: `${file.name} has been parsed. Proceed to map columns.`
+        description: `${file.name} has been parsed.`
       });
     };
     reader.readAsText(file);
@@ -221,35 +266,24 @@ export default function LocationsPage() {
     const firstLine = lines[0].split(',').map(h => h.trim());
     setHeaders(firstLine);
     
-    // Auto-Normalization Suggestions
     const initialMapping: Record<string, string | "ignore"> = {};
     let suggestedPeriod = "";
-    
     const internalFields = ["ai red flag", "sync status", "data source", "location"];
 
     firstLine.forEach(h => {
       const lowerH = h.toLowerCase();
-      
-      // Filter out internal system fields
       if (internalFields.some(f => lowerH.includes(f))) {
         initialMapping[h] = "ignore";
         return;
       }
-
       if (lowerH.includes('period') || lowerH.includes('date') || lowerH.includes('month') || lowerH.includes('quarter')) {
         suggestedPeriod = h;
       }
-      
       const match = availableMetrics.find(m => {
         const lowerM = m.toLowerCase();
         return lowerH.includes(lowerM) || lowerM.includes(lowerH);
       });
-      
-      if (match) {
-        initialMapping[h] = match;
-      } else {
-        initialMapping[h] = "ignore";
-      }
+      initialMapping[h] = match || "ignore";
     });
 
     setMapping(initialMapping);
@@ -273,7 +307,6 @@ export default function LocationsPage() {
     const updatedMetrics = [...currentMetrics, trimmed];
     setAvailableMetrics(prev => [...prev, trimmed]);
     
-    // Persist to Holding Company Document (Normalization Catalog)
     const companyRef = doc(firestore, "companies", parentCompany.id);
     updateDocumentNonBlocking(companyRef, {
       customMetrics: updatedMetrics,
@@ -286,29 +319,35 @@ export default function LocationsPage() {
   };
 
   const handleUploadData = async () => {
-    if (!firestore || !uploadingLocation || !csvContent.trim() || !periodColumn) return;
+    if (!firestore || !uploadingLocation || !periodColumn) return;
     
     setIsUploading(true);
     const batch = writeBatch(firestore);
     const now = new Date().toISOString();
     
     try {
-      const lines = csvContent.trim().split('\n');
-      const dataRows = lines.slice(1);
-      let successCount = 0;
+      let dataRows: string[][] = [];
       
-      for (const [idx, line] of dataRows.entries()) {
-        if (!line.trim()) continue;
-        const values = line.split(',').map(s => s.trim());
+      if (selectedSource === 'Manual' || selectedSource === 'Excel') {
+        const lines = csvContent.trim().split('\n');
+        dataRows = lines.slice(1).map(l => l.split(',').map(s => s.trim()));
+      } else {
+        // API Simulation: Generate dummy records for the mapped headers
+        dataRows = [
+          ["Q1 2024", "125000", "75000", "50000", "20000", "15000", "12000"],
+          ["Q2 2024", "135000", "80000", "55000", "22000", "16000", "14000"]
+        ];
+      }
+
+      let successCount = 0;
+      for (const [idx, row] of dataRows.entries()) {
         const rowObj: Record<string, string> = {};
         headers.forEach((h, i) => {
-          rowObj[h] = values[i];
+          rowObj[h] = row[i];
         });
 
         const rawPeriod = rowObj[periodColumn];
         if (!rawPeriod) continue;
-        
-        // --- DATA NORMALIZATION ---
         const normalizedPeriod = normalizePeriod(rawPeriod);
 
         Object.entries(mapping).forEach(([colName, metric]) => {
@@ -318,8 +357,6 @@ export default function LocationsPage() {
           const valNum = parseAccountingNumber(valStr);
           
           if (!isNaN(valNum)) {
-            // Use deterministic ID to prevent duplicates (idempotency)
-            // Format: locationId_period_metric_rowIdx
             const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metric.replace(/\s+/g, '_')}_${idx}`.toLowerCase();
             const recordRef = doc(firestore, "financial_records", deterministicId);
             
@@ -343,13 +380,14 @@ export default function LocationsPage() {
         const locRef = doc(firestore, "locations", uploadingLocation.id);
         batch.update(locRef, {
           integrationStatus: 'connected',
+          integrationType: selectedSource,
           updatedAt: now,
           lastSync: new Date().toLocaleString(),
           lastRawData: csvContent 
         });
         
         await batch.commit();
-        toast({ title: "Data Normalized", description: `Ingested ${successCount} records for ${uploadingLocation.name}.` });
+        toast({ title: "Data Normalized", description: `Ingested ${successCount} records via ${selectedSource}.` });
         setIsUploadOpen(false);
       } else {
         toast({ variant: "destructive", title: "Upload Failed", description: "No valid numeric data found." });
@@ -430,9 +468,9 @@ export default function LocationsPage() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-xl">{loc.name}</CardTitle>
-                    {loc.lastRawData && (
-                      <div className="flex items-center text-primary" title="Persistent data available">
-                        <FileText className="size-4" />
+                    {loc.integrationType !== 'Manual' && (
+                      <div className="flex items-center text-primary" title={`${loc.integrationType} API Connected`}>
+                        <Cloud className="size-4" />
                       </div>
                     )}
                   </div>
@@ -453,19 +491,19 @@ export default function LocationsPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Last Standard Sync</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Last Sync</p>
                     <div className="flex items-center gap-1.5 text-sm font-medium">
                       <History className="size-3 text-muted-foreground" />
                       {loc.lastSync || "Never"}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Parent Holding</p>
-                    <p className="text-sm truncate font-medium">{companies?.find(c => c.id === loc.companyId)?.name || 'Unknown'}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Source Engine</p>
+                    <p className="text-sm font-medium capitalize">{loc.integrationType}</p>
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="outline" size="sm" className="h-8 text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" onClick={() => handleOpenUpload(loc)}>
-                      <Upload className="mr-2 size-3" /> Normalize Data
+                      <Database className="mr-2 size-3" /> Connect Data Source
                     </Button>
                   </div>
                 </div>
@@ -478,9 +516,41 @@ export default function LocationsPage() {
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Normalization Engine: {uploadingLocation?.name}</DialogTitle>
-            <DialogDescription>Map disparate spreadsheet columns to your global chart of accounts.</DialogDescription>
+            <DialogTitle>Data Connection Engine: {uploadingLocation?.name}</DialogTitle>
+            <DialogDescription>Select a data source and map accounts to your global standardized schema.</DialogDescription>
           </DialogHeader>
+
+          {uploadStep === "source" && (
+            <div className="grid grid-cols-2 gap-4 py-8">
+              {[
+                { id: 'Manual', name: 'Manual Entry / CSV', icon: ClipboardList, desc: 'Paste or upload ledger snapshots.' },
+                { id: 'QuickBooks', name: 'QuickBooks Online', icon: Cloud, desc: 'Direct API sync with Intuit.' },
+                { id: 'NetSuite', name: 'Oracle NetSuite', icon: Database, desc: 'Enterprise ERP integration.' },
+                { id: 'Excel', name: 'Excel Loader', icon: FileText, desc: 'Import from .XLSX workbooks.' }
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => handleSourceSelect(s.id as any)}
+                  className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all text-center space-y-3 group"
+                >
+                  <div className="p-3 rounded-full bg-muted group-hover:bg-primary/20 transition-colors">
+                    <s.icon className="size-8 text-muted-foreground group-hover:text-primary" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-sm">{s.name}</h4>
+                    <p className="text-[11px] text-muted-foreground leading-tight">{s.desc}</p>
+                  </div>
+                </button>
+              ))}
+              {isConnecting && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                  <Loader2 className="size-12 animate-spin text-primary mb-4" />
+                  <p className="font-bold">Establishing Secure Connection...</p>
+                  <p className="text-xs text-muted-foreground">Authorizing OAuth 2.0 Handshake</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {uploadStep === "input" ? (
             <div className="space-y-4 py-4">
@@ -495,11 +565,6 @@ export default function LocationsPage() {
                       <AlertCircle className="size-3 inline mr-1" /> 
                       Normalization will automatically detect periods and scale values.
                     </p>
-                    {uploadingLocation?.lastRawData && (
-                      <span className="text-[10px] font-bold text-primary uppercase flex items-center gap-1">
-                        <FileText className="size-3" /> Persistent cache available
-                      </span>
-                    )}
                   </div>
                   <Textarea 
                     placeholder="Period, Revenue, COGS, Net Profit..." 
@@ -519,29 +584,35 @@ export default function LocationsPage() {
                   />
                   <Upload className="size-8 mb-4 opacity-20" />
                   <p className="text-sm font-medium">Click or drag a CSV file here</p>
-                  <p className="text-[10px] uppercase mt-2 tracking-widest">Supports .CSV UTF-8</p>
                   <Button variant="outline" size="sm" className="mt-4 pointer-events-none">Select File</Button>
                 </TabsContent>
               </Tabs>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsUploadOpen(false)}>Cancel</Button>
-                <Button onClick={handleAnalyzeCSV} disabled={!csvContent.trim()} className="bg-primary">Continue to Mapping <ArrowRight className="ml-2 size-4" /></Button>
+                <Button variant="outline" onClick={() => setUploadStep("source")}>Back</Button>
+                <Button onClick={handleAnalyzeCSV} disabled={!csvContent.trim()} className="bg-primary">Analyze Mapping <ArrowRight className="ml-2 size-4" /></Button>
               </DialogFooter>
             </div>
-          ) : (
+          ) : uploadStep === "mapping" && (
             <div className="space-y-6 py-4">
               <div className="grid gap-4">
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 block">1. Source Period Normalization</Label>
-                  <Select value={periodColumn} onValueChange={setPeriodColumn}>
-                    <SelectTrigger className="bg-background border-border h-11">
-                      <SelectValue placeholder="Select column containing date or fiscal period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground mt-2 italic">Engine supports: Q1 2024, Jan-24, 2024-01-01, etc.</p>
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/10 flex items-center justify-between">
+                  <div>
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 block">1. Source Period Normalization</Label>
+                    <Select value={periodColumn} onValueChange={setPeriodColumn}>
+                      <SelectTrigger className="bg-background border-border h-11 w-[300px]">
+                        <SelectValue placeholder="Select period column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Connected via</p>
+                    <p className="text-sm font-bold flex items-center gap-1 justify-end">
+                      <Link2 className="size-3 text-accent" /> {selectedSource}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -575,11 +646,11 @@ export default function LocationsPage() {
                       </DialogContent>
                     </Dialog>
                   </div>
-                  <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+                  <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm max-h-[400px] overflow-y-auto">
                     <Table>
-                      <TableHeader className="bg-muted/50">
+                      <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow>
-                          <TableHead className="text-[10px] font-bold uppercase tracking-wider">Source Header</TableHead>
+                          <TableHead className="text-[10px] font-bold uppercase tracking-wider">Source Ledger Account</TableHead>
                           <TableHead className="text-[10px] font-bold uppercase tracking-wider text-right">Standardized Target</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -592,7 +663,7 @@ export default function LocationsPage() {
                                 value={mapping[h] || "ignore"} 
                                 onValueChange={(val) => setMapping(prev => ({ ...prev, [h]: val }))}
                               >
-                                <SelectTrigger className="h-8 text-[11px] bg-background border-border w-[180px] ml-auto">
+                                <SelectTrigger className="h-8 text-[11px] bg-background border-border w-[200px] ml-auto">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -609,10 +680,10 @@ export default function LocationsPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setUploadStep("input")}>Back</Button>
+                <Button variant="outline" onClick={() => setUploadStep("source")}>Change Source</Button>
                 <Button onClick={handleUploadData} disabled={isUploading || !periodColumn} className="bg-primary">
                   {isUploading ? <Loader2 className="size-4 animate-spin mr-2" /> : <Check className="size-4 mr-2" />}
-                  Normalize & Commit
+                  Normalize & Sync
                 </Button>
               </DialogFooter>
             </div>
