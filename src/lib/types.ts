@@ -18,6 +18,7 @@ export type Company = {
   id: string;
   name: string;
   description?: string;
+  sector?: string;
   members: Record<string, CompanyRole>; 
   customMetrics?: string[]; 
   createdAt: string;

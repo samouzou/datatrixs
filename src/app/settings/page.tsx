@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -38,6 +39,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+const BUSINESS_SECTORS = [
+  "Consumer & Retail",
+  "Healthcare",
+  "Technology & Software",
+  "Industrials & Manufacturing",
+  "Financial Services",
+  "Energy & Infrastructure",
+  "Real Estate",
+  "Other"
+];
+
 export default function SettingsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
@@ -57,6 +69,7 @@ export default function SettingsPage() {
 
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [sector, setSector] = React.useState("")
   const [currency, setCurrency] = React.useState("USD")
   const [isSaving, setIsSaving] = React.useState(false)
 
@@ -64,6 +77,7 @@ export default function SettingsPage() {
     if (company) {
       setName(company.name || "")
       setDescription(company.description || "")
+      setSector(company.sector || "")
     }
   }, [company])
 
@@ -75,6 +89,7 @@ export default function SettingsPage() {
     updateDocumentNonBlocking(companyRef, {
       name,
       description,
+      sector,
       updatedAt: new Date().toISOString()
     });
 
@@ -120,6 +135,19 @@ export default function SettingsPage() {
                     onChange={(e) => setName(e.target.value)}
                     className="bg-muted border-none focus-visible:ring-primary" 
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sector">Business Sector</Label>
+                  <Select value={sector} onValueChange={setSector}>
+                    <SelectTrigger className="bg-muted border-none h-11">
+                      <SelectValue placeholder="Select Sector" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BUSINESS_SECTORS.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Business Focus / Description</Label>
