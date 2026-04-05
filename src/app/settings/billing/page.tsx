@@ -1,7 +1,9 @@
+
 'use client';
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,11 +20,10 @@ import {
   Package
 } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc } from "firebase/firestore"
-import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
+import { collection, query, where } from "firebase/firestore"
 import { Company, Location } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
+import { createCheckoutSession } from "@/app/actions/stripe-actions"
 
 const PRICING = {
   MONTHLY: {
@@ -31,12 +32,9 @@ const PRICING = {
     LABEL: "per month"
   },
   ANNUAL: {
-    // 17% off 3000 * 12 = 29,880
     BASE: 29880, 
-    // 17% off 250 * 12 = 2,490
     PER_LOCATION: 2490,
-    LABEL: "per year",
-    MONTHLY_EQUIV: 2490 // (29880 / 12)
+    LABEL: "per year"
   }
 };
 
@@ -44,9 +42,27 @@ export default function BillingPage() {
   const { user } = useUser()
   const firestore = useFirestore()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
 
   const [billingCycle, setBillingCycle] = React.useState<"monthly" | "annual">("annual")
   const [isProcessing, setIsProcessing] = React.useState(false)
+
+  // Handle post-checkout notifications
+  React.useEffect(() => {
+    if (searchParams.get('success')) {
+      toast({
+        title: "Checkout Success",
+        description: "Your subscription is being processed. It may take a few minutes to update your status.",
+      })
+    }
+    if (searchParams.get('canceled')) {
+      toast({
+        variant: "destructive",
+        title: "Checkout Canceled",
+        description: "Your subscription process was not completed.",
+      })
+    }
+  }, [searchParams, toast])
 
   // Fetch Companies
   const companiesQuery = useMemoFirebase(() => {
@@ -59,7 +75,7 @@ export default function BillingPage() {
   const { data: companies, isLoading: isCompaniesLoading } = useCollection<Company>(companiesQuery);
   const company = companies?.[0];
 
-  // Fetch Locations to count them
+  // Fetch Locations
   const locationsQuery = useMemoFirebase(() => {
     if (!firestore || !company) return null;
     return query(
@@ -70,35 +86,35 @@ export default function BillingPage() {
   const { data: locations, isLoading: isLocsLoading } = useCollection<Location>(locationsQuery);
 
   const locationCount = locations?.length || 0;
-
   const currentPrices = billingCycle === "monthly" ? PRICING.MONTHLY : PRICING.ANNUAL;
   const totalBase = currentPrices.BASE;
   const totalLocationsCost = currentPrices.PER_LOCATION * locationCount;
   const totalDue = totalBase + totalLocationsCost;
 
-  const handleSubscribe = () => {
-    if (!company || !firestore) return;
+  const handleSubscribe = async () => {
+    if (!company || isProcessing) return;
     setIsProcessing(true);
 
-    // Simulate Stripe Checkout Delay
-    setTimeout(() => {
-      const companyRef = doc(firestore, "companies", company.id);
-      updateDocumentNonBlocking(companyRef, {
-        subscription: {
-          plan: 'pro',
-          interval: billingCycle,
-          status: 'active',
-          currentPeriodEnd: new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString()
-        }
+    try {
+      const result = await createCheckoutSession({
+        companyId: company.id,
+        locationCount,
+        interval: billingCycle,
       });
 
-      setIsProcessing(false);
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error("No checkout URL returned.");
+      }
+    } catch (error: any) {
       toast({
-        title: "Subscription Active",
-        description: `Successfully subscribed to the ${billingCycle} plan.`
+        variant: "destructive",
+        title: "Subscription Error",
+        description: error.message || "Could not initiate Stripe checkout.",
       });
-    }, 1500);
+      setIsProcessing(false);
+    }
   }
 
   if (isCompaniesLoading || isLocsLoading) {
