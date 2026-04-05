@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -44,7 +43,7 @@ export default function SettingsPage() {
   const firestore = useFirestore()
   const { toast } = useToast()
 
-  // Fetch Companies
+  // Fetch Companies the user is a member of
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -65,7 +64,6 @@ export default function SettingsPage() {
     if (company) {
       setName(company.name || "")
       setDescription(company.description || "")
-      // Mocking currency for now as it's not in schema yet but we'll allow selection
     }
   }, [company])
 
@@ -73,12 +71,14 @@ export default function SettingsPage() {
     if (!firestore || !company) return;
     setIsSaving(true);
     
-    updateDocumentNonBlocking(doc(firestore, "companies", company.id), {
+    const companyRef = doc(firestore, "companies", company.id);
+    updateDocumentNonBlocking(companyRef, {
       name,
       description,
       updatedAt: new Date().toISOString()
     });
 
+    // Simulate feedback delay for better UX
     setTimeout(() => {
       setIsSaving(false);
       toast({
@@ -289,8 +289,8 @@ export default function SettingsPage() {
                 </Dialog>
               </div>
             </div>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
