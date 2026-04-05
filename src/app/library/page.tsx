@@ -64,13 +64,13 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = React.useState("reports")
 
   // Query formal reports & exports
-  // Filter by membership in the company map to satisfy optimized security rules
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports')) return null;
+    // Query documents where the user is a member of the company, or where they are the owner
+    // For simplicity in a single query with security rules, we filter by the membership map
     return query(
       collection(firestore, "saved_reports"),
-      where(`companyMembers.${user.uid}`, ">=", ""), // Effectively checks for existence of key in the map
-      orderBy(`companyMembers.${user.uid}`),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
   }, [firestore, user?.uid, activeTab]); 
@@ -81,8 +81,7 @@ export default function LibraryPage() {
     if (!firestore || !user || activeTab !== 'analysis') return null;
     return query(
       collection(firestore, "saved_analysis"),
-      where(`companyMembers.${user.uid}`, ">=", ""),
-      orderBy(`companyMembers.${user.uid}`),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
   }, [firestore, user?.uid, activeTab]); 
