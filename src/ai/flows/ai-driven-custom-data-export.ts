@@ -54,7 +54,7 @@ const aiDrivenCustomDataExportPrompt = ai.definePrompt({
   prompt: `You are an expert financial analyst for Datatrixs. Your task is to interpret a user's request for specific financial data and compile a dataset into a tabular JSON format.
 
 {{#if financialData}}
-Base your table on the following normalized records:
+Base your table on the following normalized records. Each record has a 'metric' (e.g., Revenue, Net Profit) and a 'value'.
 {{{financialData}}}
 {{else}}
 Act as if you have access to historical financial data for a multi-location retail business. Generate realistic-looking data based on the request.
@@ -62,10 +62,10 @@ Act as if you have access to historical financial data for a multi-location reta
 
 Follow these rules:
 1.  **Strictly adhere to the output JSON schema.** 
-2.  **Identify key metrics, timeframes, locations** from the user's query.
-3.  **Populate the 'tableName' field** with a clear title.
-4.  **Populate the 'header' and 'data' fields**.
-5.  **Use compact currency notation ($1.2M, $450K) for all financial values in the data rows.**
+2.  **Identify key metrics** from the provided 'metric' fields in the input data.
+3.  **Structure the table logically**. If the user asks for multiple metrics, use them as column headers (WIDE format).
+4.  **Populate the 'tableName' field** with a clear title.
+5.  **Use compact currency notation ($1.2M, $450K)** for all financial values in the data rows.
 
 User Request: {{{query}}}`,
 });

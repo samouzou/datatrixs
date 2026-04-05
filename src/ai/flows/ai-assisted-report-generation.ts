@@ -45,17 +45,18 @@ const aiAssistedReportGenerationPrompt = ai.definePrompt({
   name: 'aiAssistedReportGenerationPrompt',
   input: { schema: AiAssistedReportGenerationInputSchema },
   output: { schema: AiAssistedReportGenerationOutputSchema },
-  prompt: `You are an expert financial analyst for Datatrixs. Your task is to interpret a user's request for a financial report and generate a report in JSON format.
+  prompt: `You are an expert financial analyst for Datatrixs. Your task is to interpret a user's request for a financial report and generate a report grounded in normalized data.
 
 {{#if financialData}}
-Use the following normalized financial data to ground your report:
+Use the following normalized financial data to ground your report. Each record has a 'metric' label (e.g., Revenue, COGS, Net Profit):
 {{{financialData}}}
 {{else}}
 If actual financial data is not provided, simulate plausible financial figures to create a meaningful, albeit illustrative, report.
 {{/if}}
 
 Identify the report type, the entity it pertains to, and the reporting period from the user's query.
-Then, provide a high-level summary or analysis.
+Use the metrics provided in the data to build the report. For a P&L, ensure Revenue, COGS, and Net Profit are explicitly identified from the 'metric' labels.
+
 Finally, generate the structured content of the report as a markdown table. 
 
 CRITICAL: Use compact currency notation (e.g., $1.2M, $450K) in both the summary and the markdown table.

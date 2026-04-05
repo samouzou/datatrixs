@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A Genkit flow for an AI financial analyst that answers natural language queries about financial performance.
@@ -79,32 +78,30 @@ Financial Data: {{{financialData}}}
 User Query: {{{query}}}
 {{#if context}}Context: {{{context}}}{{/if}}
 
+CRITICAL DATA HANDLING RULES:
+1. The provided data is NORMALIZED. Each record contains a 'metric' name (e.g., "Revenue", "Net Profit", "COGS") and a 'value'.
+2. When answering queries or generating CSVs, look for these specific 'metric' labels in the data.
+3. If the user asks for a table or spreadsheet involving multiple metrics, PIVOT the data so that Location/Period are rows and the Metrics (Revenue, Profit, etc.) are COLUMNS.
+
 CRITICAL FORMATTING & STRUCTURE RULES:
 1. Always use compact currency notation in your 'answer' and 'rawSpreadsheetData'. 
    - Use 'K' for thousands (e.g., $450K)
    - Use 'M' for millions (e.g., $1.2M)
 2. In the 'results' array, provide raw numeric values (no suffixes) for chart processing.
-3. Multi-Location Handling: If the query compares locations or asks for portfolio-wide data, the 'rawSpreadsheetData' CSV MUST include a "Location" column to differentiate between entities.
-4. Be professional and objective.
+3. Be professional and objective.
 
 Follow these steps:
-1. **Analyze the data** to directly answer the user's query.
+1. **Analyze the normalized data** to directly answer the user's query.
 2. **Determine the primary analysis type**.
 3. **Extract structured data points** for the 'results' array (using raw numbers).
 4. **Suggest a chart type** (bar, line, pie, table) if quantifiable.
-5. **Provide raw CSV data** in 'rawSpreadsheetData' with formatted currency values. Ensure Location is a column for multi-location queries.
+5. **Provide raw CSV data** in 'rawSpreadsheetData'. If comparing multiple metrics, prefer a WIDE format (metrics as headers).
 6. **Provide recommendations** based on the analysis.
 
-Example Output format for 'Compare profit for Houston and Dallas':
-{
-  "answer": "Houston's profit was $1.1M while Dallas reported $845K.",
-  "analysisType": "comparison",
-  "results": [
-    { "label": "Houston", "value": 1100000, "metric": "Net Profit" },
-    { "label": "Dallas", "value": 845000, "metric": "Net Profit" }
-  ],
-  "rawSpreadsheetData": "Location,Metric,Value\nHouston,Net Profit,$1.1M\nDallas,Net Profit,$845K"
-}
+Example Wide CSV for 'Compare revenue and profit for Houston':
+Location,Period,Revenue,Net Profit
+Houston,2024-Q1,$1.2M,$240K
+Houston,2024-Q2,$1.3M,$260K
 
 Strictly adhere to the output JSON schema.`,
 });
