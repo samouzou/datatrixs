@@ -64,11 +64,6 @@ const adminNavItems = [
     icon: Building2,
   },
   {
-    title: "Integrations",
-    href: "/settings/integrations",
-    icon: Database,
-  },
-  {
     title: "Settings",
     href: "/settings",
     icon: Settings,
@@ -158,7 +153,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="p-2 group-data-[collapsible=icon]:hidden">
-              <div className="flex items-center gap-3 px-2 py-3 rounded-lg bg-muted/50 border border-white/5">
+              <div className="flex items-center gap-3 px-2 py-3 rounded-lg bg-muted/50 border border-border">
                 <div className="size-8 rounded-full overflow-hidden flex items-center justify-center bg-primary/10">
                   <div className="size-6 relative">
                     <Image 
