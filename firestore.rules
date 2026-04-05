@@ -93,9 +93,10 @@ service cloud.firestore {
 
     match /saved_reports/{reportId} {
       // Optimized list rule for query verification
+      // Specifically checks for membership in the company map OR ownership
       allow list: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        isCompanyMember(resource.data.companyMembers)
+        resource.data.companyMembers[request.auth.uid] != null
       );
       allow get: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
@@ -111,7 +112,7 @@ service cloud.firestore {
       // Optimized list rule for query verification
       allow list: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        isCompanyMember(resource.data.companyMembers)
+        resource.data.companyMembers[request.auth.uid] != null
       );
       allow get: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 

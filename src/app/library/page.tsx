@@ -64,24 +64,25 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = React.useState("reports")
 
   // Query formal reports & exports
-  // Deferred until tab is active (reports or exports) to avoid initial permission noise
+  // Filter by membership in the company map to satisfy optimized security rules
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports')) return null;
     return query(
       collection(firestore, "saved_reports"),
-      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
+      where(`companyMembers.${user.uid}`, ">=", ""), // Effectively checks for existence of key in the map
+      orderBy(`companyMembers.${user.uid}`),
       orderBy("createdAt", "desc")
     );
   }, [firestore, user?.uid, activeTab]); 
   const { data: reports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
 
   // Query ad-hoc analyses
-  // Deferred until analysis tab is active
   const analysesQuery = useMemoFirebase(() => {
     if (!firestore || !user || activeTab !== 'analysis') return null;
     return query(
       collection(firestore, "saved_analysis"),
-      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
+      where(`companyMembers.${user.uid}`, ">=", ""),
+      orderBy(`companyMembers.${user.uid}`),
       orderBy("createdAt", "desc")
     );
   }, [firestore, user?.uid, activeTab]); 
@@ -199,6 +200,7 @@ function SavedItemCard({ item, icon, onDelete }: { item: SavedReport, icon: Reac
                 <div className="rounded-xl border border-border overflow-hidden">
                   {(() => {
                     const lines = item.content.split('\n');
+                    if (lines.length < 1) return null;
                     const headers = lines[0].split(',');
                     const data = lines.slice(1).map(l => l.split(','));
                     return <SpreadsheetView title="Saved Export" headers={headers} data={data} className="border-none rounded-none" />;
