@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Trash2,
   Download,
-  BarChart3
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,8 +65,6 @@ export default function LibraryPage() {
   // Query formal reports & exports
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports')) return null;
-    // Query documents where the user is a member of the company, or where they are the owner
-    // For simplicity in a single query with security rules, we filter by the membership map
     return query(
       collection(firestore, "saved_reports"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),

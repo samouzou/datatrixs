@@ -16,16 +16,16 @@ service cloud.firestore {
     // High-performance map-based membership check
     function isCompanyMember(membersMap) {
       return isSignedIn() && membersMap != null && (
-        membersMap[request.auth.uid] == 'admin' || 
-        membersMap[request.auth.uid] == 'member' || 
-        membersMap[request.auth.uid] == true
+        membersMap.get(request.auth.uid, null) == 'admin' || 
+        membersMap.get(request.auth.uid, null) == 'member' || 
+        membersMap.get(request.auth.uid, null) == true
       );
     }
 
     function isCompanyAdmin(membersMap) {
       return isSignedIn() && membersMap != null && (
-        membersMap[request.auth.uid] == 'admin' || 
-        membersMap[request.auth.uid] == true
+        membersMap.get(request.auth.uid, null) == 'admin' || 
+        membersMap.get(request.auth.uid, null) == true
       );
     }
     
@@ -93,13 +93,13 @@ service cloud.firestore {
 
     match /saved_reports/{reportId} {
       allow list: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
         isCompanyMember(resource.data.companyMembers) || 
+        resource.data.userId == request.auth.uid || 
         isAppAdmin()
       );
       allow get: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
         isCompanyMember(resource.data.companyMembers) || 
+        resource.data.userId == request.auth.uid || 
         isAppAdmin()
       );
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
@@ -109,13 +109,13 @@ service cloud.firestore {
 
     match /saved_analysis/{analysisId} {
       allow list: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
         isCompanyMember(resource.data.companyMembers) || 
+        resource.data.userId == request.auth.uid || 
         isAppAdmin()
       );
       allow get: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
         isCompanyMember(resource.data.companyMembers) || 
+        resource.data.userId == request.auth.uid || 
         isAppAdmin()
       );
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
