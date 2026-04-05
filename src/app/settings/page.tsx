@@ -50,6 +50,15 @@ const BUSINESS_SECTORS = [
   "Other"
 ];
 
+const CURRENCIES = [
+  { code: "USD", name: "United States Dollar" },
+  { code: "EUR", name: "Euro" },
+  { code: "GBP", name: "British Pound" },
+  { code: "CAD", name: "Canadian Dollar" },
+  { code: "AUD", name: "Australian Dollar" },
+  { code: "JPY", name: "Japanese Yen" }
+];
+
 export default function SettingsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
@@ -78,6 +87,7 @@ export default function SettingsPage() {
       setName(company.name || "")
       setDescription(company.description || "")
       setSector(company.sector || "")
+      setCurrency(company.reportingCurrency || "USD")
     }
   }, [company])
 
@@ -90,6 +100,7 @@ export default function SettingsPage() {
       name,
       description,
       sector,
+      reportingCurrency: currency,
       updatedAt: new Date().toISOString()
     });
 
@@ -159,10 +170,6 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="taxId">Global Tax ID / EIN</Label>
-                <Input id="taxId" placeholder="XX-XXXXXXX" className="bg-muted border-none" />
-              </div>
               <Button 
                 className="bg-primary hover:bg-primary/90 w-full" 
                 onClick={handleSaveProfile}
@@ -199,18 +206,18 @@ export default function SettingsPage() {
               </div>
               <Separator className="my-2" />
               <div className="space-y-2">
-                <Label className="text-xs uppercase font-bold text-muted-foreground tracking-widest">Reporting Currency</Label>
+                <Label htmlFor="currency" className="text-xs uppercase font-bold text-muted-foreground tracking-widest">Reporting Currency</Label>
                 <div className="flex items-center gap-2">
                   <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger className="w-full bg-muted border-none h-11">
+                    <SelectTrigger id="currency" className="w-full bg-muted border-none h-11">
                       <SelectValue placeholder="Select Currency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="USD">United States Dollar (USD)</SelectItem>
-                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                      <SelectItem value="GBP">British Pound (GBP)</SelectItem>
-                      <SelectItem value="CAD">Canadian Dollar (CAD)</SelectItem>
-                      <SelectItem value="AUD">Australian Dollar (AUD)</SelectItem>
+                      {CURRENCIES.map(c => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.name} ({c.code})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -263,7 +270,7 @@ export default function SettingsPage() {
                         Datatrixs maps disparate ledger accounts into these five core dimensions to enable portfolio-wide aggregation.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
                       {[
                         { 
                           title: "Revenue", 
@@ -291,7 +298,7 @@ export default function SettingsPage() {
                           tags: ["Current Assets", "Stock"] 
                         }
                       ].map((rule, i) => (
-                        <div key={i} className="p-4 rounded-lg bg-muted/50 border border-border">
+                        <div key={i} className="p-4 rounded-lg bg-muted/50 border border-border mb-3 last:mb-0">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
                               <CheckCircle2 className="size-4 text-accent" />

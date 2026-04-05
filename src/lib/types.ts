@@ -19,6 +19,7 @@ export type Company = {
   name: string;
   description?: string;
   sector?: string;
+  reportingCurrency?: string;
   members: Record<string, CompanyRole>; 
   customMetrics?: string[]; 
   createdAt: string;
