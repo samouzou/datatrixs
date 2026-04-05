@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -37,18 +36,15 @@ const formatCurrency = (value: number) => {
   return `$${value.toFixed(0)}`;
 };
 
-// Normalized Period Sorting and Formatting
 const sortPeriods = (periods: string[]) => {
   return [...periods].sort((a, b) => a.localeCompare(b));
 };
 
 const displayPeriod = (p: string) => {
-  // Handle YYYY-QN
   if (p.includes('-Q')) {
     const [y, q] = p.split('-');
     return `${q} ${y}`;
   }
-  // Handle YYYY-MM
   if (p.includes('-')) {
     const parts = p.split('-');
     if (parts.length === 2) {
@@ -66,7 +62,6 @@ export default function DashboardPage() {
   const { user } = useUser()
   const firestore = useFirestore()
 
-  // Fetch all financial records securely using denormalized membership
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -77,7 +72,6 @@ export default function DashboardPage() {
 
   const { data: records, isLoading } = useCollection<FinancialRecord>(recordsQuery);
 
-  // Fetch locations
   const locationsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -87,65 +81,102 @@ export default function DashboardPage() {
   }, [firestore, user]);
   const { data: locations, isLoading: isLocsLoading } = useCollection<Location>(locationsQuery);
 
-  // --- Normalized Data Aggregation Logic ---
   const processedData = React.useMemo(() => {
     if (!records) return { 
-      kpis: { revenue: 0, profit: 0, margin: 0, turn: 0 },
+      kpis: { 
+        revenue: { val: 0, change: 0, trend: 'neutral' as const }, 
+        profit: { val: 0, change: 0, trend: 'neutral' as const }, 
+        margin: { val: 0, change: 0, trend: 'neutral' as const }, 
+        turn: { val: 0, change: 0, trend: 'neutral' as const } 
+      },
       byLocation: [],
       trends: [],
-      locRevenueMap: {} as Record<string, number>
+      locRevenueMap: {} as Record<string, number>,
+      revenueTarget: 1000000,
+      targetProgress: 0
     };
 
     const locationMap: Record<string, number> = {};
-    const periodMap: Record<string, { revenue: number; profit: number }> = {};
-    let totalRevenue = 0;
-    let totalProfit = 0;
-    let totalInventory = 0;
-
+    const periodMap: Record<string, { revenue: number; profit: number; inventory: number }> = {};
+    
     records.forEach(r => {
       const metric = r.metric.toLowerCase();
-      
-      if (metric === 'revenue') {
-        totalRevenue += r.value;
+      if (!periodMap[r.period]) {
+        periodMap[r.period] = { revenue: 0, profit: 0, inventory: 0 };
+      }
+
+      if (metric === 'revenue' || metric.includes('revenue')) {
+        periodMap[r.period].revenue += r.value;
         locationMap[r.locationName] = (locationMap[r.locationName] || 0) + r.value;
       }
-      if (metric === 'net profit') totalProfit += r.value;
-      if (metric === 'inventory value') totalInventory += r.value;
-
-      // Group by Normalized Period
-      if (!periodMap[r.period]) {
-        periodMap[r.period] = { revenue: 0, profit: 0 };
+      if (metric === 'net profit' || metric === 'profit') {
+        periodMap[r.period].profit += r.value;
       }
-      if (metric === 'revenue') periodMap[r.period].revenue += r.value;
-      if (metric === 'net profit') periodMap[r.period].profit += r.value;
+      if (metric === 'inventory value' || metric.includes('inventory')) {
+        periodMap[r.period].inventory += r.value;
+      }
     });
 
     const sortedPeriods = sortPeriods(Object.keys(periodMap));
-    const trends = sortedPeriods.map(p => ({
-      period: p,
-      displayPeriod: displayPeriod(p),
-      revenue: periodMap[p].revenue, 
-      profit: periodMap[p].profit,
-      prevYearRevenue: periodMap[p].revenue * 0.85 
-    }));
+    const latestPeriod = sortedPeriods[sortedPeriods.length - 1];
+    const prevPeriod = sortedPeriods[sortedPeriods.length - 2];
 
-    const byLocation = Object.entries(locationMap).map(([name, revenue]) => ({
-      name,
-      revenue
-    }));
+    const calculateMetrics = (curr: number, prev: number) => {
+      if (!prev || prev === 0) return { change: 0, trend: 'neutral' as const };
+      const change = ((curr - prev) / Math.abs(prev)) * 100;
+      return { 
+        change: parseFloat(change.toFixed(1)), 
+        trend: change > 0 ? 'up' as const : change < 0 ? 'down' as const : 'neutral' as const 
+      };
+    };
+
+    const latestData = latestPeriod ? periodMap[latestPeriod] : { revenue: 0, profit: 0, inventory: 0 };
+    const prevData = prevPeriod ? periodMap[prevPeriod] : { revenue: 0, profit: 0, inventory: 0 };
+
+    // EBITDA Margin latest and prev
+    const latestMargin = latestData.revenue > 0 ? (latestData.profit / latestData.revenue) * 100 : 0;
+    const prevMargin = prevData.revenue > 0 ? (prevData.profit / prevData.revenue) * 100 : 0;
+    const marginShift = latestMargin - prevMargin;
+
+    // Inventory Turn
+    const latestTurn = latestData.revenue > 0 && latestData.inventory > 0 ? (latestData.revenue / latestData.inventory) : 0;
+    const prevTurn = prevData.revenue > 0 && prevData.inventory > 0 ? (prevData.revenue / prevData.inventory) : 0;
+
+    const revenueTarget = (locations?.length || 1) * 500000; // $500k target per location
+    const targetProgress = Math.min((latestData.revenue / revenueTarget) * 100, 1000);
+
+    const trends = sortedPeriods.map((p, idx) => {
+      const prevP = sortedPeriods[idx - 1];
+      return {
+        period: p,
+        displayPeriod: displayPeriod(p),
+        revenue: periodMap[p].revenue, 
+        profit: periodMap[p].profit,
+        prevYearRevenue: prevP ? periodMap[prevP].revenue : periodMap[p].revenue * 0.9
+      };
+    });
 
     return {
       kpis: {
-        revenue: totalRevenue,
-        profit: totalProfit,
-        margin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
-        turn: totalRevenue > 0 && totalInventory > 0 ? (totalRevenue / totalInventory) : 0
+        revenue: { val: latestData.revenue, ...calculateMetrics(latestData.revenue, prevData.revenue) },
+        profit: { val: latestData.profit, ...calculateMetrics(latestData.profit, prevData.profit) },
+        margin: { 
+          val: latestMargin, 
+          change: parseFloat(marginShift.toFixed(1)), 
+          trend: marginShift > 0 ? 'up' as const : marginShift < 0 ? 'down' as const : 'neutral' as const 
+        },
+        turn: { 
+          val: latestTurn, 
+          ...calculateMetrics(latestTurn, prevTurn)
+        }
       },
-      byLocation,
+      byLocation: Object.entries(locationMap).map(([name, revenue]) => ({ name, revenue })),
       trends,
-      locRevenueMap: locationMap
+      locRevenueMap: locationMap,
+      revenueTarget,
+      targetProgress
     };
-  }, [records]);
+  }, [records, locations]);
 
   const getBarColor = (value: number) => {
     if (value === 0) return "hsl(var(--destructive))";
@@ -162,7 +193,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { kpis, byLocation, trends, locRevenueMap } = processedData;
+  const { kpis, byLocation, trends, locRevenueMap, revenueTarget, targetProgress } = processedData;
 
   const unhealthyLocs = locations?.filter(loc => {
     if (!loc.updatedAt) return true;
@@ -180,7 +211,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest">
-            Holding Aggregation Active
+            {records?.length ? 'Grounded Aggregation Active' : 'Waiting for Data Ingestion'}
           </Badge>
         </div>
       </div>
@@ -188,31 +219,31 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KpiCard 
           label="Portfolio Revenue" 
-          value={formatCompactNumber(kpis.revenue)} 
-          change={12.5} 
-          trend="up" 
+          value={formatCompactNumber(kpis.revenue.val)} 
+          change={kpis.revenue.change} 
+          trend={kpis.revenue.trend} 
           prefix="$" 
-          secondaryLabel={`Target: $1.5M (${((kpis.revenue / 1500000) * 100).toFixed(0)}%)`}
+          secondaryLabel={`Target: ${formatCurrency(revenueTarget)} (${targetProgress.toFixed(0)}%)`}
         />
         <KpiCard 
           label="Net Profit" 
-          value={formatCompactNumber(kpis.profit)} 
-          change={8.2} 
-          trend="up" 
+          value={formatCompactNumber(kpis.profit.val)} 
+          change={kpis.profit.change} 
+          trend={kpis.profit.trend} 
           prefix="$" 
         />
         <KpiCard 
           label="EBITDA Margin" 
-          value={kpis.margin.toFixed(1)} 
-          change={2.1} 
-          trend="up" 
+          value={kpis.margin.val.toFixed(1)} 
+          change={kpis.margin.change} 
+          trend={kpis.margin.trend} 
           suffix="%" 
         />
         <KpiCard 
           label="Inventory Turn" 
-          value={kpis.turn.toFixed(1)} 
-          change={0.5} 
-          trend="down" 
+          value={kpis.turn.val.toFixed(1)} 
+          change={kpis.turn.change} 
+          trend={kpis.turn.trend} 
         />
         
         <Card className="bg-primary/5 border-primary/20 shadow-sm relative overflow-hidden">
@@ -228,7 +259,7 @@ export default function DashboardPage() {
               <p className="text-[11px] leading-relaxed text-foreground font-medium">
                 {unhealthyLocs?.length 
                   ? `${unhealthyLocs[0].name} reported no normalized data for 72h. Check ingestion logs.`
-                  : "All streams normalized. Portfolio margin is 2.4% above sector baseline."}
+                  : "All streams normalized. Portfolio margin is optimized against sector baseline."}
               </p>
             </div>
           </CardContent>
