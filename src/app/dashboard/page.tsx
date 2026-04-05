@@ -92,22 +92,22 @@ export default function DashboardPage() {
       byLocation: [],
       trends: [],
       locRevenueMap: {} as Record<string, number>,
-      revenueTarget: 1000000,
-      targetProgress: 0
+      revenueTarget: 0,
+      targetProgress: 0,
+      latestPeriodLabel: ""
     };
 
-    const locationMap: Record<string, number> = {};
-    const periodMap: Record<string, { revenue: number; profit: number; inventory: number }> = {};
+    const periodMap: Record<string, { revenue: number; profit: number; inventory: number; locRevenues: Record<string, number> }> = {};
     
     records.forEach(r => {
       const metric = r.metric.toLowerCase();
       if (!periodMap[r.period]) {
-        periodMap[r.period] = { revenue: 0, profit: 0, inventory: 0 };
+        periodMap[r.period] = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
       }
 
       if (metric === 'revenue' || metric.includes('revenue')) {
         periodMap[r.period].revenue += r.value;
-        locationMap[r.locationName] = (locationMap[r.locationName] || 0) + r.value;
+        periodMap[r.period].locRevenues[r.locationName] = (periodMap[r.period].locRevenues[r.locationName] || 0) + r.value;
       }
       if (metric === 'net profit' || metric === 'profit') {
         periodMap[r.period].profit += r.value;
@@ -130,8 +130,8 @@ export default function DashboardPage() {
       };
     };
 
-    const latestData = latestPeriod ? periodMap[latestPeriod] : { revenue: 0, profit: 0, inventory: 0 };
-    const prevData = prevPeriod ? periodMap[prevPeriod] : { revenue: 0, profit: 0, inventory: 0 };
+    const latestData = latestPeriod ? periodMap[latestPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
+    const prevData = prevPeriod ? periodMap[prevPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
 
     // EBITDA Margin latest and prev
     const latestMargin = latestData.revenue > 0 ? (latestData.profit / latestData.revenue) * 100 : 0;
@@ -142,8 +142,8 @@ export default function DashboardPage() {
     const latestTurn = latestData.revenue > 0 && latestData.inventory > 0 ? (latestData.revenue / latestData.inventory) : 0;
     const prevTurn = prevData.revenue > 0 && prevData.inventory > 0 ? (prevData.revenue / prevData.inventory) : 0;
 
-    const revenueTarget = (locations?.length || 1) * 500000; // $500k target per location
-    const targetProgress = Math.min((latestData.revenue / revenueTarget) * 100, 1000);
+    const revenueTarget = (locations?.length || 1) * 500000; // $500k target per location for the period
+    const targetProgress = revenueTarget > 0 ? Math.min((latestData.revenue / revenueTarget) * 100, 1000) : 0;
 
     const trends = sortedPeriods.map((p, idx) => {
       const prevP = sortedPeriods[idx - 1];
@@ -170,11 +170,12 @@ export default function DashboardPage() {
           ...calculateMetrics(latestTurn, prevTurn)
         }
       },
-      byLocation: Object.entries(locationMap).map(([name, revenue]) => ({ name, revenue })),
+      byLocation: Object.entries(latestData.locRevenues).map(([name, revenue]) => ({ name, revenue })),
       trends,
-      locRevenueMap: locationMap,
+      locRevenueMap: latestData.locRevenues,
       revenueTarget,
-      targetProgress
+      targetProgress,
+      latestPeriodLabel: latestPeriod ? displayPeriod(latestPeriod) : "No Data"
     };
   }, [records, locations]);
 
@@ -193,7 +194,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { kpis, byLocation, trends, locRevenueMap, revenueTarget, targetProgress } = processedData;
+  const { kpis, byLocation, trends, locRevenueMap, revenueTarget, targetProgress, latestPeriodLabel } = processedData;
 
   const unhealthyLocs = locations?.filter(loc => {
     if (!loc.updatedAt) return true;
@@ -207,7 +208,10 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between space-y-2">
         <div className="flex items-center gap-3">
           <Building2 className="size-8 text-primary" />
-          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">Current Period: {latestPeriodLabel}</p>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest">
@@ -306,8 +310,8 @@ export default function DashboardPage() {
         
         <Card className="col-span-3 bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle>Revenue by Location</CardTitle>
-            <CardDescription>Normalized contribution per authorized retail unit</CardDescription>
+            <CardTitle>Revenue by Location ({latestPeriodLabel})</CardTitle>
+            <CardDescription>Contribution per unit for current reporting period</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -358,7 +362,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Revenue Contribution</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Period Contribution</p>
                     <p className="text-lg font-bold text-foreground">{formatCurrency(locRevenueMap[loc.name] || 0)}</p>
                   </div>
                   <div className="text-right">
