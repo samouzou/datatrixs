@@ -30,10 +30,11 @@ service cloud.firestore {
     }
     
     // Check if the current user is an application-level Admin
+    // Safely handles cases where the user profile might be pending creation
     function isAppAdmin() {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'User') == 'Admin';
     }
 
     // Helper to check if a user is joining by only adding themselves to a membership map

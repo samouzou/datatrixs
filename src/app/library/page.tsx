@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 import { ChartView } from "@/components/analyst/chart-view"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 function MarkdownTable({ content }: { content: string }) {
   const lines = content.trim().split('\n');
@@ -56,8 +57,6 @@ function MarkdownTable({ content }: { content: string }) {
   );
 }
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-
 export default function LibraryPage() {
   const { user } = useUser()
   const firestore = useFirestore()
@@ -65,6 +64,7 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = React.useState("reports")
 
   // Query formal reports & exports
+  // Filtered by company membership to ensure results match security rules
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -72,10 +72,11 @@ export default function LibraryPage() {
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user]);
+  }, [firestore, user?.uid]); // Use uid specifically to ensure stability
   const { data: reports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
 
   // Query ad-hoc analyses
+  // Filtered by company membership to ensure results match security rules
   const analysesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -83,7 +84,7 @@ export default function LibraryPage() {
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, user]);
+  }, [firestore, user?.uid]); // Use uid specifically to ensure stability
   const { data: analyses, isLoading: isLoadingAnalyses } = useCollection<SavedAnalysis>(analysesQuery);
 
   const handleDelete = (collectionName: string, id: string) => {
