@@ -72,6 +72,18 @@ const normalizePeriod = (p: string): string => {
   return trimmed; // Fallback to raw if unparseable
 };
 
+// Robust numeric parser for accounting data
+const parseAccountingNumber = (val: string): number => {
+  if (!val) return 0;
+  let clean = val.trim();
+  const isNegative = clean.startsWith('(') && clean.endsWith(')');
+  if (isNegative) {
+    clean = clean.slice(1, -1);
+  }
+  const num = Number(clean.replace(/[^0-9.-]+/g, ""));
+  return isNegative ? -Math.abs(num) : num;
+};
+
 export default function LocationsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
@@ -285,7 +297,7 @@ export default function LocationsPage() {
       const dataRows = lines.slice(1);
       let successCount = 0;
       
-      for (const line of dataRows) {
+      for (const [idx, line] of dataRows.entries()) {
         if (!line.trim()) continue;
         const values = line.split(',').map(s => s.trim());
         const rowObj: Record<string, string> = {};
@@ -303,15 +315,19 @@ export default function LocationsPage() {
           if (metric === "ignore" || colName === periodColumn) return;
           
           const valStr = rowObj[colName];
-          const valNum = Number(valStr?.replace(/[^0-9.-]+/g, ""));
+          const valNum = parseAccountingNumber(valStr);
           
           if (!isNaN(valNum)) {
-            const recordRef = doc(collection(firestore, "financial_records"));
+            // Use deterministic ID to prevent duplicates (idempotency)
+            // Format: locationId_period_metric_rowIdx
+            const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metric.replace(/\s+/g, '_')}_${idx}`.toLowerCase();
+            const recordRef = doc(firestore, "financial_records", deterministicId);
+            
             const record: FinancialRecord = {
-              id: recordRef.id,
+              id: deterministicId,
               locationId: uploadingLocation.id,
               locationName: uploadingLocation.name,
-              period: normalizedPeriod, // Store normalized version
+              period: normalizedPeriod,
               metric: metric as FinancialMetric,
               value: valNum,
               companyMembers: uploadingLocation.companyMembers,
