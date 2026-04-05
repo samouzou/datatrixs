@@ -14,7 +14,8 @@ import {
   LogOut,
   Building2,
   Database,
-  Library
+  Library,
+  CreditCard
 } from "lucide-react"
 
 import {
@@ -62,6 +63,11 @@ const adminNavItems = [
     title: "Holding Structure",
     href: "/settings/holding",
     icon: Building2,
+  },
+  {
+    title: "Billing",
+    href: "/settings/billing",
+    icon: CreditCard,
   },
   {
     title: "Settings",

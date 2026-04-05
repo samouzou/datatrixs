@@ -14,6 +14,16 @@ export type UserProfile = {
 
 export type CompanyRole = 'admin' | 'member';
 
+export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'trialing';
+
+export type CompanySubscription = {
+  plan: 'pro' | 'enterprise';
+  interval: 'monthly' | 'annual';
+  status: SubscriptionStatus;
+  currentPeriodEnd: string;
+  updatedAt: string;
+};
+
 export type Company = {
   id: string;
   name: string;
@@ -23,6 +33,7 @@ export type Company = {
   reportingCurrency?: string;
   members: Record<string, CompanyRole>; 
   customMetrics?: string[]; 
+  subscription?: CompanySubscription;
   createdAt: string;
   updatedAt: string;
 };
