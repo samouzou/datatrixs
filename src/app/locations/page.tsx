@@ -209,7 +209,6 @@ export default function LocationsPage() {
     if (source === 'Manual' || source === 'Excel') {
       setUploadStep("input");
     } else {
-      // API Direct Simulation
       setIsConnecting(true);
       setTimeout(() => {
         setIsConnecting(false);
@@ -217,7 +216,6 @@ export default function LocationsPage() {
         setHeaders(mockHeaders);
         setPeriodColumn("Period");
         
-        // Auto-Normalization Logic
         const initialMapping: Record<string, string | "ignore"> = {};
         mockHeaders.forEach(h => {
           if (h === "Period") return;
@@ -332,15 +330,15 @@ export default function LocationsPage() {
         const lines = csvContent.trim().split('\n');
         dataRows = lines.slice(1).map(l => l.split(',').map(s => s.trim()));
       } else {
-        // API Simulation: Generate dummy records for the mapped headers
+        // API Simulation: Generate dummy records for the mapped headers for past 2 periods
         dataRows = [
-          ["Q1 2024", "125000", "75000", "50000", "20000", "15000", "12000"],
-          ["Q2 2024", "135000", "80000", "55000", "22000", "16000", "14000"]
+          ["2024-Q1", "125000", "75000", "50000", "20000", "15000", "12000"],
+          ["2024-Q2", "135000", "80000", "55000", "22000", "16000", "14000"]
         ];
       }
 
       let successCount = 0;
-      for (const [idx, row] of dataRows.entries()) {
+      for (const row of dataRows) {
         const rowObj: Record<string, string> = {};
         headers.forEach((h, i) => {
           rowObj[h] = row[i];
@@ -357,7 +355,10 @@ export default function LocationsPage() {
           const valNum = parseAccountingNumber(valStr);
           
           if (!isNaN(valNum)) {
-            const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metric.replace(/\s+/g, '_')}_${idx}`.toLowerCase();
+            // STRICT DETERMINISTIC ID: {locationId}_{period}_{metric}
+            // This prevents duplication on re-sync and re-upload.
+            const metricSlug = metric.toLowerCase().replace(/\s+/g, '_');
+            const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metricSlug}`;
             const recordRef = doc(firestore, "financial_records", deterministicId);
             
             const record: FinancialRecord = {
@@ -387,14 +388,14 @@ export default function LocationsPage() {
         });
         
         await batch.commit();
-        toast({ title: "Data Normalized", description: `Ingested ${successCount} records via ${selectedSource}.` });
+        toast({ title: "Sync Complete", description: `Standardized ${successCount} financial data points.` });
         setIsUploadOpen(false);
       } else {
-        toast({ variant: "destructive", title: "Upload Failed", description: "No valid numeric data found." });
+        toast({ variant: "destructive", title: "Sync Failed", description: "No valid financial data found to normalize." });
       }
     } catch (error: any) {
       console.error(error);
-      toast({ variant: "destructive", title: "Normalization Error", description: "Could not process data." });
+      toast({ variant: "destructive", title: "Normalization Error", description: "Could not process ledger data." });
     } finally {
       setIsUploading(false);
     }
