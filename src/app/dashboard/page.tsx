@@ -32,16 +32,18 @@ import {
 } from "@/components/ui/select"
 
 const formatCompactNumber = (number: number) => {
-  if (Math.abs(number) < 1000) return number.toString();
-  if (Math.abs(number) >= 1000000) return (number / 1000000).toFixed(1) + "M";
-  if (Math.abs(number) >= 1000) return (number / 1000).toFixed(1) + "K";
-  return number.toString();
+  const absNum = Math.abs(number);
+  if (absNum >= 1000000) return (number / 1000000).toFixed(1) + "M";
+  if (absNum >= 1000) return (number / 1000).toFixed(1) + "K";
+  return number.toFixed(0);
 };
 
 const formatCurrency = (value: number) => {
-  if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
+  const absValue = Math.abs(value);
+  const prefix = value < 0 ? "-" : "";
+  if (absValue >= 1000000) return `${prefix}$${(absValue / 1000000).toFixed(1)}M`;
+  if (absValue >= 1000) return `${prefix}$${(absValue / 1000).toFixed(1)}K`;
+  return `${prefix}$${absValue.toLocaleString()}`;
 };
 
 const sortPeriods = (periods: string[]) => {
@@ -50,6 +52,7 @@ const sortPeriods = (periods: string[]) => {
 
 const displayPeriod = (p: string) => {
   if (p === 'all') return "Portfolio View (All Time)";
+  if (p === 'latest') return "Latest Period";
   if (p.includes('-Q')) {
     const [y, q] = p.split('-');
     return `${q} ${y}`;
@@ -92,21 +95,23 @@ export default function DashboardPage() {
   const { data: locations, isLoading: isLocsLoading } = useCollection<Location>(locationsQuery);
 
   const processedData = React.useMemo(() => {
-    if (!records) return { 
+    const defaultData = { 
       kpis: { 
         revenue: { val: 0, change: 0, trend: 'neutral' as const }, 
         profit: { val: 0, change: 0, trend: 'neutral' as const }, 
         margin: { val: 0, change: 0, trend: 'neutral' as const }, 
         turn: { val: 0, change: 0, trend: 'neutral' as const } 
       },
-      byLocation: [],
-      trends: [],
+      byLocation: [] as { name: string, revenue: number }[],
+      trends: [] as any[],
       locRevenueMap: {} as Record<string, number>,
       revenueTarget: 0,
       targetProgress: 0,
       latestPeriodLabel: "",
-      availablePeriods: []
+      availablePeriods: [] as string[]
     };
+
+    if (!records || records.length === 0) return defaultData;
 
     const periodMap: Record<string, { revenue: number; profit: number; inventory: number; locRevenues: Record<string, number> }> = {};
     
@@ -116,9 +121,10 @@ export default function DashboardPage() {
         periodMap[r.period] = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
       }
 
+      const locName = r.locationName.trim();
       if (metric === 'revenue' || metric.includes('revenue')) {
         periodMap[r.period].revenue += r.value;
-        periodMap[r.period].locRevenues[r.locationName] = (periodMap[r.period].locRevenues[r.locationName] || 0) + r.value;
+        periodMap[r.period].locRevenues[locName] = (periodMap[r.period].locRevenues[locName] || 0) + r.value;
       }
       if (metric === 'net profit' || metric === 'profit') {
         periodMap[r.period].profit += r.value;
@@ -131,7 +137,6 @@ export default function DashboardPage() {
     const sortedPeriods = sortPeriods(Object.keys(periodMap));
     const latestPeriod = sortedPeriods[sortedPeriods.length - 1];
     
-    // Determine target period and its previous counterpart
     let targetPeriod = selectedPeriod === "latest" ? latestPeriod : selectedPeriod;
     let prevPeriod = "";
     
@@ -155,29 +160,27 @@ export default function DashboardPage() {
     let prevData;
 
     if (targetPeriod === "all") {
-      // Aggregate everything
       latestData = records.reduce((acc, r) => {
         const metric = r.metric.toLowerCase();
         if (metric === 'revenue' || metric.includes('revenue')) {
           acc.revenue += r.value;
-          acc.locRevenues[r.locationName] = (acc.locRevenues[r.locationName] || 0) + r.value;
+          const locName = r.locationName.trim();
+          acc.locRevenues[locName] = (acc.locRevenues[locName] || 0) + r.value;
         }
         if (metric === 'net profit' || metric === 'profit') acc.profit += r.value;
         if (metric === 'inventory value' || metric.includes('inventory')) acc.inventory += r.value;
         return acc;
       }, { revenue: 0, profit: 0, inventory: 0, locRevenues: {} as Record<string, number> });
-      prevData = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} }; // No comparison for all-time
+      prevData = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
     } else {
       latestData = targetPeriod ? periodMap[targetPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
       prevData = prevPeriod ? periodMap[prevPeriod] : { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
     }
 
-    // EBITDA Margin latest and prev
     const latestMargin = latestData.revenue > 0 ? (latestData.profit / latestData.revenue) * 100 : 0;
     const prevMargin = prevData.revenue > 0 ? (prevData.profit / prevData.revenue) * 100 : 0;
     const marginShift = latestMargin - prevMargin;
 
-    // Inventory Turn
     const latestTurn = latestData.revenue > 0 && latestData.inventory > 0 ? (latestData.revenue / latestData.inventory) : 0;
     const prevTurn = prevData.revenue > 0 && prevData.inventory > 0 ? (prevData.revenue / prevData.inventory) : 0;
 
@@ -421,7 +424,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Period Share</p>
-                    <p className="text-lg font-bold text-foreground">{formatCurrency(locRevenueMap[loc.name] || 0)}</p>
+                    <p className="text-lg font-bold text-foreground">{formatCurrency(locRevenueMap[loc.name.trim()] || 0)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Source Engine</p>
