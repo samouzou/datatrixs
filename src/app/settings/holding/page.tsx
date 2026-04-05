@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -154,19 +155,35 @@ export default function HoldingStructurePage() {
       );
       
       const locationsSnap = await getDocs(locationsQuery);
+      const locationIds: string[] = [];
+      
       locationsSnap.docs.forEach(locDoc => {
+        locationIds.push(locDoc.id);
         batch.update(locDoc.ref, {
           [`companyMembers.${user.uid}`]: invite.role,
           updatedAt: now
         });
       });
 
-      // 4. Commit all updates as a single atomic job
+      // 4. Deep Synchronize Membership to existing Financial Records
+      // This ensures the dashboard calculations "unlock" for the new member immediately.
+      for (const locId of locationIds) {
+        const recordsQuery = query(
+          collection(firestore, "financial_records"),
+          where("locationId", "==", locId)
+        );
+        const recordsSnap = await getDocs(recordsQuery);
+        recordsSnap.docs.forEach(recordDoc => {
+          batch.update(recordDoc.ref, {
+            [`companyMembers.${user.uid}`]: invite.role
+          });
+        });
+      }
+
+      // 5. Commit all updates as a single atomic job
       await batch.commit();
 
     } catch (e: any) {
-      // Re-emit specialized permission error if the batch fails due to rules
-      // We focus the error path on the company update as it's the primary join point
       const permissionError = new FirestorePermissionError({
         path: `companies/${invite.companyId}`,
         operation: 'update',
