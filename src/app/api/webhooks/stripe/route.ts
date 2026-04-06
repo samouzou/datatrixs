@@ -1,4 +1,3 @@
-
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
@@ -8,7 +7,8 @@ import Stripe from 'stripe';
 
 export async function POST(req: Request) {
   const body = await req.text();
-  const signature = (await headers()).get('stripe-signature') as string;
+  const headerList = await headers();
+  const signature = headerList.get('stripe-signature') as string;
 
   if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
     return new NextResponse('Webhook Secret or Signature missing', { status: 400 });
@@ -93,6 +93,7 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     console.error('Error updating Firestore from webhook:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 
   return new NextResponse(JSON.stringify({ received: true }), { status: 200 });

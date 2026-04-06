@@ -1,4 +1,3 @@
-
 'use server';
 
 import { stripe } from '@/lib/stripe';
@@ -41,6 +40,7 @@ export async function createCheckoutSession(params: {
       mode: 'subscription',
       allow_promotion_codes: true, // Enable discount codes
       subscription_data: {
+        // Metadata on subscription_data ensures it persists onto the Subscription object
         metadata: {
           companyId,
           locationLimit: locationCount.toString(),
@@ -49,6 +49,7 @@ export async function createCheckoutSession(params: {
       success_url: `${origin}/settings/billing?success=true`,
       cancel_url: `${origin}/settings/billing?canceled=true`,
       metadata: {
+        // Metadata on the session itself for immediate webhook processing
         companyId,
         locationLimit: locationCount.toString(),
       },
