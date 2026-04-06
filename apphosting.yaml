@@ -5,3 +5,23 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  
+  # Environment variables for the server-side runtime
+  env:
+    - variable: STRIPE_PRICE_ID_BASE_MONTHLY
+      value: "price_..." # Replace with your actual Monthly Base Price ID
+    - variable: STRIPE_PRICE_ID_BASE_ANNUAL
+      value: "price_..." # Replace with your actual Annual Base Price ID
+    - variable: STRIPE_PRICE_ID_LOCATION_MONTHLY
+      value: "price_..." # Replace with your actual Monthly Location Price ID
+    - variable: STRIPE_PRICE_ID_LOCATION_ANNUAL
+      value: "price_..." # Replace with your actual Annual Location Price ID
+    
+    # Sensitive keys should be stored in Cloud Secret Manager and referenced here
+    # Example: firebase apphosting:secrets:set STRIPE_SECRET_KEY
+    - variable: STRIPE_SECRET_KEY
+      secret: STRIPE_SECRET_KEY
+    - variable: STRIPE_WEBHOOK_SECRET
+      secret: STRIPE_WEBHOOK_SECRET
+    - variable: GEMINI_API_KEY
+      secret: GEMINI_API_KEY
