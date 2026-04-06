@@ -17,7 +17,8 @@ To ensure subscription statuses and license limits are synchronized automaticall
     *   `customer.subscription.updated`
     *   `customer.subscription.deleted`
 3.  **Environment Variables**:
-    *   Ensure `STRIPE_WEBHOOK_SECRET` is added to your environment variables (retrieved from the Stripe dashboard after creating the webhook).
+    *   Ensure `STRIPE_WEBHOOK_SECRET` is added to your environment variables. 
+    *   *Note: When using the Stripe CLI for local testing, the command output will provide a secret starting with `whsec_`. Use this value.*
 
 ## Pricing Model (Branding)
 

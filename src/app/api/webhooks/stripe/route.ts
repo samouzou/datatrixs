@@ -8,10 +8,17 @@ import Stripe from 'stripe';
 export async function POST(req: Request) {
   const body = await req.text();
   const headerList = await headers();
-  const signature = headerList.get('stripe-signature') as string;
+  const signature = headerList.get('stripe-signature');
 
-  if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return new NextResponse('Webhook Secret or Signature missing', { status: 400 });
+  // Diagnostic logging for debugging
+  if (!signature) {
+    console.error('Stripe Webhook Error: Missing stripe-signature header.');
+    return new NextResponse('Webhook Error: Missing stripe-signature header', { status: 400 });
+  }
+
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error('Stripe Webhook Error: STRIPE_WEBHOOK_SECRET is not defined in environment variables.');
+    return new NextResponse('Webhook Error: Server configuration missing', { status: 400 });
   }
 
   let event: Stripe.Event;
