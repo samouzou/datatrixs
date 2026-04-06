@@ -43,6 +43,7 @@ export async function POST(req: Request) {
         const companyId = session.metadata?.companyId;
         const locationLimit = parseInt(session.metadata?.locationLimit || '0');
 
+        // Initial provisioning on checkout completion
         if (companyId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const companyRef = doc(firestore, 'companies', companyId);
@@ -64,15 +65,17 @@ export async function POST(req: Request) {
 
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
-        // When an invoice is paid, ensure the subscription is active and period is updated
+        // The most reliable event for both first-time provisioning and renewals
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
           const companyId = subscription.metadata?.companyId;
+          const locationLimit = parseInt(subscription.metadata?.locationLimit || '0');
           
           if (companyId) {
             const companyRef = doc(firestore, 'companies', companyId);
             await updateDoc(companyRef, {
               'subscription.status': 'active',
+              'subscription.locationLimit': locationLimit, // Ensure capacity is synchronized on every payment
               'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
               'subscription.updatedAt': new Date().toISOString(),
               updatedAt: new Date().toISOString(),

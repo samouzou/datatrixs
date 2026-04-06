@@ -13,9 +13,10 @@ To ensure subscription statuses and license limits are synchronized automaticall
 1.  **Endpoint URL**: `https://<your-deployed-domain>/api/webhooks/stripe`
     *   *Note: For local development, use the Stripe CLI to forward events: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`*
 2.  **Select Events**:
-    *   `checkout.session.completed`
-    *   `customer.subscription.updated`
-    *   `customer.subscription.deleted`
+    *   `invoice.paid` (Primary provisioning event)
+    *   `customer.subscription.updated` (Handles renewals and plan changes)
+    *   `customer.subscription.deleted` (Handles cancellations)
+    *   `checkout.session.completed` (Handles initial purchase redirect)
 3.  **Environment Variables**:
     *   Ensure `STRIPE_WEBHOOK_SECRET` is added to your environment variables. 
     *   *Note: When using the Stripe CLI for local testing, the command output will provide a secret starting with `whsec_`. Use this value.*
