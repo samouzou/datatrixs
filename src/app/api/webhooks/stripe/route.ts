@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { initializeFirebase } from '@/firebase/config';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
 
 export async function POST(req: Request) {
@@ -36,36 +36,43 @@ export async function POST(req: Request) {
   try {
     /**
      * MULTI-STAGE COMPANY ID RESOLUTION
-     * We look for the companyId in three places:
-     * 1. The immediate object metadata (Invoice/Subscription)
-     * 2. The Subscription object (if only a sub ID is present)
-     * 3. The Customer object (our persistent anchor)
+     * We look for the companyId in four places to ensure fulfillment never fails:
+     * 1. Invoice object metadata
+     * 2. Subscription Details metadata (Specific to Dahlia invoices)
+     * 3. The linked Subscription object metadata
+     * 4. The Customer object metadata (The ultimate persistent anchor)
      */
-    const resolveCompanyId = async (obj: any): Promise<string | null> => {
-      console.log(`[Stripe Webhook] Resolving companyId for object: ${obj.id}`);
+    const resolveCompanyId = async (invoice: Stripe.Invoice): Promise<string | null> => {
+      console.log(`[Stripe Webhook] Resolving companyId for Invoice: ${invoice.id}`);
       
-      // 1. Direct Metadata check
-      if (obj.metadata?.companyId) {
-        console.log(`[Stripe Webhook] Found companyId in direct metadata: ${obj.metadata.companyId}`);
-        return obj.metadata.companyId;
+      // 1. Direct Invoice Metadata
+      if (invoice.metadata?.companyId) {
+        console.log(`[Stripe Webhook] Found companyId in Invoice metadata: ${invoice.metadata.companyId}`);
+        return invoice.metadata.companyId;
       }
 
-      // 2. Subscription retrieval (Invoices usually have a subscription field)
-      if (obj.subscription) {
-        console.log(`[Stripe Webhook] Checking subscription: ${obj.subscription}`);
-        const subscription = await stripe.subscriptions.retrieve(obj.subscription as string);
+      // 2. Subscription Details (New in Dahlia)
+      if (invoice.subscription_details?.metadata?.companyId) {
+        console.log(`[Stripe Webhook] Found companyId in Invoice subscription_details: ${invoice.subscription_details.metadata.companyId}`);
+        return invoice.subscription_details.metadata.companyId;
+      }
+
+      // 3. Subscription object retrieval
+      if (invoice.subscription) {
+        console.log(`[Stripe Webhook] Fetching linked subscription: ${invoice.subscription}`);
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
         if (subscription.metadata?.companyId) {
-          console.log(`[Stripe Webhook] Found companyId in subscription metadata: ${subscription.metadata.companyId}`);
+          console.log(`[Stripe Webhook] Found companyId in Subscription metadata: ${subscription.metadata.companyId}`);
           return subscription.metadata.companyId;
         }
       }
 
-      // 3. Customer retrieval (The ultimate anchor)
-      if (obj.customer) {
-        console.log(`[Stripe Webhook] Checking customer: ${obj.customer}`);
-        const customer = await stripe.customers.retrieve(obj.customer as string);
+      // 4. Customer object retrieval (Persistent Anchor)
+      if (invoice.customer) {
+        console.log(`[Stripe Webhook] Fetching linked customer: ${invoice.customer}`);
+        const customer = await stripe.customers.retrieve(invoice.customer as string);
         if (!customer.deleted && (customer as Stripe.Customer).metadata?.companyId) {
-          console.log(`[Stripe Webhook] Found companyId in customer metadata: ${(customer as Stripe.Customer).metadata.companyId}`);
+          console.log(`[Stripe Webhook] Found companyId in Customer metadata: ${(customer as Stripe.Customer).metadata.companyId}`);
           return (customer as Stripe.Customer).metadata.companyId;
         }
       }
@@ -77,20 +84,19 @@ export async function POST(req: Request) {
     switch (event.type) {
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log(`[Stripe Webhook] Processing successful payment for Invoice: ${invoice.id}`);
+        console.log(`[Stripe Webhook] Processing payment for Invoice: ${invoice.id}`);
         
         const companyId = await resolveCompanyId(invoice);
         
         if (companyId) {
-          console.log(`[Stripe Webhook] Fulfillment starting for Company: ${companyId}`);
+          console.log(`[Stripe Webhook] Provisioning license for Company: ${companyId}`);
           
-          // Determine license limits. Try to find locationLimit metadata.
-          const locationLimit = parseInt(invoice.metadata?.locationLimit || invoice.subscription_details?.metadata?.locationLimit || '1');
-          console.log(`[Stripe Webhook] Provisioning Capacity: ${locationLimit} locations`);
-
+          // Determine license limits from metadata
+          const rawLimit = invoice.metadata?.locationLimit || invoice.subscription_details?.metadata?.locationLimit || '1';
+          const locationLimit = parseInt(rawLimit);
+          
           const companyRef = doc(firestore, 'companies', companyId);
           
-          // Update Firestore
           await updateDoc(companyRef, {
             'subscription.plan': 'pro',
             'subscription.status': 'active',
@@ -103,22 +109,30 @@ export async function POST(req: Request) {
 
           console.log(`[Stripe Webhook] Fulfillment SUCCESS for ${companyId}`);
 
-          // ASYNC ANCHOR: Ensure the companyId is saved to the customer for future renewals
+          // PERMANENT ANCHOR: Ensure the companyId is saved to the customer for future renewals
           if (invoice.customer) {
             stripe.customers.update(invoice.customer as string, {
               metadata: { companyId }
-            }).catch(e => console.error('[Stripe Webhook] Non-critical error: Failed to anchor customer metadata', e));
+            }).catch(e => console.error('[Stripe Webhook] Non-critical error anchoring customer', e));
           }
         } else {
-          console.error('[Stripe Webhook] CRITICAL: Skipping fulfillment. No companyId could be resolved.');
+          console.error('[Stripe Webhook] CRITICAL: Skipping fulfillment. No companyId resolved.');
         }
         break;
       }
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        console.log(`[Stripe Webhook] Processing cancellation for Subscription: ${subscription.id}`);
-        const companyId = await resolveCompanyId(subscription);
+        console.log(`[Stripe Webhook] Revoking license for Subscription: ${subscription.id}`);
+        
+        // For cancellations, we check the subscription object metadata directly
+        let companyId = subscription.metadata?.companyId;
+        
+        // Fallback to customer if missing
+        if (!companyId && subscription.customer) {
+          const customer = await stripe.customers.retrieve(subscription.customer as string);
+          if (!customer.deleted) companyId = (customer as Stripe.Customer).metadata?.companyId;
+        }
 
         if (companyId) {
           const companyRef = doc(firestore, 'companies', companyId);
@@ -139,7 +153,7 @@ export async function POST(req: Request) {
         break;
 
       default:
-        console.log(`[Stripe Webhook] Info: Ignoring unhandled event type: ${event.type}`);
+        console.log(`[Stripe Webhook] Info: Ignoring event type: ${event.type}`);
     }
   } catch (error: any) {
     console.error(`[Stripe Webhook] EXECUTION ERROR:`, error);

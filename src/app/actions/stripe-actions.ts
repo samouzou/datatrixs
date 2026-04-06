@@ -26,9 +26,10 @@ export async function createCheckoutSession(params: {
 
   try {
     /**
-     * We pass the companyId and locationLimit to both the SESSION metadata
-     * and the SUBSCRIPTION_DATA metadata. This ensures that even if one event
-     * is missing context, the other will provide it.
+     * DAHLIA API OPTIMIZATION:
+     * We attach the companyId to the metadata of the Session, the Subscription,
+     * AND the Customer. This ensures that no matter which event fires first,
+     * our webhook can always resolve the link back to our Firestore record.
      */
     const session = await stripe.checkout.sessions.create({
       line_items: [
@@ -46,6 +47,12 @@ export async function createCheckoutSession(params: {
           companyId,
           locationLimit: locationCount.toString(),
         },
+      },
+      // Ensure the newly created customer inherits this metadata
+      customer_data: {
+        metadata: {
+          companyId,
+        }
       },
       success_url: `${origin}/settings/billing?success=true`,
       cancel_url: `${origin}/settings/billing?canceled=true`,
