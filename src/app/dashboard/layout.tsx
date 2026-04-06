@@ -44,6 +44,16 @@ export default function AppLayout({
   // Routes that are always accessible during setup/billing phases
   const isAllowedRoute = isBillingPage || isHoldingPage || isSettingsPage || isLoginPage || isVerifyPage;
 
+  const userInitials = React.useMemo(() => {
+    if (!user) return "U";
+    if (user.displayName) {
+      const parts = user.displayName.split(' ');
+      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return user.email?.substring(0, 2).toUpperCase() || "U";
+  }, [user]);
+
   React.useEffect(() => {
     // 1. Auth Guard
     if (!isUserLoading && !user && !isLoginPage) {
@@ -123,7 +133,7 @@ export default function AppLayout({
               <ThemeToggle />
               <div className="flex items-center gap-2">
                 <div className="size-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground uppercase">
-                  {user?.email?.substring(0, 2) || "U"}
+                  {userInitials}
                 </div>
                 <div className="flex flex-col hidden sm:flex">
                   <span className="text-xs font-bold text-foreground leading-none">
