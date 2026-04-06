@@ -2,8 +2,12 @@
 
 This is a NextJS application for Private Equity firms to manage and aggregate financial data from multiple retail locations using AI-powered insights.
 
-## Stripe Webhook Setup
+## Stripe Configuration
 
+### API Version
+The application is configured to use Stripe API version: **2025-01-27.acacia**.
+
+### Webhook Setup
 To ensure subscription statuses and license limits are synchronized automatically, you must configure a webhook in your [Stripe Dashboard](https://dashboard.stripe.com/webhooks):
 
 1.  **Endpoint URL**: `https://<your-deployed-domain>/api/webhooks/stripe`
