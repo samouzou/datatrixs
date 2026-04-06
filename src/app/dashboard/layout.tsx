@@ -39,9 +39,10 @@ export default function AppLayout({
   const isHoldingPage = pathname === '/settings/holding';
   const isSettingsPage = pathname === '/settings';
   const isLoginPage = pathname === '/login' || pathname === '/register';
+  const isVerifyPage = pathname === '/verify-email';
   
   // Routes that are always accessible during setup/billing phases
-  const isAllowedRoute = isBillingPage || isHoldingPage || isSettingsPage || isLoginPage;
+  const isAllowedRoute = isBillingPage || isHoldingPage || isSettingsPage || isLoginPage || isVerifyPage;
 
   React.useEffect(() => {
     // 1. Auth Guard
@@ -50,18 +51,22 @@ export default function AppLayout({
       return
     }
 
+    // 2. Email Verification Guard
+    if (user && !user.emailVerified && !isVerifyPage && !isLoginPage) {
+      router.push("/verify-email")
+      return
+    }
+
     // Don't interrupt if already on a setup or billing page
     if (isAllowedRoute || isUserLoading || isCompaniesLoading) return;
 
-    // 2. Organization Guard (Require at least one holding entity)
-    // We explicitly check for 'null' to distinguish between "still loading" and "actually empty"
+    // 3. Organization Guard (Require at least one holding entity)
     if (user && companies !== null && companies.length === 0) {
       router.push("/settings/holding")
       return;
     }
 
-    // 3. License Guard (Require active subscription for protected routes)
-    // Protected routes are anything NOT in the allowed list (Dashboard, Analyst, Locations, etc.)
+    // 4. License Guard (Require active subscription for protected routes)
     if (activeCompany && !isSubscriptionActive) {
       toast({
         variant: "destructive",
@@ -80,10 +85,11 @@ export default function AppLayout({
     companies, 
     router, 
     toast,
-    pathname // Ensure re-evaluation on navigation
+    pathname,
+    isVerifyPage
   ])
 
-  if (isUserLoading || (isCompaniesLoading && !companies)) {
+  if (isUserLoading || (isCompaniesLoading && !companies && !isVerifyPage)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="size-8 animate-spin text-primary" />
@@ -92,6 +98,11 @@ export default function AppLayout({
   }
 
   if (!user && !isLoginPage) return null
+
+  // If we are on the verification page or login page, don't show the sidebar layout
+  if (isLoginPage || isVerifyPage) {
+    return <>{children}</>;
+  }
 
   return (
     <SidebarProvider>

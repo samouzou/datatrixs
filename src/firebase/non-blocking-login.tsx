@@ -3,6 +3,7 @@ import {
   Auth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendEmailVerification,
   User,
 } from 'firebase/auth';
 import { doc, setDoc, Firestore, getDoc, updateDoc } from 'firebase/firestore';
@@ -73,6 +74,8 @@ export function initiateEmailSignUp(
 ): void {
   createUserWithEmailAndPassword(authInstance, email, password)
     .then((userCredential) => {
+      // Send verification email immediately
+      sendEmailVerification(userCredential.user).catch(err => console.error("Failed to send verification email", err));
       ensureUserProfile(db, userCredential.user, profileData);
     })
     .catch((error) => {
