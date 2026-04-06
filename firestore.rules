@@ -55,15 +55,15 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      // allow get: if isSignedIn() || request.auth == null; // Relaxed for Webhook lookup
-      allow get: if true; // Public read-by-ID for lookup; security is enforced on updates
+      // allow get: Public read-by-ID for lookup; security is enforced on updates
+      allow get: if true; 
       allow list: if isSignedIn() && (isCompanyMember(resource.data.members) || isAppAdmin());
       allow create: if isSignedIn();
       allow update: if 
         isCompanyAdmin(resource.data.members) || 
         isAppAdmin() || 
         isJoining(resource.data, request.resource.data, 'members') ||
-        // ALLOW background webhook updates to subscription fields specifically
+        // ALLOW unauthenticated background webhook updates to subscription fields
         (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscription', 'updatedAt']));
       allow delete: if isAppAdmin();
     }

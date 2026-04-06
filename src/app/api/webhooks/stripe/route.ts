@@ -1,8 +1,8 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { initializeFirebase } from '@/firebase/config'; // Import directly from config to avoid client-hook barrel conflicts
-import { doc, updateDoc } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase/config'; // Direct import to avoid client-hook conflicts
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
 
 export async function POST(req: Request) {
@@ -36,9 +36,9 @@ export async function POST(req: Request) {
   try {
     console.log(`[Stripe Webhook] Event Received: ${event.type}`);
 
-    // Robust companyId lookup across event types
+    // Multi-stage companyId lookup for robustness
     const findCompanyId = async (obj: any): Promise<string | null> => {
-      // 1. Direct metadata (Session/Subscription)
+      // 1. Direct metadata (Session or Subscription)
       if (obj.metadata?.companyId) return obj.metadata.companyId;
       
       // 2. Fallback to Customer metadata
@@ -65,9 +65,9 @@ export async function POST(req: Request) {
         const locationLimit = parseInt(session.metadata?.locationLimit || '1');
 
         if (companyId) {
-          console.log(`[checkout.session.completed] Fulfilling for company: ${companyId}`);
+          console.log(`[checkout.session.completed] Initial fulfillment for: ${companyId}`);
           
-          // Anchor the companyId to the Customer object permanently
+          // Anchor the companyId to the Customer object for future renewals
           if (session.customer) {
             await stripe.customers.update(session.customer as string, {
               metadata: { companyId }
@@ -95,16 +95,27 @@ export async function POST(req: Request) {
         const companyId = await findCompanyId(invoice);
         
         if (companyId && invoice.subscription) {
-          console.log(`[invoice.paid] Refreshing license for: ${companyId}`);
+          console.log(`[invoice.paid] Provisioning license for: ${companyId}`);
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
           
           const companyRef = doc(firestore, 'companies', companyId);
-          await updateDoc(companyRef, {
-            'subscription.status': 'active',
-            'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
-            'subscription.updatedAt': new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
+          // Ensure the subscription object exists before updating nested fields
+          const companySnap = await getDoc(companyRef);
+          const locationLimit = parseInt(subscription.metadata?.locationLimit || '1');
+
+          if (companySnap.exists()) {
+            await updateDoc(companyRef, {
+              subscription: {
+                plan: 'pro',
+                status: 'active',
+                locationLimit: locationLimit,
+                interval: subscription.items.data[0]?.price.type === 'recurring' ? 'monthly' : 'annual', // Simplified
+                currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+              updatedAt: new Date().toISOString(),
+            });
+          }
         }
         break;
       }
@@ -127,7 +138,7 @@ export async function POST(req: Request) {
 
       case 'invoice.created':
       case 'invoice.finalized':
-        // Acknowledge these to avoid log noise
+        // Acknowledge these lifecycle events to avoid log noise
         break;
 
       default:
