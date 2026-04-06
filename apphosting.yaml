@@ -9,7 +9,7 @@ runConfig:
   # Environment variables for the server-side runtime
   env:
     - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-      value: "pk_test_replace_with_your_actual_key" # Replace with your actual Publishable Key
+      value: "pk_live_51HhOLjIAWwtv4OdWpNl9JHfGHwMkAvxKjTdDTJUhagPJZoisrNrYB63RNPSeGZAwQF6sSojTwFzjRgZEdYjJ0A6H002yGU7tnd" # Replace with your actual Publishable Key
     - variable: STRIPE_PRICE_ID_BASE_MONTHLY
       value: "price_1TJ0NTIAWwtv4OdWK4huLF12" # Replace with your actual Monthly Base Price ID
     - variable: STRIPE_PRICE_ID_BASE_ANNUAL
