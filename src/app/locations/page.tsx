@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -21,7 +20,8 @@ import {
   Cloud,
   Link2,
   Building2,
-  Lock
+  Lock,
+  Zap
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
@@ -375,15 +375,25 @@ export default function LocationsPage() {
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-accent text-background hover:bg-accent/90" disabled={!companies?.length || isLimitReached}>
-              {isLimitReached ? <Lock className="mr-2 size-4" /> : <Plus className="mr-2 size-4" />}
-              {isLimitReached ? "License Capacity Reached" : "Add New Location"}
+            <Button 
+              className={cn(
+                "transition-all",
+                isLimitReached ? "bg-primary hover:bg-primary/90" : "bg-accent text-background hover:bg-accent/90"
+              )} 
+              disabled={!companies?.length}
+            >
+              {isLimitReached ? <Zap className="mr-2 size-4" /> : <Plus className="mr-2 size-4" />}
+              {isLimitReached ? "Expand Capacity" : "Add New Location"}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add Business Location</DialogTitle>
-              <DialogDescription>Register a new retail or service location.</DialogDescription>
+              <DialogTitle>{isLimitReached ? "Portfolio Capacity Reached" : "Add Business Location"}</DialogTitle>
+              <DialogDescription>
+                {isLimitReached 
+                  ? "You have exhausted your current Entity Connection Licenses." 
+                  : "Register a new retail or service location."}
+              </DialogDescription>
             </DialogHeader>
             
             {isLimitReached ? (
@@ -392,14 +402,14 @@ export default function LocationsPage() {
                   <Building2 className="size-12 text-destructive" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="font-bold text-lg">Portfolio Capacity Reached</h3>
+                  <h3 className="font-bold text-lg">Expansion Required</h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    You have used all {locationLimit} of your **Entity Connection Licenses**. Please expand your capacity to add more locations.
+                    You have used all {locationLimit} of your **Entity Connection Licenses**. To manage more units, please expand your capacity.
                   </p>
                 </div>
                 <Button asChild className="bg-primary">
                   <Link href="/settings/billing">
-                    Purchase More Licenses <ArrowRight className="ml-2 size-4" />
+                    Update Subscription & Add Licenses <ArrowRight className="ml-2 size-4" />
                   </Link>
                 </Button>
               </div>
