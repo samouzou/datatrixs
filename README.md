@@ -5,7 +5,7 @@ This is a NextJS application for Private Equity firms to manage and aggregate fi
 ## Stripe Configuration
 
 ### API Version
-The application is configured to use Stripe API version: **2025-01-27.acacia**.
+The application is configured to use Stripe API version: **2026-03-25.dahlia**.
 
 ### Webhook Setup
 To ensure subscription statuses and license limits are synchronized automatically, you must configure a webhook in your [Stripe Dashboard](https://dashboard.stripe.com/webhooks):
