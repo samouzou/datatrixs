@@ -39,25 +39,30 @@ export default function AppLayout({
   const isHoldingPage = pathname === '/settings/holding';
   const isSettingsPage = pathname === '/settings';
   const isLoginPage = pathname === '/login' || pathname === '/register';
+  
+  // Routes that are always accessible during setup/billing phases
   const isAllowedRoute = isBillingPage || isHoldingPage || isSettingsPage || isLoginPage;
 
   React.useEffect(() => {
-    if (!isUserLoading && !user) {
+    // 1. Auth Guard
+    if (!isUserLoading && !user && !isLoginPage) {
       router.push("/login")
       return
     }
 
-    // Don't redirect while on allowed pages
-    if (isAllowedRoute) return;
+    // Don't interrupt if already on a setup or billing page
+    if (isAllowedRoute || isUserLoading || isCompaniesLoading) return;
 
-    // 1. Require company setup
-    if (!isCompaniesLoading && user && (!companies || companies.length === 0)) {
+    // 2. Organization Guard (Require at least one holding entity)
+    // We explicitly check for 'null' to distinguish between "still loading" and "actually empty"
+    if (user && companies !== null && companies.length === 0) {
       router.push("/settings/holding")
       return;
     }
 
-    // 2. Require active subscription for core dashboard features
-    if (!isCompaniesLoading && activeCompany && !isSubscriptionActive) {
+    // 3. License Guard (Require active subscription for protected routes)
+    // Protected routes are anything NOT in the allowed list (Dashboard, Analyst, Locations, etc.)
+    if (activeCompany && !isSubscriptionActive) {
       toast({
         variant: "destructive",
         title: "Subscription Required",
@@ -65,9 +70,20 @@ export default function AppLayout({
       });
       router.push("/settings/billing?restricted=true")
     }
-  }, [user, isUserLoading, activeCompany, isSubscriptionActive, isAllowedRoute, isCompaniesLoading, companies, router, toast])
+  }, [
+    user, 
+    isUserLoading, 
+    activeCompany, 
+    isSubscriptionActive, 
+    isAllowedRoute, 
+    isCompaniesLoading, 
+    companies, 
+    router, 
+    toast,
+    pathname // Ensure re-evaluation on navigation
+  ])
 
-  if (isUserLoading || isCompaniesLoading) {
+  if (isUserLoading || (isCompaniesLoading && !companies)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="size-8 animate-spin text-primary" />
@@ -75,7 +91,7 @@ export default function AppLayout({
     )
   }
 
-  if (!user) return null
+  if (!user && !isLoginPage) return null
 
   return (
     <SidebarProvider>
@@ -96,14 +112,14 @@ export default function AppLayout({
               <ThemeToggle />
               <div className="flex items-center gap-2">
                 <div className="size-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground uppercase">
-                  {user.email?.substring(0, 2) || "U"}
+                  {user?.email?.substring(0, 2) || "U"}
                 </div>
                 <div className="flex flex-col hidden sm:flex">
                   <span className="text-xs font-bold text-foreground leading-none">
-                    {user.displayName || user.email?.split('@')[0]}
+                    {user?.displayName || user?.email?.split('@')[0]}
                   </span>
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                    {activeCompany?.members[user.uid] === 'admin' ? 'Admin' : 'Member'}
+                    {activeCompany && user ? (activeCompany.members[user.uid] === 'admin' ? 'Admin' : 'Member') : 'User'}
                   </span>
                 </div>
               </div>
