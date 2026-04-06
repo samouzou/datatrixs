@@ -25,15 +25,16 @@ import { Company, Location } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { createCheckoutSession } from "@/app/actions/stripe-actions"
 
+// Updated Pricing Constants
 const PRICING = {
   MONTHLY: {
-    BASE: 3000,
-    PER_LOCATION: 250,
+    BASE: 3333,
+    PER_LOCATION: 278,
     LABEL: "per month"
   },
   ANNUAL: {
-    BASE: 29880, 
-    PER_LOCATION: 2490,
+    BASE: 33200, 
+    PER_LOCATION: 2760,
     LABEL: "per year"
   }
 };
@@ -90,6 +91,11 @@ export default function BillingPage() {
   const totalBase = currentPrices.BASE;
   const totalLocationsCost = currentPrices.PER_LOCATION * locationCount;
   const totalDue = totalBase + totalLocationsCost;
+
+  // Calculate specific savings for display
+  const annualBaseSavings = (PRICING.MONTHLY.BASE * 12) - PRICING.ANNUAL.BASE;
+  const annualLocationSavings = ((PRICING.MONTHLY.PER_LOCATION * 12) - PRICING.ANNUAL.PER_LOCATION) * locationCount;
+  const totalAnnualSavings = annualBaseSavings + annualLocationSavings;
 
   const handleSubscribe = async () => {
     if (!company || isProcessing) return;
@@ -174,7 +180,7 @@ export default function BillingPage() {
                     <p className="text-sm text-muted-foreground">Unlimited reports, AI analyst, and standard normalization.</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-3xl font-bold">${(totalBase / (billingCycle === 'annual' ? 12 : 1)).toLocaleString()}</p>
+                    <p className="text-3xl font-bold">${(totalBase / (billingCycle === 'annual' ? 12 : 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">{PRICING.MONTHLY.LABEL}</p>
                   </div>
                 </div>
@@ -190,7 +196,7 @@ export default function BillingPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-bold">${(totalLocationsCost / (billingCycle === 'annual' ? 12 : 1)).toLocaleString()}</p>
+                    <p className="text-xl font-bold">${(totalLocationsCost / (billingCycle === 'annual' ? 12 : 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Added monthly cost</p>
                   </div>
                 </div>
@@ -253,7 +259,7 @@ export default function BillingPage() {
               {billingCycle === 'annual' && (
                 <div className="flex justify-between text-sm py-2 text-accent-foreground font-bold">
                   <span>Annual Savings</span>
-                  <span>-$6,000+</span>
+                  <span>-${totalAnnualSavings.toLocaleString()}</span>
                 </div>
               )}
               <div className="pt-4 flex justify-between items-end">
