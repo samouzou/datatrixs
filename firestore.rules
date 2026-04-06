@@ -44,7 +44,7 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAppAdmin();
+      allow get: if isSignedIn(); // Allow reading profiles for team identification
       allow list: if isAppAdmin();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAppAdmin();

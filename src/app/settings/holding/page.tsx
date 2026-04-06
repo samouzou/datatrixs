@@ -1,11 +1,10 @@
-
 'use client';
 
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell } from "lucide-react"
-import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirestore, useUser, useMemoFirebase, useDoc } from "@/firebase"
 import { collection, query, where, doc, getDocs, writeBatch } from "firebase/firestore"
 import { 
   Dialog, 
@@ -20,11 +19,68 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Company, CompanyInvitation, CompanyRole } from "@/lib/types"
+import { Company, CompanyInvitation, CompanyRole, UserProfile } from "@/lib/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
+import { Badge } from "@/components/ui/badge"
+
+function MemberRow({ 
+  uid, 
+  role, 
+  isCurrent, 
+  onRemove, 
+  canManage 
+}: { 
+  uid: string, 
+  role: string, 
+  isCurrent: boolean,
+  onRemove: () => void,
+  canManage: boolean
+}) {
+  const firestore = useFirestore();
+  const userRef = useMemoFirebase(() => {
+    if (!firestore || !uid) return null;
+    return doc(firestore, "users", uid);
+  }, [firestore, uid]);
+  
+  const { data: profile, isLoading } = useDoc<UserProfile>(userRef);
+
+  const initials = profile 
+    ? `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`.toUpperCase()
+    : uid.substring(0, 2).toUpperCase();
+
+  const fullName = profile 
+    ? `${profile.firstName} ${profile.lastName}`.trim() 
+    : (isLoading ? "Loading..." : "Unknown User");
+
+  const email = profile?.email || "";
+
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
+      <div className="flex items-center gap-3">
+        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+          {initials}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium truncate max-w-[150px]">{fullName}</p>
+            {isCurrent && <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-bold uppercase tracking-widest border-primary/30 text-primary">Me</Badge>}
+          </div>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate">
+            {role} {email && `• ${email}`}
+          </p>
+        </div>
+      </div>
+      {canManage && !isCurrent && (
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={onRemove}>
+          <X className="size-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export default function HoldingStructurePage() {
   const { user } = useUser()
@@ -455,24 +511,14 @@ export default function HoldingStructurePage() {
                   {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => {
                     const displayRole = typeof role === 'boolean' ? (role ? 'admin' : 'member') : role;
                     return (
-                      <div key={uid} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-                        <div className="flex items-center gap-3">
-                          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold">
-                            {uid.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium">{uid === user?.uid ? "You" : "Authorized User"}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                              {displayRole}
-                            </p>
-                          </div>
-                        </div>
-                        {currentUserRole === 'admin' && uid !== user?.uid && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
-                            <X className="size-4" />
-                          </Button>
-                        )}
-                      </div>
+                      <MemberRow 
+                        key={uid}
+                        uid={uid}
+                        role={displayRole}
+                        isCurrent={uid === user?.uid}
+                        onRemove={() => {}} // Placeholder for removal logic
+                        canManage={currentUserRole === 'admin'}
+                      />
                     );
                   })}
                 </div>
