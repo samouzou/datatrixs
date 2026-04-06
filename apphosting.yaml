@@ -8,14 +8,16 @@ runConfig:
   
   # Environment variables for the server-side runtime
   env:
+    - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+      value: "pk_test_replace_with_your_actual_key" # Replace with your actual Publishable Key
     - variable: STRIPE_PRICE_ID_BASE_MONTHLY
-      value: "price_..." # Replace with your actual Monthly Base Price ID
+      value: "price_1TJ0NTIAWwtv4OdWK4huLF12" # Replace with your actual Monthly Base Price ID
     - variable: STRIPE_PRICE_ID_BASE_ANNUAL
-      value: "price_..." # Replace with your actual Annual Base Price ID
+      value: "price_1TJ0SJIAWwtv4OdWhj0F1s3c" # Replace with your actual Annual Base Price ID
     - variable: STRIPE_PRICE_ID_LOCATION_MONTHLY
-      value: "price_..." # Replace with your actual Monthly Location Price ID
+      value: "price_1TJ0TXIAWwtv4OdWl6t7Sy9j" # Replace with your actual Monthly Location Price ID
     - variable: STRIPE_PRICE_ID_LOCATION_ANNUAL
-      value: "price_..." # Replace with your actual Annual Location Price ID
+      value: "price_1TJ0aAIAWwtv4OdWJwuwJf9b" # Replace with your actual Annual Location Price ID
     
     # Sensitive keys should be stored in Cloud Secret Manager and referenced here
     # Example: firebase apphosting:secrets:set STRIPE_SECRET_KEY
