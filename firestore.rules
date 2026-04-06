@@ -59,8 +59,8 @@ service cloud.firestore {
         isCompanyAdmin(resource.data.members) || 
         isAppAdmin() || 
         isJoining(resource.data, request.resource.data, 'members') ||
-        // ALLOW background webhook updates to subscription fields even if unauthenticated
-        (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscription', 'updatedAt']));
+        // ALLOW background webhook updates to specific billing fields even if unauthenticated
+        (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscription', 'stripeCustomerId', 'updatedAt']));
       allow delete: if isAppAdmin();
     }
 
