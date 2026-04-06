@@ -62,6 +62,26 @@ export async function POST(req: Request) {
         break;
       }
 
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice;
+        // When an invoice is paid, ensure the subscription is active and period is updated
+        if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+          const companyId = subscription.metadata?.companyId;
+          
+          if (companyId) {
+            const companyRef = doc(firestore, 'companies', companyId);
+            await updateDoc(companyRef, {
+              'subscription.status': 'active',
+              'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
+              'subscription.updatedAt': new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+        break;
+      }
+
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const companyId = subscription.metadata?.companyId;
