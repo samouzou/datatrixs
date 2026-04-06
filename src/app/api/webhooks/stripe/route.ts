@@ -66,6 +66,14 @@ export async function POST(req: Request) {
 
         if (companyId) {
           console.log(`[checkout.session.completed] Fulfilling for company: ${companyId}`);
+          
+          // CRITICAL: Anchor the companyId to the Customer object for all future recurring events
+          if (session.customer) {
+            await stripe.customers.update(session.customer as string, {
+              metadata: { companyId }
+            });
+          }
+
           const companyRef = doc(firestore, 'companies', companyId);
           
           // Initial provisioning
@@ -140,6 +148,11 @@ export async function POST(req: Request) {
         }
         break;
       }
+
+      case 'invoice.created':
+      case 'invoice.finalized':
+        // Acknowledge these events to prevent logs noise but no action needed
+        break;
 
       default:
         console.log(`[Stripe Webhook] Unhandled event: ${event.type}`);

@@ -10,7 +10,8 @@ export async function createCheckoutSession(params: {
 }) {
   const { companyId, locationCount, interval } = params;
   const headerList = await headers();
-  const origin = headerList.get('origin');
+  // Fallback to absolute domain if origin header is missing in some environments
+  const origin = headerList.get('origin') || 'https://app.datatrixs.com';
 
   // Map intervals to Price IDs from your Stripe dashboard
   const priceIdBase = interval === 'monthly' 
@@ -39,10 +40,6 @@ export async function createCheckoutSession(params: {
       ],
       mode: 'subscription',
       allow_promotion_codes: true,
-      // Persist metadata to the Customer object (Last resort lookup)
-      customer_metadata: {
-        companyId,
-      },
       subscription_data: {
         // Persist metadata to the Subscription object (Renewal lookup)
         metadata: {
