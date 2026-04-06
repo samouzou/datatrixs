@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -24,11 +23,12 @@ import {
   Package,
   Lock,
   Plus,
-  Minus
+  Minus,
+  RefreshCw
 } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
-import { Company, Location } from "@/lib/types"
+import { Company } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { createCheckoutSession } from "@/app/actions/stripe-actions"
 
@@ -52,28 +52,6 @@ export default function BillingPage() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
 
-  const [billingCycle, setBillingCycle] = React.useState<"monthly" | "annual">("annual")
-  const [requestedLocations, setRequestedLocations] = React.useState(5)
-  const [isProcessing, setIsProcessing] = React.useState(false)
-  const isRestricted = searchParams.get('restricted') === 'true';
-
-  // Handle post-checkout notifications
-  React.useEffect(() => {
-    if (searchParams.get('success')) {
-      toast({
-        title: "Checkout Success",
-        description: "Your subscription is being processed. It may take a few minutes to update your status.",
-      })
-    }
-    if (searchParams.get('canceled')) {
-      toast({
-        variant: "destructive",
-        title: "Checkout Canceled",
-        description: "Your subscription process was not completed.",
-      })
-    }
-  }, [searchParams, toast])
-
   // Fetch Companies
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -84,6 +62,38 @@ export default function BillingPage() {
   }, [firestore, user]);
   const { data: companies, isLoading: isCompaniesLoading } = useCollection<Company>(companiesQuery);
   const company = companies?.[0];
+
+  const [billingCycle, setBillingCycle] = React.useState<"monthly" | "annual">("annual")
+  const [requestedLocations, setRequestedLocations] = React.useState(5)
+  const [isProcessing, setIsProcessing] = React.useState(false)
+  
+  const isRestricted = searchParams.get('restricted') === 'true';
+  const isSuccess = searchParams.get('success') === 'true';
+
+  // Pre-fill state from existing subscription
+  React.useEffect(() => {
+    if (company?.subscription) {
+      setBillingCycle(company.subscription.interval === 'annual' ? 'annual' : 'monthly');
+      setRequestedLocations(company.subscription.locationLimit || 1);
+    }
+  }, [company]);
+
+  // Handle post-checkout notifications
+  React.useEffect(() => {
+    if (isSuccess) {
+      toast({
+        title: "Payment Received",
+        description: "Your license is being provisioned. Features will unlock automatically in a few moments.",
+      })
+    }
+    if (searchParams.get('canceled')) {
+      toast({
+        variant: "destructive",
+        title: "Checkout Canceled",
+        description: "Your subscription process was not completed.",
+      })
+    }
+  }, [isSuccess, searchParams, toast])
 
   const currentPrices = billingCycle === "monthly" ? PRICING.MONTHLY : PRICING.ANNUAL;
   const totalBase = currentPrices.BASE;
@@ -129,6 +139,8 @@ export default function BillingPage() {
     )
   }
 
+  const isSubscribed = company?.subscription?.status === 'active';
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -140,10 +152,10 @@ export default function BillingPage() {
           <p className="text-muted-foreground">Manage your portfolio license and entity-based connections.</p>
         </div>
         
-        {company?.subscription?.status === 'active' ? (
+        {isSubscribed ? (
           <Badge className="bg-accent/10 text-accent border-accent/20 px-4 py-1 flex items-center gap-2">
             <ShieldCheck className="size-3" />
-            Active {company.subscription.interval} plan
+            Active {company?.subscription?.interval} plan
           </Badge>
         ) : (
           <Badge variant="outline" className="border-destructive/50 text-destructive bg-destructive/5 px-4 py-1 flex items-center gap-2">
@@ -159,6 +171,16 @@ export default function BillingPage() {
           <AlertTitle>Access Restricted</AlertTitle>
           <AlertDescription>
             You tried to access a feature that requires an active <strong>Datatrixs Portfolio Core</strong> license. Please complete your subscription setup below.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isSuccess && !isSubscribed && (
+        <Alert className="bg-accent/10 border-accent/20 text-accent animate-pulse">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <AlertTitle>Fulfillment in Progress</AlertTitle>
+          <AlertDescription>
+            Stripe has confirmed your payment. Our background engine is now standardizing your account. This page will refresh once active.
           </AlertDescription>
         </Alert>
       )}
@@ -288,7 +310,7 @@ export default function BillingPage() {
                 className="bg-primary hover:bg-primary/90 min-w-[200px]"
               >
                 {isProcessing ? <Loader2 className="size-4 animate-spin mr-2" /> : <Zap className="size-4 mr-2" />}
-                {company?.subscription?.status === 'active' ? 'Update Subscription' : 'Subscribe Now'}
+                {isSubscribed ? 'Update Subscription' : 'Subscribe Now'}
               </Button>
             </CardFooter>
           </Card>
