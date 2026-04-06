@@ -25,6 +25,11 @@ export async function createCheckoutSession(params: {
   }
 
   try {
+    /**
+     * We pass the companyId and locationLimit to both the SESSION metadata
+     * and the SUBSCRIPTION_DATA metadata. This ensures that even if one event
+     * is missing context, the other will provide it.
+     */
     const session = await stripe.checkout.sessions.create({
       line_items: [
         { price: priceIdBase, quantity: 1 },
@@ -32,12 +37,10 @@ export async function createCheckoutSession(params: {
       ],
       mode: 'subscription',
       allow_promotion_codes: true,
-      // Metadata on the session itself
       metadata: {
         companyId,
         locationLimit: locationCount.toString(),
       },
-      // Metadata passed to the created Subscription object
       subscription_data: {
         metadata: {
           companyId,
