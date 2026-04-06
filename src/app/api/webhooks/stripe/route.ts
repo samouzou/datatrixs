@@ -35,26 +35,26 @@ export async function POST(req: Request) {
 
   try {
     /**
-     * MULTI-STAGE COMPANY ID RESOLUTION
-     * We look for the companyId in four places to ensure fulfillment never fails:
-     * 1. Invoice object metadata
-     * 2. Subscription Details metadata (Specific to Dahlia invoices)
-     * 3. The linked Subscription object metadata
-     * 4. The Customer object metadata (The ultimate persistent anchor)
+     * DAHLIA MULTI-STAGE COMPANY ID RESOLUTION
+     * Metadata no longer flows automatically. We check multiple sources:
+     * 1. Invoice subscription_details (New in Dahlia)
+     * 2. Direct Invoice Metadata
+     * 3. Linked Subscription Object
+     * 4. Linked Customer Object (Persistent Anchor)
      */
     const resolveCompanyId = async (invoice: Stripe.Invoice): Promise<string | null> => {
       console.log(`[Stripe Webhook] Resolving companyId for Invoice: ${invoice.id}`);
       
-      // 1. Direct Invoice Metadata
+      // 1. Subscription Details (Structured in Dahlia)
+      if (invoice.subscription_details?.metadata?.companyId) {
+        console.log(`[Stripe Webhook] Found companyId in subscription_details: ${invoice.subscription_details.metadata.companyId}`);
+        return invoice.subscription_details.metadata.companyId;
+      }
+
+      // 2. Direct Invoice Metadata
       if (invoice.metadata?.companyId) {
         console.log(`[Stripe Webhook] Found companyId in Invoice metadata: ${invoice.metadata.companyId}`);
         return invoice.metadata.companyId;
-      }
-
-      // 2. Subscription Details (New in Dahlia)
-      if (invoice.subscription_details?.metadata?.companyId) {
-        console.log(`[Stripe Webhook] Found companyId in Invoice subscription_details: ${invoice.subscription_details.metadata.companyId}`);
-        return invoice.subscription_details.metadata.companyId;
       }
 
       // 3. Subscription object retrieval
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
         }
       }
 
-      // 4. Customer object retrieval (Persistent Anchor)
+      // 4. Customer object retrieval
       if (invoice.customer) {
         console.log(`[Stripe Webhook] Fetching linked customer: ${invoice.customer}`);
         const customer = await stripe.customers.retrieve(invoice.customer as string);
@@ -91,8 +91,8 @@ export async function POST(req: Request) {
         if (companyId) {
           console.log(`[Stripe Webhook] Provisioning license for Company: ${companyId}`);
           
-          // Determine license limits from metadata
-          const rawLimit = invoice.metadata?.locationLimit || invoice.subscription_details?.metadata?.locationLimit || '1';
+          // Determine license limits from metadata hierarchy
+          const rawLimit = invoice.subscription_details?.metadata?.locationLimit || invoice.metadata?.locationLimit || '1';
           const locationLimit = parseInt(rawLimit);
           
           const companyRef = doc(firestore, 'companies', companyId);
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
 
           console.log(`[Stripe Webhook] Fulfillment SUCCESS for ${companyId}`);
 
-          // PERMANENT ANCHOR: Ensure the companyId is saved to the customer for future renewals
+          // Ensure the companyId is anchored to the customer for all future renewals
           if (invoice.customer) {
             stripe.customers.update(invoice.customer as string, {
               metadata: { companyId }
@@ -125,10 +125,8 @@ export async function POST(req: Request) {
         const subscription = event.data.object as Stripe.Subscription;
         console.log(`[Stripe Webhook] Revoking license for Subscription: ${subscription.id}`);
         
-        // For cancellations, we check the subscription object metadata directly
         let companyId = subscription.metadata?.companyId;
         
-        // Fallback to customer if missing
         if (!companyId && subscription.customer) {
           const customer = await stripe.customers.retrieve(subscription.customer as string);
           if (!customer.deleted) companyId = (customer as Stripe.Customer).metadata?.companyId;

@@ -26,10 +26,9 @@ export async function createCheckoutSession(params: {
 
   try {
     /**
-     * DAHLIA API OPTIMIZATION:
-     * We attach the companyId to the metadata of the Session, the Subscription,
-     * AND the Customer. This ensures that no matter which event fires first,
-     * our webhook can always resolve the link back to our Firestore record.
+     * DAHLIA API COMPLIANCE:
+     * In 2026-03-25.dahlia, metadata does not propagate automatically.
+     * We must explicitly set it on subscription_data and customer_data.
      */
     const session = await stripe.checkout.sessions.create({
       line_items: [
@@ -48,7 +47,6 @@ export async function createCheckoutSession(params: {
           locationLimit: locationCount.toString(),
         },
       },
-      // Ensure the newly created customer inherits this metadata
       customer_data: {
         metadata: {
           companyId,
