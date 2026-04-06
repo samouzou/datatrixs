@@ -36,30 +36,39 @@ export async function POST(req: Request) {
   try {
     /**
      * DAHLIA MULTI-STAGE COMPANY ID RESOLUTION
-     * Metadata no longer flows automatically in Dahlia. We check multiple sources:
-     * 1. Invoice subscription_details (New in Dahlia, populated from subscription_data.metadata)
-     * 2. Direct Invoice Metadata (Often empty in Dahlia sessions)
-     * 3. Linked Subscription Object
-     * 4. Linked Customer Object
+     * Metadata in 2026-03-25.dahlia is nested in parent.subscription_details.
      */
     const resolveCompanyId = async (invoice: Stripe.Invoice): Promise<string | null> => {
       console.log(`[Stripe Webhook] Attempting resolution for Invoice: ${invoice.id}`);
       
-      // 1. Subscription Details (Primary for Dahlia)
-      // Note: In Dahlia, invoice.subscription_details is a real field
+      // 1. Parent Subscription Details (Primary for Dahlia as per provided payload)
+      const parentMeta = (invoice as any).parent?.subscription_details?.metadata;
+      if (parentMeta?.companyId) {
+        console.log(`[Stripe Webhook] Success: Found companyId in parent.subscription_details: ${parentMeta.companyId}`);
+        return parentMeta.companyId;
+      }
+
+      // 2. Direct Subscription Details (Dahlia standard field)
       if ((invoice as any).subscription_details?.metadata?.companyId) {
         const cid = (invoice as any).subscription_details.metadata.companyId;
         console.log(`[Stripe Webhook] Success: Found companyId in subscription_details: ${cid}`);
         return cid;
       }
 
-      // 2. Direct Invoice Metadata
+      // 3. Line Item Metadata (Visible in provided payload)
+      const firstLineMeta = invoice.lines.data[0]?.metadata;
+      if (firstLineMeta?.companyId) {
+        console.log(`[Stripe Webhook] Success: Found companyId in first line item: ${firstLineMeta.companyId}`);
+        return firstLineMeta.companyId;
+      }
+
+      // 4. Direct Invoice Metadata (Legacy/Standard)
       if (invoice.metadata?.companyId) {
         console.log(`[Stripe Webhook] Success: Found companyId in Invoice metadata: ${invoice.metadata.companyId}`);
         return invoice.metadata.companyId;
       }
 
-      // 3. Subscription object retrieval (Fallback)
+      // 5. Subscription object retrieval (Fallback)
       if (invoice.subscription) {
         console.log(`[Stripe Webhook] Checking linked subscription: ${invoice.subscription}`);
         const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
@@ -69,7 +78,7 @@ export async function POST(req: Request) {
         }
       }
 
-      // 4. Customer object retrieval (Final Anchor)
+      // 6. Customer object retrieval (Final Anchor)
       if (invoice.customer) {
         console.log(`[Stripe Webhook] Checking linked customer: ${invoice.customer}`);
         const customer = await stripe.customers.retrieve(invoice.customer as string);
@@ -92,7 +101,12 @@ export async function POST(req: Request) {
         
         if (companyId) {
           // Resolve location limit from Dahlia fields or fallback to 1
-          const rawLimit = (invoice as any).subscription_details?.metadata?.locationLimit || invoice.metadata?.locationLimit || '1';
+          const rawLimit = 
+            (invoice as any).parent?.subscription_details?.metadata?.locationLimit || 
+            (invoice as any).subscription_details?.metadata?.locationLimit || 
+            invoice.lines.data[0]?.metadata?.locationLimit ||
+            invoice.metadata?.locationLimit || '1';
+            
           const locationLimit = parseInt(rawLimit);
           
           console.log(`[Stripe Webhook] Provisioning: Company=${companyId}, Limit=${locationLimit}`);
@@ -150,11 +164,11 @@ export async function POST(req: Request) {
       case 'invoice.created':
       case 'invoice.finalized':
       case 'invoice.updated':
-        console.log(`[Stripe Webhook] Acknowledged: ${event.type}`);
+        console.log(`[Stripe Webhook] Acknowledged lifecycle event: ${event.type}`);
         break;
 
       default:
-        console.log(`[Stripe Webhook] Ignored: ${event.type}`);
+        console.log(`[Stripe Webhook] Ignored event type: ${event.type}`);
     }
   } catch (error: any) {
     console.error(`[Stripe Webhook] INTERNAL ERROR:`, error);
