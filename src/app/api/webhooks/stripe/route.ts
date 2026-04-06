@@ -1,3 +1,4 @@
+
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
             
           const locationLimit = parseInt(rawLimit);
           
-          console.log(`[Stripe Webhook] Provisioning: Company=${companyId}, Limit=${locationLimit}`);
+          console.log(`[Stripe Webhook] Provisioning: Company=${companyId}, Limit=${locationLimit}, Customer=${invoice.customer}`);
           
           const companyRef = doc(firestore, 'companies', companyId);
           const now = new Date().toISOString();
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
             'subscription.interval': invoice.lines.data[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly',
             'subscription.currentPeriodEnd': new Date(invoice.period_end * 1000).toISOString(),
             'subscription.updatedAt': now,
+            stripeCustomerId: invoice.customer as string, // PERSIST THE CUSTOMER ID
             updatedAt: now,
           });
 

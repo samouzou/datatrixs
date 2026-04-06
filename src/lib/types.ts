@@ -34,6 +34,7 @@ export type Company = {
   reportingCurrency?: string;
   members: Record<string, CompanyRole>; 
   customMetrics?: string[]; 
+  stripeCustomerId?: string; // Persistent link to Stripe billing
   subscription?: CompanySubscription;
   createdAt: string;
   updatedAt: string;

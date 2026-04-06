@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -94,6 +95,10 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Shared financial metrics defined at the holding level."
+        },
+        "stripeCustomerId": {
+          "type": "string",
+          "description": "The persistent ID of the Stripe Customer object."
         },
         "subscription": {
           "type": "object",

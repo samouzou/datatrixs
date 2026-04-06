@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -23,13 +24,14 @@ import {
   Plus,
   Minus,
   RefreshCw,
-  Check
+  Check,
+  ExternalLink
 } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
 import { Company } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
-import { createCheckoutSession } from "@/app/actions/stripe-actions"
+import { createCheckoutSession, createBillingPortalSession } from "@/app/actions/stripe-actions"
 
 const PRICING = {
   MONTHLY: {
@@ -66,6 +68,8 @@ export default function BillingPage() {
   
   const isRestricted = searchParams.get('restricted') === 'true';
   const isSuccess = searchParams.get('success') === 'true';
+
+  const isSubscribed = company?.subscription?.status === 'active' || company?.subscription?.status === 'trialing';
 
   React.useEffect(() => {
     if (company?.subscription) {
@@ -104,6 +108,20 @@ export default function BillingPage() {
     setIsProcessing(true);
 
     try {
+      // UPGRADE LOGIC: If already subscribed, use Billing Portal to handle proration and existing charges
+      if (isSubscribed && company.stripeCustomerId) {
+        const result = await createBillingPortalSession({
+          customerId: company.stripeCustomerId,
+        });
+        if (result.url) {
+          window.location.href = result.url;
+        } else {
+          throw new Error("No portal URL returned.");
+        }
+        return;
+      }
+
+      // NEW SUBSCRIPTION LOGIC
       const result = await createCheckoutSession({
         companyId: company.id,
         locationCount: requestedLocations,
@@ -119,7 +137,7 @@ export default function BillingPage() {
       toast({
         variant: "destructive",
         title: "Subscription Error",
-        description: error.message || "Could not initiate Stripe checkout.",
+        description: error.message || "Could not connect to Stripe services.",
       });
       setIsProcessing(false);
     }
@@ -132,8 +150,6 @@ export default function BillingPage() {
       </div>
     )
   }
-
-  const isSubscribed = company?.subscription?.status === 'active';
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -188,14 +204,16 @@ export default function BillingPage() {
                   <CardTitle>Portfolio License</CardTitle>
                   <CardDescription>Enterprise-grade financial intelligence for your holdings.</CardDescription>
                 </div>
-                <Tabs value={billingCycle} onValueChange={(v) => setBillingCycle(v as any)} className="bg-background/50 p-1 border border-border rounded-lg">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="monthly" className="text-xs h-8">Monthly</TabsTrigger>
-                    <TabsTrigger value="annual" className="text-xs h-8">
-                      Annual <span className="ml-1 text-[10px] text-accent font-bold">-17%</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                {!isSubscribed && (
+                  <Tabs value={billingCycle} onValueChange={(v) => setBillingCycle(v as any)} className="bg-background/50 p-1 border border-border rounded-lg">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="monthly" className="text-xs h-8">Monthly</TabsTrigger>
+                      <TabsTrigger value="annual" className="text-xs h-8">
+                        Annual <span className="ml-1 text-[10px] text-accent font-bold">-17%</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
               </div>
             </CardHeader>
             <CardContent className="pt-8 space-y-8">
@@ -223,42 +241,49 @@ export default function BillingPage() {
                     <p className="text-xs text-muted-foreground">Pre-purchase connection slots for your retail locations.</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="size-8"
-                      onClick={() => setRequestedLocations(prev => Math.max(1, prev - 1))}
-                    >
-                      <Minus className="size-3" />
-                    </Button>
+                    {!isSubscribed && (
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="size-8"
+                        onClick={() => setRequestedLocations(prev => Math.max(1, prev - 1))}
+                      >
+                        <Minus className="size-3" />
+                      </Button>
+                    )}
                     <div className="flex items-center gap-2">
                       <Input 
                         type="number" 
                         value={requestedLocations} 
                         onChange={(e) => setRequestedLocations(Math.max(1, parseInt(e.target.value) || 1))}
                         className="w-16 h-8 text-center font-bold"
+                        readOnly={isSubscribed}
                       />
                       <span className="text-xs font-medium text-muted-foreground">Units</span>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="size-8"
-                      onClick={() => setRequestedLocations(prev => prev + 1)}
-                    >
-                      <Plus className="size-3" />
-                    </Button>
+                    {!isSubscribed && (
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="size-8"
+                        onClick={() => setRequestedLocations(prev => prev + 1)}
+                      >
+                        <Plus className="size-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                <Slider 
-                  value={[requestedLocations]} 
-                  onValueChange={([val]) => setRequestedLocations(val)} 
-                  max={100} 
-                  min={1} 
-                  step={1}
-                  className="py-4"
-                />
+                {!isSubscribed && (
+                  <Slider 
+                    value={[requestedLocations]} 
+                    onValueChange={([val]) => setRequestedLocations(val)} 
+                    max={100} 
+                    min={1} 
+                    step={1}
+                    className="py-4"
+                  />
+                )}
 
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -294,15 +319,17 @@ export default function BillingPage() {
             <CardFooter className="bg-muted/20 border-t border-border p-6 flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Info className="size-4" />
-                Pricing is dynamically calculated based on your portfolio size.
+                {isSubscribed 
+                  ? "Expanding capacity will redirect you to secure subscription management."
+                  : "Pricing is dynamically calculated based on your portfolio size."}
               </div>
               <Button 
                 onClick={handleSubscribe} 
                 disabled={isProcessing}
                 className="bg-primary hover:bg-primary/90 min-w-[200px]"
               >
-                {isProcessing ? <Loader2 className="size-4 animate-spin mr-2" /> : <Zap className="size-4 mr-2" />}
-                {isSubscribed ? 'Update Subscription' : 'Subscribe Now'}
+                {isProcessing ? <Loader2 className="size-4 animate-spin mr-2" /> : (isSubscribed ? <ExternalLink className="size-4 mr-2" /> : <Zap className="size-4 mr-2" />)}
+                {isSubscribed ? 'Manage Subscription' : 'Subscribe Now'}
               </Button>
             </CardFooter>
           </Card>
@@ -314,7 +341,7 @@ export default function BillingPage() {
             <CardHeader>
               <CardTitle className="text-white">Order Summary</CardTitle>
               <CardDescription className="text-primary-foreground/70">
-                {billingCycle === 'annual' ? 'Billed annually with 17% savings.' : 'Billed monthly per connection.'}
+                {isSubscribed ? "Viewing your active configuration." : (billingCycle === 'annual' ? 'Billed annually with 17% savings.' : 'Billed monthly per connection.')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -355,7 +382,7 @@ export default function BillingPage() {
                 Payments processed securely via Stripe. Automated receipts will be sent to your billing email.
               </div>
               <p className="text-[10px] text-muted-foreground">
-                You will be redirected to Stripe to complete your purchase. You can apply promotional codes on the checkout page.
+                You will be redirected to Stripe to {isSubscribed ? 'modify' : 'complete'} your purchase. {isSubscribed ? 'Prorated adjustments will be calculated automatically.' : 'You can apply promotional codes on the checkout page.'}
               </p>
             </CardContent>
           </Card>

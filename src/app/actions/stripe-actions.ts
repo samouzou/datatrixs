@@ -1,8 +1,12 @@
+
 'use server';
 
 import { stripe } from '@/lib/stripe';
 import { headers } from 'next/headers';
 
+/**
+ * Creates a Checkout Session for new subscriptions.
+ */
 export async function createCheckoutSession(params: {
   companyId: string;
   locationCount: number;
@@ -25,12 +29,6 @@ export async function createCheckoutSession(params: {
   }
 
   try {
-    /**
-     * DAHLIA API COMPLIANCE:
-     * In 2026-03-25.dahlia, metadata does not propagate automatically from session to invoice.
-     * We must explicitly set it on subscription_data. Metadata set here will appear 
-     * on the Invoice object in subscription_details.metadata.
-     */
     const session = await stripe.checkout.sessions.create({
       line_items: [
         { price: priceIdBase, quantity: 1 },
@@ -56,5 +54,29 @@ export async function createCheckoutSession(params: {
   } catch (error: any) {
     console.error('Error creating Stripe session:', error);
     throw new Error(error.message || 'Failed to create checkout session.');
+  }
+}
+
+/**
+ * Creates a Billing Portal Session for existing subscribers.
+ * This allows them to expand capacity without duplicate base charges.
+ */
+export async function createBillingPortalSession(params: {
+  customerId: string;
+}) {
+  const { customerId } = params;
+  const headerList = await headers();
+  const origin = headerList.get('origin') || 'https://app.datatrixs.com';
+
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${origin}/settings/billing`,
+    });
+
+    return { url: session.url };
+  } catch (error: any) {
+    console.error('Error creating Billing Portal session:', error);
+    throw new Error(error.message || 'Failed to open billing portal.');
   }
 }
