@@ -10,10 +10,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { 
   CreditCard, 
-  Check, 
   ShieldCheck, 
   Building2, 
   ArrowRight, 
@@ -24,7 +22,8 @@ import {
   Lock,
   Plus,
   Minus,
-  RefreshCw
+  RefreshCw,
+  Check
 } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
@@ -32,7 +31,6 @@ import { Company } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { createCheckoutSession } from "@/app/actions/stripe-actions"
 
-// Updated Pricing Constants
 const PRICING = {
   MONTHLY: {
     BASE: 3333,
@@ -52,7 +50,6 @@ export default function BillingPage() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
 
-  // Fetch Companies
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -70,7 +67,6 @@ export default function BillingPage() {
   const isRestricted = searchParams.get('restricted') === 'true';
   const isSuccess = searchParams.get('success') === 'true';
 
-  // Pre-fill state from existing subscription
   React.useEffect(() => {
     if (company?.subscription) {
       setBillingCycle(company.subscription.interval === 'annual' ? 'annual' : 'monthly');
@@ -78,7 +74,6 @@ export default function BillingPage() {
     }
   }, [company]);
 
-  // Handle post-checkout notifications
   React.useEffect(() => {
     if (isSuccess) {
       toast({
@@ -100,7 +95,6 @@ export default function BillingPage() {
   const totalLocationsCost = currentPrices.PER_LOCATION * requestedLocations;
   const totalDue = totalBase + totalLocationsCost;
 
-  // Calculate specific savings for display
   const annualBaseSavings = (PRICING.MONTHLY.BASE * 12) - PRICING.ANNUAL.BASE;
   const annualLocationSavings = ((PRICING.MONTHLY.PER_LOCATION * 12) - PRICING.ANNUAL.PER_LOCATION) * requestedLocations;
   const totalAnnualSavings = annualBaseSavings + annualLocationSavings;
@@ -180,7 +174,7 @@ export default function BillingPage() {
           <RefreshCw className="h-4 w-4 animate-spin" />
           <AlertTitle>Fulfillment in Progress</AlertTitle>
           <AlertDescription>
-            Stripe has confirmed your payment. Our background engine is now standardizing your account. This page will refresh once active.
+            Stripe has confirmed your payment. Our background engine is now provisioning your license. This page will refresh once active.
           </AlertDescription>
         </Alert>
       )}
@@ -205,7 +199,6 @@ export default function BillingPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-8 space-y-8">
-              {/* Base Plan */}
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -220,7 +213,6 @@ export default function BillingPage() {
                 </div>
               </div>
 
-              {/* Location Capacity Selector */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">

@@ -1,8 +1,8 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { initializeFirebase } from '@/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase/config'; // Import directly from config to avoid client-hook barrel conflicts
+import { doc, updateDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
 
 export async function POST(req: Request) {
@@ -36,23 +36,23 @@ export async function POST(req: Request) {
   try {
     console.log(`[Stripe Webhook] Event Received: ${event.type}`);
 
-    // Unified helper to find the Company ID from any Stripe object
+    // Robust companyId lookup across event types
     const findCompanyId = async (obj: any): Promise<string | null> => {
-      // 1. Check direct metadata
+      // 1. Direct metadata (Session/Subscription)
       if (obj.metadata?.companyId) return obj.metadata.companyId;
       
-      // 2. Check associated subscription metadata
-      if (obj.subscription) {
-        const sub = await stripe.subscriptions.retrieve(obj.subscription as string);
-        if (sub.metadata?.companyId) return sub.metadata.companyId;
-      }
-
-      // 3. Check customer metadata (The "Source of Truth" fallback)
+      // 2. Fallback to Customer metadata
       if (obj.customer) {
         const customer = await stripe.customers.retrieve(obj.customer as string);
         if (!customer.deleted && (customer as Stripe.Customer).metadata?.companyId) {
           return (customer as Stripe.Customer).metadata.companyId;
         }
+      }
+
+      // 3. Fallback to Subscription metadata if it's an Invoice
+      if (obj.subscription) {
+        const subscription = await stripe.subscriptions.retrieve(obj.subscription as string);
+        if (subscription.metadata?.companyId) return subscription.metadata.companyId;
       }
 
       return null;
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
         if (companyId) {
           console.log(`[checkout.session.completed] Fulfilling for company: ${companyId}`);
           
-          // CRITICAL: Anchor the companyId to the Customer object for all future recurring events
+          // Anchor the companyId to the Customer object permanently
           if (session.customer) {
             await stripe.customers.update(session.customer as string, {
               metadata: { companyId }
@@ -75,15 +75,13 @@ export async function POST(req: Request) {
           }
 
           const companyRef = doc(firestore, 'companies', companyId);
-          
-          // Initial provisioning
           await updateDoc(companyRef, {
             subscription: {
               plan: 'pro',
               status: 'active',
               locationLimit: locationLimit,
-              interval: session.mode === 'subscription' ? 'monthly' : 'annual', // Default fallback
-              currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Temporary until invoice.paid
+              interval: session.mode === 'subscription' ? 'monthly' : 'annual',
+              currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
               updatedAt: new Date().toISOString(),
             },
             updatedAt: new Date().toISOString(),
@@ -97,34 +95,12 @@ export async function POST(req: Request) {
         const companyId = await findCompanyId(invoice);
         
         if (companyId && invoice.subscription) {
-          console.log(`[invoice.paid] Confirming payment for company: ${companyId}`);
+          console.log(`[invoice.paid] Refreshing license for: ${companyId}`);
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-          const locationLimitStr = subscription.metadata?.locationLimit || '1';
           
           const companyRef = doc(firestore, 'companies', companyId);
           await updateDoc(companyRef, {
             'subscription.status': 'active',
-            'subscription.locationLimit': parseInt(locationLimitStr),
-            'subscription.interval': subscription.items.data[0].plan.interval === 'year' ? 'annual' : 'monthly',
-            'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
-            'subscription.updatedAt': new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        } else {
-          console.warn(`[invoice.paid] Could not associate invoice ${invoice.id} with a company or subscription.`);
-        }
-        break;
-      }
-
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        const companyId = await findCompanyId(subscription);
-
-        if (companyId) {
-          console.log(`[subscription.updated] Updating status for: ${companyId} -> ${subscription.status}`);
-          const companyRef = doc(firestore, 'companies', companyId);
-          await updateDoc(companyRef, {
-            'subscription.status': subscription.status,
             'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
             'subscription.updatedAt': new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -151,14 +127,14 @@ export async function POST(req: Request) {
 
       case 'invoice.created':
       case 'invoice.finalized':
-        // Acknowledge these events to prevent logs noise but no action needed
+        // Acknowledge these to avoid log noise
         break;
 
       default:
         console.log(`[Stripe Webhook] Unhandled event: ${event.type}`);
     }
   } catch (error: any) {
-    console.error(`[Stripe Webhook] Critical Error:`, error);
+    console.error(`[Stripe Webhook] Error:`, error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 
