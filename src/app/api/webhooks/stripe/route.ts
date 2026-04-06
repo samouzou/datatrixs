@@ -36,35 +36,35 @@ export async function POST(req: Request) {
   const { firestore } = initializeFirebase();
 
   try {
-    console.log(`Processing Stripe Event: ${event.type}`);
+    console.log(`[Stripe Webhook] Processing Event: ${event.type}`);
 
     switch (event.type) {
-      case 'checkout.session.completed': {
-        // We acknowledge this but move primary provisioning to invoice.paid 
-        // for better consistency with modern Stripe lifecycle
-        console.log('Checkout session completed. Waiting for invoice.paid for provisioning.');
-        break;
-      }
-
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
+        console.log(`[invoice.paid] Processing invoice ${invoice.id}`);
+
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
           
-          // Primary metadata retrieval (persistent from subscription_data.metadata)
+          // Fallback chain for metadata: 
+          // 1. Subscription metadata (copied from subscription_data during checkout)
+          // 2. Invoice metadata (sometimes set manually or during checkout)
           const companyId = subscription.metadata?.companyId || invoice.metadata?.companyId;
-          const locationLimit = parseInt(subscription.metadata?.locationLimit || invoice.metadata?.locationLimit || '0');
+          const locationLimitStr = subscription.metadata?.locationLimit || invoice.metadata?.locationLimit || '0';
+          const locationLimit = parseInt(locationLimitStr);
           
+          console.log(`[invoice.paid] Metadata check: companyId=${companyId}, locationLimit=${locationLimit}`);
+
           if (companyId) {
             const companyRef = doc(firestore, 'companies', companyId);
             const companySnap = await getDoc(companyRef);
 
             if (companySnap.exists()) {
-              // Full object update to ensure 'plan' and other required fields are present
-              // even if the subscription object didn't exist before.
+              console.log(`[invoice.paid] Found company ${companyId}. Updating subscription status...`);
+              
               await updateDoc(companyRef, {
                 subscription: {
-                  plan: 'pro', // Defaulting to pro as per branding
+                  plan: 'pro',
                   status: 'active',
                   locationLimit: locationLimit,
                   interval: subscription.items.data[0].plan.interval === 'year' ? 'annual' : 'monthly',
@@ -73,16 +73,19 @@ export async function POST(req: Request) {
                 },
                 updatedAt: new Date().toISOString(),
               });
-              console.log(`Successfully provisioned/updated subscription for company ${companyId} via invoice.paid`);
+              
+              console.log(`[invoice.paid] SUCCESS: Updated company ${companyId}`);
             } else {
-              console.error(`Company ${companyId} not found in Firestore during invoice.paid`);
+              console.error(`[invoice.paid] ERROR: Company ${companyId} not found in Firestore.`);
             }
           } else {
-            console.error(`Missing companyId in metadata for invoice ${invoice.id}. Metadata:`, {
-              subMetadata: subscription.metadata,
-              invMetadata: invoice.metadata
+            console.error(`[invoice.paid] ERROR: Missing companyId in metadata.`, {
+              subMeta: subscription.metadata,
+              invMeta: invoice.metadata
             });
           }
+        } else {
+          console.log(`[invoice.paid] Skipping: Invoice ${invoice.id} is not associated with a subscription.`);
         }
         break;
       }
@@ -90,8 +93,11 @@ export async function POST(req: Request) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const companyId = subscription.metadata?.companyId;
-        const locationLimit = parseInt(subscription.metadata?.locationLimit || '0');
+        const locationLimitStr = subscription.metadata?.locationLimit || '0';
+        const locationLimit = parseInt(locationLimitStr);
         
+        console.log(`[subscription.updated] Processing: companyId=${companyId}, status=${subscription.status}`);
+
         if (companyId) {
           const companyRef = doc(firestore, 'companies', companyId);
           await updateDoc(companyRef, {
@@ -101,7 +107,7 @@ export async function POST(req: Request) {
             'subscription.updatedAt': new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
-          console.log(`Updated subscription status to ${subscription.status} for company ${companyId}`);
+          console.log(`[subscription.updated] SUCCESS: Updated status to ${subscription.status} for ${companyId}`);
         }
         break;
       }
@@ -117,21 +123,16 @@ export async function POST(req: Request) {
             'subscription.updatedAt': new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
-          console.log(`Canceled subscription for company ${companyId}`);
+          console.log(`[subscription.deleted] SUCCESS: Canceled license for ${companyId}`);
         }
         break;
       }
 
-      case 'invoice.created':
-      case 'invoice.finalized':
-        // Acknowledge standard lifecycle events silently
-        break;
-
       default:
-        console.log(`Ignored event type ${event.type}`);
+        console.log(`[Stripe Webhook] Acknowledged unhandled event type: ${event.type}`);
     }
   } catch (error: any) {
-    console.error('Error processing Stripe webhook event:', error);
+    console.error(`[Stripe Webhook] FATAL ERROR processing ${event.type}:`, error);
     return new NextResponse(`Internal Server Error: ${error.message}`, { status: 500 });
   }
 
