@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -139,7 +138,7 @@ export default function BillingPage() {
             <CreditCard className="size-6 text-primary" />
             <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Billing & Subscription</h2>
           </div>
-          <p className="text-muted-foreground">Manage your portfolio license and location-based add-ons.</p>
+          <p className="text-muted-foreground">Manage your portfolio license and entity-based connections.</p>
         </div>
         
         {company?.subscription?.status === 'active' && (
@@ -175,7 +174,7 @@ export default function BillingPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Package className="size-5 text-primary" />
-                      <h3 className="font-bold text-lg">Base Platform Fee</h3>
+                      <h3 className="font-bold text-lg">Datatrixs Portfolio Core</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">Unlimited reports, AI analyst, and standard normalization.</p>
                   </div>
@@ -191,8 +190,8 @@ export default function BillingPage() {
                       <Building2 className="size-6 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-sm">Location Add-ons</h4>
-                      <p className="text-xs text-muted-foreground">Currently monitoring <span className="text-primary font-bold">{locationCount}</span> authorized locations.</p>
+                      <h4 className="font-bold text-sm">Entity Connection License</h4>
+                      <p className="text-xs text-muted-foreground">Currently monitoring <span className="text-primary font-bold">{locationCount}</span> authorized entities.</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -244,16 +243,16 @@ export default function BillingPage() {
             <CardHeader>
               <CardTitle className="text-white">Order Summary</CardTitle>
               <CardDescription className="text-primary-foreground/70">
-                {billingCycle === 'annual' ? 'Billed annually with 17% savings.' : 'Billed monthly per location.'}
+                {billingCycle === 'annual' ? 'Billed annually with 17% savings.' : 'Billed monthly per connection.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between text-sm py-2 border-b border-white/10">
-                <span>Base Platform</span>
+                <span>Portfolio Core</span>
                 <span className="font-bold">${totalBase.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm py-2 border-b border-white/10">
-                <span>Locations ({locationCount})</span>
+                <span>Entity Connections ({locationCount})</span>
                 <span className="font-bold">${totalLocationsCost.toLocaleString()}</span>
               </div>
               {billingCycle === 'annual' && (
