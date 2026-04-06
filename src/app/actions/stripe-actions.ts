@@ -27,8 +27,9 @@ export async function createCheckoutSession(params: {
   try {
     /**
      * DAHLIA API COMPLIANCE:
-     * In 2026-03-25.dahlia, metadata does not propagate automatically.
-     * We must explicitly set it on subscription_data and customer_data.
+     * In 2026-03-25.dahlia, metadata does not propagate automatically from session to invoice.
+     * We must explicitly set it on subscription_data. Metadata set here will appear 
+     * on the Invoice object in subscription_details.metadata.
      */
     const session = await stripe.checkout.sessions.create({
       line_items: [
@@ -46,11 +47,6 @@ export async function createCheckoutSession(params: {
           companyId,
           locationLimit: locationCount.toString(),
         },
-      },
-      customer_data: {
-        metadata: {
-          companyId,
-        }
       },
       success_url: `${origin}/settings/billing?success=true`,
       cancel_url: `${origin}/settings/billing?canceled=true`,

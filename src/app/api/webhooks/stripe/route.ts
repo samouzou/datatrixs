@@ -36,66 +36,69 @@ export async function POST(req: Request) {
   try {
     /**
      * DAHLIA MULTI-STAGE COMPANY ID RESOLUTION
-     * Metadata no longer flows automatically. We check multiple sources:
-     * 1. Invoice subscription_details (New in Dahlia)
-     * 2. Direct Invoice Metadata
+     * Metadata no longer flows automatically in Dahlia. We check multiple sources:
+     * 1. Invoice subscription_details (New in Dahlia, populated from subscription_data.metadata)
+     * 2. Direct Invoice Metadata (Often empty in Dahlia sessions)
      * 3. Linked Subscription Object
-     * 4. Linked Customer Object (Persistent Anchor)
+     * 4. Linked Customer Object
      */
     const resolveCompanyId = async (invoice: Stripe.Invoice): Promise<string | null> => {
-      console.log(`[Stripe Webhook] Resolving companyId for Invoice: ${invoice.id}`);
+      console.log(`[Stripe Webhook] Attempting resolution for Invoice: ${invoice.id}`);
       
-      // 1. Subscription Details (Structured in Dahlia)
-      if (invoice.subscription_details?.metadata?.companyId) {
-        console.log(`[Stripe Webhook] Found companyId in subscription_details: ${invoice.subscription_details.metadata.companyId}`);
-        return invoice.subscription_details.metadata.companyId;
+      // 1. Subscription Details (Primary for Dahlia)
+      // Note: In Dahlia, invoice.subscription_details is a real field
+      if ((invoice as any).subscription_details?.metadata?.companyId) {
+        const cid = (invoice as any).subscription_details.metadata.companyId;
+        console.log(`[Stripe Webhook] Success: Found companyId in subscription_details: ${cid}`);
+        return cid;
       }
 
       // 2. Direct Invoice Metadata
       if (invoice.metadata?.companyId) {
-        console.log(`[Stripe Webhook] Found companyId in Invoice metadata: ${invoice.metadata.companyId}`);
+        console.log(`[Stripe Webhook] Success: Found companyId in Invoice metadata: ${invoice.metadata.companyId}`);
         return invoice.metadata.companyId;
       }
 
-      // 3. Subscription object retrieval
+      // 3. Subscription object retrieval (Fallback)
       if (invoice.subscription) {
-        console.log(`[Stripe Webhook] Fetching linked subscription: ${invoice.subscription}`);
+        console.log(`[Stripe Webhook] Checking linked subscription: ${invoice.subscription}`);
         const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
         if (subscription.metadata?.companyId) {
-          console.log(`[Stripe Webhook] Found companyId in Subscription metadata: ${subscription.metadata.companyId}`);
+          console.log(`[Stripe Webhook] Success: Found companyId in Subscription object: ${subscription.metadata.companyId}`);
           return subscription.metadata.companyId;
         }
       }
 
-      // 4. Customer object retrieval
+      // 4. Customer object retrieval (Final Anchor)
       if (invoice.customer) {
-        console.log(`[Stripe Webhook] Fetching linked customer: ${invoice.customer}`);
+        console.log(`[Stripe Webhook] Checking linked customer: ${invoice.customer}`);
         const customer = await stripe.customers.retrieve(invoice.customer as string);
         if (!customer.deleted && (customer as Stripe.Customer).metadata?.companyId) {
-          console.log(`[Stripe Webhook] Found companyId in Customer metadata: ${(customer as Stripe.Customer).metadata.companyId}`);
+          console.log(`[Stripe Webhook] Success: Found companyId in Customer object: ${(customer as Stripe.Customer).metadata.companyId}`);
           return (customer as Stripe.Customer).metadata.companyId;
         }
       }
 
-      console.warn('[Stripe Webhook] Warning: Could not resolve companyId from current context.');
+      console.warn('[Stripe Webhook] Warning: Could not resolve companyId after all checks.');
       return null;
     };
 
     switch (event.type) {
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log(`[Stripe Webhook] Processing payment for Invoice: ${invoice.id}`);
+        console.log(`[Stripe Webhook] Processing invoice.paid: ${invoice.id}`);
         
         const companyId = await resolveCompanyId(invoice);
         
         if (companyId) {
-          console.log(`[Stripe Webhook] Provisioning license for Company: ${companyId}`);
-          
-          // Determine license limits from metadata hierarchy
-          const rawLimit = invoice.subscription_details?.metadata?.locationLimit || invoice.metadata?.locationLimit || '1';
+          // Resolve location limit from Dahlia fields or fallback to 1
+          const rawLimit = (invoice as any).subscription_details?.metadata?.locationLimit || invoice.metadata?.locationLimit || '1';
           const locationLimit = parseInt(rawLimit);
           
+          console.log(`[Stripe Webhook] Provisioning: Company=${companyId}, Limit=${locationLimit}`);
+          
           const companyRef = doc(firestore, 'companies', companyId);
+          const now = new Date().toISOString();
           
           await updateDoc(companyRef, {
             'subscription.plan': 'pro',
@@ -103,27 +106,27 @@ export async function POST(req: Request) {
             'subscription.locationLimit': locationLimit,
             'subscription.interval': invoice.lines.data[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly',
             'subscription.currentPeriodEnd': new Date(invoice.period_end * 1000).toISOString(),
-            'subscription.updatedAt': new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            'subscription.updatedAt': now,
+            updatedAt: now,
           });
 
-          console.log(`[Stripe Webhook] Fulfillment SUCCESS for ${companyId}`);
+          console.log(`[Stripe Webhook] PROVISIONING SUCCESS for company ${companyId}`);
 
-          // Ensure the companyId is anchored to the customer for all future renewals
+          // Anchor the companyId to the customer for all future lifecycle events
           if (invoice.customer) {
-            stripe.customers.update(invoice.customer as string, {
+            await stripe.customers.update(invoice.customer as string, {
               metadata: { companyId }
-            }).catch(e => console.error('[Stripe Webhook] Non-critical error anchoring customer', e));
+            }).catch(e => console.warn('[Stripe Webhook] Minor: Failed to anchor customer metadata', e.message));
           }
         } else {
-          console.error('[Stripe Webhook] CRITICAL: Skipping fulfillment. No companyId resolved.');
+          console.error('[Stripe Webhook] CRITICAL: fulfillment failed because no companyId was found in the Dahlia lifecycle context.');
         }
         break;
       }
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        console.log(`[Stripe Webhook] Revoking license for Subscription: ${subscription.id}`);
+        console.log(`[Stripe Webhook] revoking license: ${subscription.id}`);
         
         let companyId = subscription.metadata?.companyId;
         
@@ -139,7 +142,7 @@ export async function POST(req: Request) {
             'subscription.updatedAt': new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
-          console.log(`[Stripe Webhook] License revoked for ${companyId}`);
+          console.log(`[Stripe Webhook] REVOCATION SUCCESS for ${companyId}`);
         }
         break;
       }
@@ -147,14 +150,14 @@ export async function POST(req: Request) {
       case 'invoice.created':
       case 'invoice.finalized':
       case 'invoice.updated':
-        console.log(`[Stripe Webhook] Acknowledged lifecycle event: ${event.type}`);
+        console.log(`[Stripe Webhook] Acknowledged: ${event.type}`);
         break;
 
       default:
-        console.log(`[Stripe Webhook] Info: Ignoring event type: ${event.type}`);
+        console.log(`[Stripe Webhook] Ignored: ${event.type}`);
     }
   } catch (error: any) {
-    console.error(`[Stripe Webhook] EXECUTION ERROR:`, error);
+    console.error(`[Stripe Webhook] INTERNAL ERROR:`, error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 
