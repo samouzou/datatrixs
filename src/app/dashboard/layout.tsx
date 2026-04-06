@@ -5,9 +5,9 @@ import { useRouter, usePathname } from "next/navigation"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, where } from "firebase/firestore"
-import { Company } from "@/lib/types"
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase"
+import { collection, query, where, doc } from "firebase/firestore"
+import { Company, UserProfile } from "@/lib/types"
 import { Loader2, ShieldAlert } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -32,6 +32,12 @@ export default function AppLayout({
 
   const { data: companies, isLoading: isCompaniesLoading } = useCollection<Company>(companiesQuery);
 
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, "users", user.uid);
+  }, [firestore, user]);
+  const { data: profile } = useDoc<UserProfile>(userProfileRef);
+
   const activeCompany = companies?.[0];
   const isSubscriptionActive = activeCompany?.subscription?.status === 'active' || activeCompany?.subscription?.status === 'trialing';
   
@@ -44,7 +50,14 @@ export default function AppLayout({
   // Routes that are always accessible during setup/billing phases
   const isAllowedRoute = isBillingPage || isHoldingPage || isSettingsPage || isLoginPage || isVerifyPage;
 
+  const displayName = profile 
+    ? `${profile.firstName} ${profile.lastName}`.trim() 
+    : user?.displayName || user?.email?.split('@')[0];
+
   const userInitials = React.useMemo(() => {
+    if (profile && (profile.firstName || profile.lastName)) {
+      return `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`.toUpperCase();
+    }
     if (!user) return "U";
     if (user.displayName) {
       const parts = user.displayName.split(' ');
@@ -52,7 +65,7 @@ export default function AppLayout({
       return parts[0].substring(0, 2).toUpperCase();
     }
     return user.email?.substring(0, 2).toUpperCase() || "U";
-  }, [user]);
+  }, [user, profile]);
 
   React.useEffect(() => {
     // 1. Auth Guard
@@ -137,7 +150,7 @@ export default function AppLayout({
                 </div>
                 <div className="flex flex-col hidden sm:flex">
                   <span className="text-xs font-bold text-foreground leading-none">
-                    {user?.displayName || user?.email?.split('@')[0]}
+                    {displayName}
                   </span>
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
                     {activeCompany && user ? (activeCompany.members[user.uid] === 'admin' ? 'Admin' : 'Member') : 'User'}

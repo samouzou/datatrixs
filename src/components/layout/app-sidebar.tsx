@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -28,7 +27,9 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { useAuth, useUser } from "@/firebase"
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase"
+import { doc } from "firebase/firestore"
+import { UserProfile } from "@/lib/types"
 
 const mainNavItems = [
   {
@@ -81,6 +82,17 @@ export function AppSidebar() {
   const router = useRouter()
   const auth = useAuth()
   const { user } = useUser()
+  const firestore = useFirestore()
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, "users", user.uid);
+  }, [firestore, user]);
+  const { data: profile } = useDoc<UserProfile>(userProfileRef);
+
+  const displayName = profile 
+    ? `${profile.firstName} ${profile.lastName}`.trim() 
+    : user?.displayName || user?.email?.split('@')[0];
 
   const handleSignOut = async () => {
     await auth.signOut()
@@ -171,7 +183,7 @@ export function AppSidebar() {
                   </div>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold truncate text-foreground">{user?.displayName || user?.email?.split('@')[0]}</span>
+                  <span className="text-xs font-bold truncate text-foreground">{displayName}</span>
                   <span className="text-[10px] text-muted-foreground truncate">{user?.email}</span>
                 </div>
               </div>
