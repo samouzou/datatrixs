@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { 
   CreditCard, 
   Check, 
@@ -16,7 +17,8 @@ import {
   Loader2, 
   Zap,
   Info,
-  Package
+  Package,
+  Lock
 } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
@@ -46,6 +48,7 @@ export default function BillingPage() {
 
   const [billingCycle, setBillingCycle] = React.useState<"monthly" | "annual">("annual")
   const [isProcessing, setIsProcessing] = React.useState(false)
+  const isRestricted = searchParams.get('restricted') === 'true';
 
   // Handle post-checkout notifications
   React.useEffect(() => {
@@ -141,13 +144,28 @@ export default function BillingPage() {
           <p className="text-muted-foreground">Manage your portfolio license and entity-based connections.</p>
         </div>
         
-        {company?.subscription?.status === 'active' && (
+        {company?.subscription?.status === 'active' ? (
           <Badge className="bg-accent/10 text-accent border-accent/20 px-4 py-1 flex items-center gap-2">
             <ShieldCheck className="size-3" />
             Active {company.subscription.interval} plan
           </Badge>
+        ) : (
+          <Badge variant="outline" className="border-destructive/50 text-destructive bg-destructive/5 px-4 py-1 flex items-center gap-2">
+            <Lock className="size-3" />
+            Subscription Required
+          </Badge>
         )}
       </div>
+
+      {isRestricted && (
+        <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 animate-in slide-in-from-top-2">
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Access Restricted</AlertTitle>
+          <AlertDescription>
+            You tried to access a feature that requires an active <strong>Datatrixs Portfolio Core</strong> license. Please complete your subscription setup below.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
@@ -227,7 +245,7 @@ export default function BillingPage() {
               </div>
               <Button 
                 onClick={handleSubscribe} 
-                disabled={isProcessing || company?.subscription?.interval === billingCycle}
+                disabled={isProcessing || (company?.subscription?.status === 'active' && company?.subscription?.interval === billingCycle)}
                 className="bg-primary hover:bg-primary/90 min-w-[200px]"
               >
                 {isProcessing ? <Loader2 className="size-4 animate-spin mr-2" /> : <Zap className="size-4 mr-2" />}
