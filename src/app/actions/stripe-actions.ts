@@ -10,10 +10,8 @@ export async function createCheckoutSession(params: {
 }) {
   const { companyId, locationCount, interval } = params;
   const headerList = await headers();
-  // Fallback to absolute domain if origin header is missing in some environments
   const origin = headerList.get('origin') || 'https://app.datatrixs.com';
 
-  // Map intervals to Price IDs from your Stripe dashboard
   const priceIdBase = interval === 'monthly' 
     ? process.env.STRIPE_PRICE_ID_BASE_MONTHLY 
     : process.env.STRIPE_PRICE_ID_BASE_ANNUAL;
@@ -23,34 +21,28 @@ export async function createCheckoutSession(params: {
     : process.env.STRIPE_PRICE_ID_LOCATION_ANNUAL;
 
   if (!priceIdBase || !priceIdLocation) {
-    throw new Error('Stripe Price IDs are not configured in environment variables.');
+    throw new Error('Stripe Price IDs are not configured.');
   }
 
   try {
     const session = await stripe.checkout.sessions.create({
       line_items: [
-        {
-          price: priceIdBase,
-          quantity: 1,
-        },
-        {
-          price: priceIdLocation,
-          quantity: Math.max(1, locationCount),
-        },
+        { price: priceIdBase, quantity: 1 },
+        { price: priceIdLocation, quantity: Math.max(1, locationCount) },
       ],
       mode: 'subscription',
       allow_promotion_codes: true,
+      // Metadata on the session itself
+      metadata: {
+        companyId,
+        locationLimit: locationCount.toString(),
+      },
+      // Metadata passed to the created Subscription object
       subscription_data: {
-        // Persist metadata to the Subscription object (Renewal lookup)
         metadata: {
           companyId,
           locationLimit: locationCount.toString(),
         },
-      },
-      // Metadata on the session (Initial fulfillment lookup)
-      metadata: {
-        companyId,
-        locationLimit: locationCount.toString(),
       },
       success_url: `${origin}/settings/billing?success=true`,
       cancel_url: `${origin}/settings/billing?canceled=true`,

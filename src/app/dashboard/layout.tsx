@@ -22,7 +22,6 @@ export default function AppLayout({
   const pathname = usePathname()
   const { toast } = useToast()
 
-  // Fetch the user's company to check subscription status
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -36,7 +35,6 @@ export default function AppLayout({
   const activeCompany = companies?.[0];
   const isSubscriptionActive = activeCompany?.subscription?.status === 'active' || activeCompany?.subscription?.status === 'trialing';
   
-  // Define routes that are always accessible even without a subscription
   const isBillingPage = pathname === '/settings/billing';
   const isHoldingPage = pathname === '/settings/holding';
   const isSettingsPage = pathname === '/settings';
@@ -49,9 +47,17 @@ export default function AppLayout({
       return
     }
 
-    // Enforcement Logic:
-    // 1. If we have a company but NO active subscription and NOT on an allowed page
-    if (!isCompaniesLoading && activeCompany && !isSubscriptionActive && !isAllowedRoute) {
+    // Don't redirect while on allowed pages
+    if (isAllowedRoute) return;
+
+    // 1. Require company setup
+    if (!isCompaniesLoading && user && (!companies || companies.length === 0)) {
+      router.push("/settings/holding")
+      return;
+    }
+
+    // 2. Require active subscription for core dashboard features
+    if (!isCompaniesLoading && activeCompany && !isSubscriptionActive) {
       toast({
         variant: "destructive",
         title: "Subscription Required",
@@ -59,13 +65,7 @@ export default function AppLayout({
       });
       router.push("/settings/billing?restricted=true")
     }
-    
-    // 2. If we have NO company yet and NOT on a holding/billing/login page
-    // Added isBillingPage to exclusion list to prevent bouncing during fulfillment
-    if (!isCompaniesLoading && user && (!companies || companies.length === 0) && !isAllowedRoute) {
-      router.push("/settings/holding")
-    }
-  }, [user, isUserLoading, activeCompany, isSubscriptionActive, isAllowedRoute, isCompaniesLoading, companies, isHoldingPage, isSettingsPage, isLoginPage, router, toast])
+  }, [user, isUserLoading, activeCompany, isSubscriptionActive, isAllowedRoute, isCompaniesLoading, companies, router, toast])
 
   if (isUserLoading || isCompaniesLoading) {
     return (

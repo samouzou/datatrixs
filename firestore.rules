@@ -12,7 +12,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // High-performance map-based membership check
     function isCompanyMember(membersMap) {
       return isSignedIn() && membersMap != null && (
         membersMap.get(request.auth.uid, null) == 'admin' || 
@@ -28,14 +27,12 @@ service cloud.firestore {
       );
     }
     
-    // Check if the current user is an application-level Admin
     function isAppAdmin() {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'User') == 'Admin';
     }
 
-    // Helper to check if a user is joining by only adding themselves to a membership map
     function isJoining(oldData, newData, mapField) {
       let oldMap = oldData[mapField];
       let newMap = newData[mapField];
@@ -55,7 +52,6 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      // allow get: Public read-by-ID for lookup; security is enforced on updates
       allow get: if true; 
       allow list: if isSignedIn() && (isCompanyMember(resource.data.members) || isAppAdmin());
       allow create: if isSignedIn();
@@ -63,7 +59,7 @@ service cloud.firestore {
         isCompanyAdmin(resource.data.members) || 
         isAppAdmin() || 
         isJoining(resource.data, request.resource.data, 'members') ||
-        // ALLOW unauthenticated background webhook updates to subscription fields
+        // ALLOW background webhook updates to subscription fields even if unauthenticated
         (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscription', 'updatedAt']));
       allow delete: if isAppAdmin();
     }
@@ -97,32 +93,16 @@ service cloud.firestore {
     }
 
     match /saved_reports/{reportId} {
-      allow list: if isSignedIn() && (
-        isCompanyMember(resource.data.companyMembers) || 
-        resource.data.userId == request.auth.uid || 
-        isAppAdmin()
-      );
-      allow get: if isSignedIn() && (
-        isCompanyMember(resource.data.companyMembers) || 
-        resource.data.userId == request.auth.uid || 
-        isAppAdmin()
-      );
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
       allow delete: if isOwner(resource.data.userId) || isAppAdmin();
     }
 
     match /saved_analysis/{analysisId} {
-      allow list: if isSignedIn() && (
-        isCompanyMember(resource.data.companyMembers) || 
-        resource.data.userId == request.auth.uid || 
-        isAppAdmin()
-      );
-      allow get: if isSignedIn() && (
-        isCompanyMember(resource.data.companyMembers) || 
-        resource.data.userId == request.auth.uid || 
-        isAppAdmin()
-      );
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
       allow delete: if isOwner(resource.data.userId) || isAppAdmin();

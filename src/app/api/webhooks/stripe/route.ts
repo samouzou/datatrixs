@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { initializeFirebase } from '@/firebase/config'; // Direct import to avoid client-hook conflicts
+import { initializeFirebase } from '@/firebase/config';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
 
@@ -10,12 +10,9 @@ export async function POST(req: Request) {
   const headerList = await headers();
   const signature = headerList.get('stripe-signature');
 
-  if (!signature) {
-    return new NextResponse('Webhook Error: Missing stripe-signature', { status: 400 });
-  }
-
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    return new NextResponse('Webhook Error: Secret not configured', { status: 400 });
+  if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error('[Stripe Webhook] Missing signature or secret.');
+    return new NextResponse('Webhook Error: Missing configuration', { status: 400 });
   }
 
   let event: Stripe.Event;
@@ -34,14 +31,14 @@ export async function POST(req: Request) {
   const { firestore } = initializeFirebase();
 
   try {
-    console.log(`[Stripe Webhook] Event Received: ${event.type}`);
+    console.log(`[Stripe Webhook] Processing Event: ${event.type}`);
 
-    // Multi-stage companyId lookup for robustness
+    // Robust multi-stage companyId lookup
     const findCompanyId = async (obj: any): Promise<string | null> => {
-      // 1. Direct metadata (Session or Subscription)
+      // 1. Check direct metadata
       if (obj.metadata?.companyId) return obj.metadata.companyId;
       
-      // 2. Fallback to Customer metadata
+      // 2. Check Customer object metadata (the anchor)
       if (obj.customer) {
         const customer = await stripe.customers.retrieve(obj.customer as string);
         if (!customer.deleted && (customer as Stripe.Customer).metadata?.companyId) {
@@ -49,7 +46,7 @@ export async function POST(req: Request) {
         }
       }
 
-      // 3. Fallback to Subscription metadata if it's an Invoice
+      // 3. Check Subscription object metadata (if applicable)
       if (obj.subscription) {
         const subscription = await stripe.subscriptions.retrieve(obj.subscription as string);
         if (subscription.metadata?.companyId) return subscription.metadata.companyId;
@@ -65,7 +62,7 @@ export async function POST(req: Request) {
         const locationLimit = parseInt(session.metadata?.locationLimit || '1');
 
         if (companyId) {
-          console.log(`[checkout.session.completed] Initial fulfillment for: ${companyId}`);
+          console.log(`[Stripe Webhook] Initial fulfillment for: ${companyId}`);
           
           // Anchor the companyId to the Customer object for future renewals
           if (session.customer) {
@@ -86,6 +83,8 @@ export async function POST(req: Request) {
             },
             updatedAt: new Date().toISOString(),
           });
+        } else {
+          console.warn('[Stripe Webhook] No companyId found in checkout session metadata.');
         }
         break;
       }
@@ -95,27 +94,22 @@ export async function POST(req: Request) {
         const companyId = await findCompanyId(invoice);
         
         if (companyId && invoice.subscription) {
-          console.log(`[invoice.paid] Provisioning license for: ${companyId}`);
+          console.log(`[Stripe Webhook] Refreshing license for: ${companyId}`);
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+          const locationLimit = parseInt(subscription.metadata?.locationLimit || '1');
           
           const companyRef = doc(firestore, 'companies', companyId);
-          // Ensure the subscription object exists before updating nested fields
-          const companySnap = await getDoc(companyRef);
-          const locationLimit = parseInt(subscription.metadata?.locationLimit || '1');
-
-          if (companySnap.exists()) {
-            await updateDoc(companyRef, {
-              subscription: {
-                plan: 'pro',
-                status: 'active',
-                locationLimit: locationLimit,
-                interval: subscription.items.data[0]?.price.type === 'recurring' ? 'monthly' : 'annual', // Simplified
-                currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
-                updatedAt: new Date().toISOString(),
-              },
+          await updateDoc(companyRef, {
+            subscription: {
+              plan: 'pro',
+              status: 'active',
+              locationLimit: locationLimit,
+              interval: subscription.items.data[0]?.price.recurring?.interval === 'year' ? 'annual' : 'monthly',
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
               updatedAt: new Date().toISOString(),
-            });
-          }
+            },
+            updatedAt: new Date().toISOString(),
+          });
         }
         break;
       }
@@ -125,7 +119,7 @@ export async function POST(req: Request) {
         const companyId = await findCompanyId(subscription);
 
         if (companyId) {
-          console.log(`[subscription.deleted] Revoking license for: ${companyId}`);
+          console.log(`[Stripe Webhook] Revoking license for: ${companyId}`);
           const companyRef = doc(firestore, 'companies', companyId);
           await updateDoc(companyRef, {
             'subscription.status': 'canceled',
@@ -138,14 +132,14 @@ export async function POST(req: Request) {
 
       case 'invoice.created':
       case 'invoice.finalized':
-        // Acknowledge these lifecycle events to avoid log noise
+        // Silently acknowledge standard lifecycle events
         break;
 
       default:
         console.log(`[Stripe Webhook] Unhandled event: ${event.type}`);
     }
   } catch (error: any) {
-    console.error(`[Stripe Webhook] Error:`, error);
+    console.error(`[Stripe Webhook] Execution Error:`, error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 
