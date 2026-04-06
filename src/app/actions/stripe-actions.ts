@@ -34,25 +34,29 @@ export async function createCheckoutSession(params: {
         },
         {
           price: priceIdLocation,
-          quantity: Math.max(1, locationCount), // Ensure at least 1 license slot is purchased
+          quantity: Math.max(1, locationCount),
         },
       ],
       mode: 'subscription',
-      allow_promotion_codes: true, // Enable discount codes
+      allow_promotion_codes: true,
+      // Persist metadata to the Customer object (Last resort lookup)
+      customer_metadata: {
+        companyId,
+      },
       subscription_data: {
-        // Metadata on subscription_data ensures it persists onto the Subscription object
+        // Persist metadata to the Subscription object (Renewal lookup)
         metadata: {
           companyId,
           locationLimit: locationCount.toString(),
         },
       },
-      success_url: `${origin}/settings/billing?success=true`,
-      cancel_url: `${origin}/settings/billing?canceled=true`,
+      // Metadata on the session (Initial fulfillment lookup)
       metadata: {
-        // Metadata on the session itself for immediate webhook processing
         companyId,
         locationLimit: locationCount.toString(),
       },
+      success_url: `${origin}/settings/billing?success=true`,
+      cancel_url: `${origin}/settings/billing?canceled=true`,
     });
 
     return { url: session.url };
