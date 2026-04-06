@@ -40,27 +40,9 @@ export async function POST(req: Request) {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const companyId = session.metadata?.companyId;
-        const locationLimit = parseInt(session.metadata?.locationLimit || '0');
-
-        if (companyId && session.subscription) {
-          const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-          const companyRef = doc(firestore, 'companies', companyId);
-          
-          await updateDoc(companyRef, {
-            subscription: {
-              plan: 'pro',
-              interval: subscription.items.data[0].plan.interval === 'year' ? 'annual' : 'monthly',
-              status: 'active',
-              locationLimit: locationLimit,
-              currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-            updatedAt: new Date().toISOString(),
-          });
-          console.log(`Successfully provisioned company ${companyId} via checkout.session.completed`);
-        }
+        // We acknowledge this but move primary provisioning to invoice.paid 
+        // for better consistency with modern Stripe lifecycle
+        console.log('Checkout session completed. Waiting for invoice.paid for provisioning.');
         break;
       }
 
@@ -68,7 +50,8 @@ export async function POST(req: Request) {
         const invoice = event.data.object as Stripe.Invoice;
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-          // Try to get metadata from subscription first, fallback to invoice metadata
+          
+          // Primary metadata retrieval (persistent from subscription_data.metadata)
           const companyId = subscription.metadata?.companyId || invoice.metadata?.companyId;
           const locationLimit = parseInt(subscription.metadata?.locationLimit || invoice.metadata?.locationLimit || '0');
           
@@ -77,20 +60,28 @@ export async function POST(req: Request) {
             const companySnap = await getDoc(companyRef);
 
             if (companySnap.exists()) {
+              // Full object update to ensure 'plan' and other required fields are present
+              // even if the subscription object didn't exist before.
               await updateDoc(companyRef, {
-                'subscription.status': 'active',
-                'subscription.locationLimit': locationLimit,
-                'subscription.interval': subscription.items.data[0].plan.interval === 'year' ? 'annual' : 'monthly',
-                'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
-                'subscription.updatedAt': new Date().toISOString(),
+                subscription: {
+                  plan: 'pro', // Defaulting to pro as per branding
+                  status: 'active',
+                  locationLimit: locationLimit,
+                  interval: subscription.items.data[0].plan.interval === 'year' ? 'annual' : 'monthly',
+                  currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
                 updatedAt: new Date().toISOString(),
               });
-              console.log(`Successfully updated subscription for company ${companyId} via invoice.paid`);
+              console.log(`Successfully provisioned/updated subscription for company ${companyId} via invoice.paid`);
             } else {
               console.error(`Company ${companyId} not found in Firestore during invoice.paid`);
             }
           } else {
-            console.error(`Missing companyId in subscription/invoice metadata for invoice ${invoice.id}`);
+            console.error(`Missing companyId in metadata for invoice ${invoice.id}. Metadata:`, {
+              subMetadata: subscription.metadata,
+              invMetadata: invoice.metadata
+            });
           }
         }
         break;
@@ -133,6 +124,7 @@ export async function POST(req: Request) {
 
       case 'invoice.created':
       case 'invoice.finalized':
+        // Acknowledge standard lifecycle events silently
         break;
 
       default:
