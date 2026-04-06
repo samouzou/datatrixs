@@ -63,6 +63,7 @@ service cloud.firestore {
         isAppAdmin() || 
         isJoining(resource.data, request.resource.data, 'members') ||
         // ALLOW background webhook updates to subscription fields specifically
+        // We use a broader check for unauthenticated updates to the subscription key to handle nested updates via dot notation
         (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscription', 'updatedAt']));
       allow delete: if isAppAdmin();
     }

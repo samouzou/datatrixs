@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -61,8 +60,9 @@ export default function AppLayout({
       router.push("/settings/billing?restricted=true")
     }
     
-    // 2. If we have NO company yet and NOT on the holding setup page
-    if (!isCompaniesLoading && user && (!companies || companies.length === 0) && !isHoldingPage && !isSettingsPage && !isLoginPage) {
+    // 2. If we have NO company yet and NOT on a holding/billing/login page
+    // Added isBillingPage to exclusion list to prevent bouncing during fulfillment
+    if (!isCompaniesLoading && user && (!companies || companies.length === 0) && !isAllowedRoute) {
       router.push("/settings/holding")
     }
   }, [user, isUserLoading, activeCompany, isSubscriptionActive, isAllowedRoute, isCompaniesLoading, companies, isHoldingPage, isSettingsPage, isLoginPage, router, toast])
