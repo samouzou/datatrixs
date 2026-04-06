@@ -1,4 +1,3 @@
-
 'use server';
 
 import { stripe } from '@/lib/stripe';
@@ -40,6 +39,12 @@ export async function createCheckoutSession(params: {
       ],
       mode: 'subscription',
       allow_promotion_codes: true, // Enable discount codes
+      subscription_data: {
+        metadata: {
+          companyId,
+          locationLimit: locationCount.toString(),
+        },
+      },
       success_url: `${origin}/settings/billing?success=true`,
       cancel_url: `${origin}/settings/billing?canceled=true`,
       metadata: {
