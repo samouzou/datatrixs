@@ -20,6 +20,7 @@ export type CompanySubscription = {
   plan: 'pro' | 'enterprise';
   interval: 'monthly' | 'annual';
   status: SubscriptionStatus;
+  locationLimit: number; // Added to enforce ceiling
   currentPeriodEnd: string;
   updatedAt: string;
 };

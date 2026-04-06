@@ -35,14 +35,16 @@ export async function createCheckoutSession(params: {
         },
         {
           price: priceIdLocation,
-          quantity: Math.max(0, locationCount),
+          quantity: Math.max(1, locationCount), // Ensure at least 1 license slot is purchased
         },
       ],
       mode: 'subscription',
+      allow_promotion_codes: true, // Enable discount codes
       success_url: `${origin}/settings/billing?success=true`,
       cancel_url: `${origin}/settings/billing?canceled=true`,
       metadata: {
         companyId,
+        locationLimit: locationCount.toString(),
       },
     });
 

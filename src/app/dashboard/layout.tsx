@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -40,7 +41,8 @@ export default function AppLayout({
   const isBillingPage = pathname === '/settings/billing';
   const isHoldingPage = pathname === '/settings/holding';
   const isSettingsPage = pathname === '/settings';
-  const isAuthRoute = isBillingPage || isHoldingPage || isSettingsPage;
+  const isLoginPage = pathname === '/login' || pathname === '/register';
+  const isAllowedRoute = isBillingPage || isHoldingPage || isSettingsPage || isLoginPage;
 
   React.useEffect(() => {
     if (!isUserLoading && !user) {
@@ -50,7 +52,7 @@ export default function AppLayout({
 
     // Enforcement Logic:
     // 1. If we have a company but NO active subscription and NOT on an allowed page
-    if (!isCompaniesLoading && activeCompany && !isSubscriptionActive && !isAuthRoute) {
+    if (!isCompaniesLoading && activeCompany && !isSubscriptionActive && !isAllowedRoute) {
       toast({
         variant: "destructive",
         title: "Subscription Required",
@@ -60,10 +62,10 @@ export default function AppLayout({
     }
     
     // 2. If we have NO company yet and NOT on the holding setup page
-    if (!isCompaniesLoading && user && (!companies || companies.length === 0) && !isHoldingPage && !isSettingsPage) {
+    if (!isCompaniesLoading && user && (!companies || companies.length === 0) && !isHoldingPage && !isSettingsPage && !isLoginPage) {
       router.push("/settings/holding")
     }
-  }, [user, isUserLoading, activeCompany, isSubscriptionActive, isAuthRoute, isCompaniesLoading, companies, isHoldingPage, isSettingsPage, router, toast])
+  }, [user, isUserLoading, activeCompany, isSubscriptionActive, isAllowedRoute, isCompaniesLoading, companies, isHoldingPage, isSettingsPage, isLoginPage, router, toast])
 
   if (isUserLoading || isCompaniesLoading) {
     return (

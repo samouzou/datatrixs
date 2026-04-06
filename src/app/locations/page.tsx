@@ -4,6 +4,7 @@
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { 
   Plus, 
   MoreVertical, 
@@ -18,7 +19,9 @@ import {
   History,
   FileText,
   Cloud,
-  Link2
+  Link2,
+  Building2,
+  Lock
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
@@ -48,6 +51,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
+import Link from "next/link"
 
 const INITIAL_FINANCIAL_METRICS = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
 
@@ -60,34 +64,24 @@ const MOCK_LEDGERS = {
 // Normalization Utility for Periods
 const normalizePeriod = (p: string): string => {
   const trimmed = p.trim();
-  
-  // Try QX YYYY -> YYYY-QN
   const qMatch = trimmed.match(/Q([1-4])\s+(\d{4})/i);
   if (qMatch) return `${qMatch[2]}-Q${qMatch[1]}`;
-  
-  // Try YYYY QX
   const qMatchRev = trimmed.match(/(\d{4})\s+Q([1-4])/i);
   if (qMatchRev) return `${qMatchRev[1]}-Q${qMatchRev[2]}`;
-
-  // Try Date Parser
   const date = new Date(trimmed);
   if (!isNaN(date.getTime())) {
     const y = date.getFullYear();
     const m = (date.getMonth() + 1).toString().padStart(2, '0');
     return `${y}-${m}`;
   }
-  
   return trimmed; 
 };
 
-// Robust numeric parser for accounting data
 const parseAccountingNumber = (val: string): number => {
   if (!val) return 0;
   let clean = val.trim();
   const isNegative = clean.startsWith('(') && clean.endsWith(')');
-  if (isNegative) {
-    clean = clean.slice(1, -1);
-  }
+  if (isNegative) clean = clean.slice(1, -1);
   const num = Number(clean.replace(/[^0-9.-]+/g, ""));
   return isNegative ? -Math.abs(num) : num;
 };
@@ -107,17 +101,14 @@ export default function LocationsPage() {
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   
-  // Custom Metrics State (Shared at Company Level)
   const [availableMetrics, setAvailableMetrics] = React.useState<string[]>(INITIAL_FINANCIAL_METRICS)
   const [isAddingMetric, setIsAddingMetric] = React.useState(false)
   const [newMetricName, setNewMetricName] = React.useState("")
 
-  // Mapping State
   const [headers, setHeaders] = React.useState<string[]>([])
   const [mapping, setMapping] = React.useState<Record<string, string | "ignore">>({})
   const [periodColumn, setPeriodColumn] = React.useState<string>("")
 
-  // Create Location Form State
   const [name, setName] = React.useState("")
   const [companyId, setCompanyId] = React.useState("")
   const [address, setAddress] = React.useState("")
@@ -126,7 +117,6 @@ export default function LocationsPage() {
   const [zip, setZip] = React.useState("")
   const [phone, setPhone] = React.useState("")
 
-  // Fetch Companies
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -135,8 +125,8 @@ export default function LocationsPage() {
     );
   }, [firestore, user]);
   const { data: companies } = useCollection<Company>(companiesQuery);
+  const activeCompany = companies?.[0];
 
-  // Fetch Locations
   const locationsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -146,8 +136,21 @@ export default function LocationsPage() {
   }, [firestore, user]);
   const { data: locations, isLoading } = useCollection<Location>(locationsQuery);
 
+  // License Ceiling Enforcement
+  const locationLimit = activeCompany?.subscription?.locationLimit || 0;
+  const currentUnitCount = locations?.length || 0;
+  const isLimitReached = currentUnitCount >= locationLimit && locationLimit > 0;
+
   const handleCreateLocation = () => {
     if (!firestore || !user || !companyId || !name.trim()) return;
+    if (isLimitReached) {
+      toast({
+        variant: "destructive",
+        title: "Capacity Reached",
+        description: "Please upgrade your Entity Connection Licenses to add more units."
+      });
+      return;
+    }
 
     const selectedCompany = companies?.find(c => c.id === companyId);
     if (!selectedCompany) return;
@@ -240,15 +243,11 @@ export default function LocationsPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
       setCsvContent(content);
-      toast({
-        title: "File Loaded",
-        description: `${file.name} has been parsed.`
-      });
+      toast({ title: "File Loaded", description: `${file.name} has been parsed.` });
     };
     reader.readAsText(file);
   };
@@ -256,34 +255,20 @@ export default function LocationsPage() {
   const handleAnalyzeCSV = () => {
     if (!csvContent.trim()) return;
     const lines = csvContent.trim().split('\n');
-    if (lines.length < 1) {
-      toast({ variant: "destructive", title: "Invalid Data", description: "Need at least a header row." });
-      return;
-    }
-
+    if (lines.length < 1) return;
     const firstLine = lines[0].split(',').map(h => h.trim());
     setHeaders(firstLine);
-    
     const initialMapping: Record<string, string | "ignore"> = {};
     let suggestedPeriod = "";
-    const internalFields = ["ai red flag", "sync status", "data source", "location"];
-
     firstLine.forEach(h => {
       const lowerH = h.toLowerCase();
-      if (internalFields.some(f => lowerH.includes(f))) {
-        initialMapping[h] = "ignore";
-        return;
-      }
-      if (lowerH.includes('period') || lowerH.includes('date') || lowerH.includes('month') || lowerH.includes('quarter')) {
-        suggestedPeriod = h;
-      }
+      if (lowerH.includes('period') || lowerH.includes('date') || lowerH.includes('month') || lowerH.includes('quarter')) suggestedPeriod = h;
       const match = availableMetrics.find(m => {
         const lowerM = m.toLowerCase();
         return lowerH.includes(lowerM) || lowerM.includes(lowerH);
       });
       initialMapping[h] = match || "ignore";
     });
-
     setMapping(initialMapping);
     setPeriodColumn(suggestedPeriod);
     setUploadStep("mapping");
@@ -292,75 +277,49 @@ export default function LocationsPage() {
   const handleAddCustomMetric = () => {
     const trimmed = newMetricName.trim();
     if (!trimmed || !uploadingLocation || !firestore) return;
-    
     const parentCompany = companies?.find(c => c.id === uploadingLocation.companyId);
     if (!parentCompany) return;
-
     const currentMetrics = parentCompany.customMetrics || [];
-    if (currentMetrics.includes(trimmed)) {
-      toast({ title: "Metric exists", description: "This metric is already in your global chart of accounts." });
-      return;
-    }
-
+    if (currentMetrics.includes(trimmed)) return;
     const updatedMetrics = [...currentMetrics, trimmed];
     setAvailableMetrics(prev => [...prev, trimmed]);
-    
     const companyRef = doc(firestore, "companies", parentCompany.id);
-    updateDocumentNonBlocking(companyRef, {
-      customMetrics: updatedMetrics,
-      updatedAt: new Date().toISOString()
-    });
-
+    updateDocumentNonBlocking(companyRef, { customMetrics: updatedMetrics, updatedAt: new Date().toISOString() });
     setNewMetricName("");
     setIsAddingMetric(false);
-    toast({ title: "Global Metric Added", description: `"${trimmed}" added to holding COA.` });
   };
 
   const handleUploadData = async () => {
     if (!firestore || !uploadingLocation || !periodColumn) return;
-    
     setIsUploading(true);
     const batch = writeBatch(firestore);
     const now = new Date().toISOString();
-    
     try {
       let dataRows: string[][] = [];
-      
       if (selectedSource === 'Manual' || selectedSource === 'Excel') {
         const lines = csvContent.trim().split('\n');
         dataRows = lines.slice(1).map(l => l.split(',').map(s => s.trim()));
       } else {
-        // API Simulation: Generate dummy records for the mapped headers for past 2 periods
         dataRows = [
           ["2024-Q1", "125000", "75000", "50000", "20000", "15000", "12000"],
           ["2024-Q2", "135000", "80000", "55000", "22000", "16000", "14000"]
         ];
       }
-
       let successCount = 0;
       for (const row of dataRows) {
         const rowObj: Record<string, string> = {};
-        headers.forEach((h, i) => {
-          rowObj[h] = row[i];
-        });
-
+        headers.forEach((h, i) => { rowObj[h] = row[i]; });
         const rawPeriod = rowObj[periodColumn];
         if (!rawPeriod) continue;
         const normalizedPeriod = normalizePeriod(rawPeriod);
-
         Object.entries(mapping).forEach(([colName, metric]) => {
           if (metric === "ignore" || colName === periodColumn) return;
-          
           const valStr = rowObj[colName];
           const valNum = parseAccountingNumber(valStr);
-          
           if (!isNaN(valNum)) {
-            // STRICT DETERMINISTIC ID: {locationId}_{period}_{metric}
-            // This prevents duplication on re-sync and re-upload.
             const metricSlug = metric.toLowerCase().replace(/\s+/g, '_');
             const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metricSlug}`;
             const recordRef = doc(firestore, "financial_records", deterministicId);
-            
             const record: FinancialRecord = {
               id: deterministicId,
               locationId: uploadingLocation.id,
@@ -376,7 +335,6 @@ export default function LocationsPage() {
           }
         });
       }
-      
       if (successCount > 0) {
         const locRef = doc(firestore, "locations", uploadingLocation.id);
         batch.update(locRef, {
@@ -386,15 +344,11 @@ export default function LocationsPage() {
           lastSync: new Date().toLocaleString(),
           lastRawData: csvContent 
         });
-        
         await batch.commit();
         toast({ title: "Sync Complete", description: `Standardized ${successCount} financial data points.` });
         setIsUploadOpen(false);
-      } else {
-        toast({ variant: "destructive", title: "Sync Failed", description: "No valid financial data found to normalize." });
       }
     } catch (error: any) {
-      console.error(error);
       toast({ variant: "destructive", title: "Normalization Error", description: "Could not process ledger data." });
     } finally {
       setIsUploading(false);
@@ -406,13 +360,24 @@ export default function LocationsPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage Locations</h2>
-          <p className="text-muted-foreground">Standardizing financials across your private equity portfolio.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-muted-foreground">Standardizing financials across your private equity portfolio.</p>
+            {activeCompany?.subscription && (
+              <Badge variant="outline" className={cn(
+                "h-6 px-3 text-[10px] uppercase font-bold tracking-widest",
+                isLimitReached ? "border-destructive/50 text-destructive bg-destructive/5" : "border-primary/30 text-primary bg-primary/5"
+              )}>
+                {currentUnitCount} / {locationLimit} Licenses Used
+              </Badge>
+            )}
+          </div>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-accent text-background hover:bg-accent/90" disabled={!companies?.length}>
-              <Plus className="mr-2 size-4" /> Add New Location
+            <Button className="bg-accent text-background hover:bg-accent/90" disabled={!companies?.length || isLimitReached}>
+              {isLimitReached ? <Lock className="mr-2 size-4" /> : <Plus className="mr-2 size-4" />}
+              {isLimitReached ? "License Capacity Reached" : "Add New Location"}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
@@ -420,41 +385,64 @@ export default function LocationsPage() {
               <DialogTitle>Add Business Location</DialogTitle>
               <DialogDescription>Register a new retail or service location.</DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="grid gap-2 col-span-2">
-                <Label htmlFor="company">Parent Holding Company</Label>
-                <Select onValueChange={setCompanyId} value={companyId}>
-                  <SelectTrigger><SelectValue placeholder="Select a company" /></SelectTrigger>
-                  <SelectContent>
-                    {companies?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            
+            {isLimitReached ? (
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="p-4 rounded-full bg-destructive/10">
+                  <Building2 className="size-12 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-bold text-lg">Portfolio Capacity Reached</h3>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    You have used all {locationLimit} of your **Entity Connection Licenses**. Please expand your capacity to add more locations.
+                  </p>
+                </div>
+                <Button asChild className="bg-primary">
+                  <Link href="/settings/billing">
+                    Purchase More Licenses <ArrowRight className="ml-2 size-4" />
+                  </Link>
+                </Button>
               </div>
-              <div className="grid gap-2 col-span-2">
-                <Label htmlFor="name">Location Name</Label>
-                <Input id="name" placeholder="e.g., Houston West Branch" value={name} onChange={e => setName(e.target.value)} />
+            ) : (
+              <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="grid gap-2 col-span-2">
+                  <Label htmlFor="company">Parent Holding Company</Label>
+                  <Select onValueChange={setCompanyId} value={companyId}>
+                    <SelectTrigger><SelectValue placeholder="Select a company" /></SelectTrigger>
+                    <SelectContent>
+                      {companies?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2 col-span-2">
+                  <Label htmlFor="name">Location Name</Label>
+                  <Input id="name" placeholder="e.g., Houston West Branch" value={name} onChange={e => setName(e.target.value)} />
+                </div>
+                <div className="grid gap-2 col-span-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input id="address" placeholder="123 Main St" value={address} onChange={e => setAddress(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input id="city" placeholder="Houston" value={city} onChange={e => setCity(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input id="state" placeholder="TX" value={state} onChange={e => setState(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="zip">ZIP Code</Label>
+                  <Input id="zip" placeholder="77001" value={zip} onChange={e => setZip(e.target.value)} />
+                </div>
               </div>
-              <div className="grid gap-2 col-span-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" placeholder="123 Main St" value={address} onChange={e => setAddress(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="city">City</Label>
-                <Input id="city" placeholder="Houston" value={city} onChange={e => setCity(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="state">State</Label>
-                <Input id="state" placeholder="TX" value={state} onChange={e => setState(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="zip">ZIP Code</Label>
-                <Input id="zip" placeholder="77001" value={zip} onChange={e => setZip(e.target.value)} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateLocation} disabled={!companyId || !name.trim()}>Add Location</Button>
-            </DialogFooter>
+            )}
+            
+            {!isLimitReached && (
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateLocation} disabled={!companyId || !name.trim()}>Add Location</Button>
+              </DialogFooter>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -511,6 +499,12 @@ export default function LocationsPage() {
               </CardContent>
             </Card>
           ))
+        )}
+        {!locations?.length && !isLoading && (
+          <div className="text-center py-20 border-2 border-dashed border-border rounded-xl bg-card/20">
+            <Building2 className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
+            <p className="text-muted-foreground font-medium italic">No normalized locations found. Add your first unit to begin aggregation.</p>
+          </div>
         )}
       </div>
 

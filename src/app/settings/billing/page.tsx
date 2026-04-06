@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -8,6 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Slider } from "@/components/ui/slider"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { 
   CreditCard, 
   Check, 
@@ -18,7 +22,9 @@ import {
   Zap,
   Info,
   Package,
-  Lock
+  Lock,
+  Plus,
+  Minus
 } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
@@ -47,6 +53,7 @@ export default function BillingPage() {
   const searchParams = useSearchParams()
 
   const [billingCycle, setBillingCycle] = React.useState<"monthly" | "annual">("annual")
+  const [requestedLocations, setRequestedLocations] = React.useState(5)
   const [isProcessing, setIsProcessing] = React.useState(false)
   const isRestricted = searchParams.get('restricted') === 'true';
 
@@ -78,25 +85,14 @@ export default function BillingPage() {
   const { data: companies, isLoading: isCompaniesLoading } = useCollection<Company>(companiesQuery);
   const company = companies?.[0];
 
-  // Fetch Locations
-  const locationsQuery = useMemoFirebase(() => {
-    if (!firestore || !company) return null;
-    return query(
-      collection(firestore, "locations"),
-      where("companyId", "==", company.id)
-    );
-  }, [firestore, company]);
-  const { data: locations, isLoading: isLocsLoading } = useCollection<Location>(locationsQuery);
-
-  const locationCount = locations?.length || 0;
   const currentPrices = billingCycle === "monthly" ? PRICING.MONTHLY : PRICING.ANNUAL;
   const totalBase = currentPrices.BASE;
-  const totalLocationsCost = currentPrices.PER_LOCATION * locationCount;
+  const totalLocationsCost = currentPrices.PER_LOCATION * requestedLocations;
   const totalDue = totalBase + totalLocationsCost;
 
   // Calculate specific savings for display
   const annualBaseSavings = (PRICING.MONTHLY.BASE * 12) - PRICING.ANNUAL.BASE;
-  const annualLocationSavings = ((PRICING.MONTHLY.PER_LOCATION * 12) - PRICING.ANNUAL.PER_LOCATION) * locationCount;
+  const annualLocationSavings = ((PRICING.MONTHLY.PER_LOCATION * 12) - PRICING.ANNUAL.PER_LOCATION) * requestedLocations;
   const totalAnnualSavings = annualBaseSavings + annualLocationSavings;
 
   const handleSubscribe = async () => {
@@ -106,7 +102,7 @@ export default function BillingPage() {
     try {
       const result = await createCheckoutSession({
         companyId: company.id,
-        locationCount,
+        locationCount: requestedLocations,
         interval: billingCycle,
       });
 
@@ -125,7 +121,7 @@ export default function BillingPage() {
     }
   }
 
-  if (isCompaniesLoading || isLocsLoading) {
+  if (isCompaniesLoading) {
     return (
       <div className="flex h-[80vh] w-full items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />
@@ -186,55 +182,98 @@ export default function BillingPage() {
                 </Tabs>
               </div>
             </CardHeader>
-            <CardContent className="pt-8">
-              <div className="space-y-8">
-                <div className="flex justify-between items-start">
+            <CardContent className="pt-8 space-y-8">
+              {/* Base Plan */}
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Package className="size-5 text-primary" />
+                    <h3 className="font-bold text-lg">Datatrixs Portfolio Core</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Unlimited reports, AI analyst, and standard normalization.</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-bold">${(totalBase / (billingCycle === 'annual' ? 12 : 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">{PRICING.MONTHLY.LABEL}</p>
+                </div>
+              </div>
+
+              {/* Location Capacity Selector */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Package className="size-5 text-primary" />
-                      <h3 className="font-bold text-lg">Datatrixs Portfolio Core</h3>
+                      <Building2 className="size-5 text-primary" />
+                      <h3 className="font-bold text-sm">Entity Connection License</h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">Unlimited reports, AI analyst, and standard normalization.</p>
+                    <p className="text-xs text-muted-foreground">Pre-purchase connection slots for your retail locations.</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold">${(totalBase / (billingCycle === 'annual' ? 12 : 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">{PRICING.MONTHLY.LABEL}</p>
+                  <div className="flex items-center gap-3">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="size-8"
+                      onClick={() => setRequestedLocations(prev => Math.max(1, prev - 1))}
+                    >
+                      <Minus className="size-3" />
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="number" 
+                        value={requestedLocations} 
+                        onChange={(e) => setRequestedLocations(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-16 h-8 text-center font-bold"
+                      />
+                      <span className="text-xs font-medium text-muted-foreground">Units</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="size-8"
+                      onClick={() => setRequestedLocations(prev => prev + 1)}
+                    >
+                      <Plus className="size-3" />
+                    </Button>
                   </div>
                 </div>
 
+                <Slider 
+                  value={[requestedLocations]} 
+                  onValueChange={([val]) => setRequestedLocations(val)} 
+                  max={100} 
+                  min={1} 
+                  step={1}
+                  className="py-4"
+                />
+
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-background rounded-lg border border-primary/20">
-                      <Building2 className="size-6 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm">Entity Connection License</h4>
-                      <p className="text-xs text-muted-foreground">Currently monitoring <span className="text-primary font-bold">{locationCount}</span> authorized entities.</p>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Info className="size-4 text-primary" />
+                    <p className="text-xs font-medium">Selected Capacity: <span className="text-primary font-bold">{requestedLocations} retail units</span></p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-bold">${(totalLocationsCost / (billingCycle === 'annual' ? 12 : 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    <p className="text-lg font-bold">${(totalLocationsCost / (billingCycle === 'annual' ? 12 : 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Added monthly cost</p>
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Included Features</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      "Unlimited API Integrations",
-                      "Advanced Normalization Engine",
-                      "Grounded AI Financial Analyst",
-                      "Custom Metric Creation",
-                      "Excel & CSV Data Ingestion",
-                      "Holding Structure Management"
-                    ].map((feature, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
-                        <Check className="size-4 text-accent shrink-0" />
-                        {feature}
-                      </div>
-                    ))}
-                  </div>
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Included Features</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    "Unlimited API Integrations",
+                    "Advanced Normalization Engine",
+                    "Grounded AI Financial Analyst",
+                    "Custom Metric Creation",
+                    "Excel & CSV Data Ingestion",
+                    "Holding Structure Management"
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
+                      <Check className="size-4 text-accent shrink-0" />
+                      {feature}
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -245,7 +284,7 @@ export default function BillingPage() {
               </div>
               <Button 
                 onClick={handleSubscribe} 
-                disabled={isProcessing || (company?.subscription?.status === 'active' && company?.subscription?.interval === billingCycle)}
+                disabled={isProcessing}
                 className="bg-primary hover:bg-primary/90 min-w-[200px]"
               >
                 {isProcessing ? <Loader2 className="size-4 animate-spin mr-2" /> : <Zap className="size-4 mr-2" />}
@@ -270,7 +309,7 @@ export default function BillingPage() {
                 <span className="font-bold">${totalBase.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm py-2 border-b border-white/10">
-                <span>Entity Connections ({locationCount})</span>
+                <span>Entity Licenses ({requestedLocations})</span>
                 <span className="font-bold">${totalLocationsCost.toLocaleString()}</span>
               </div>
               {billingCycle === 'annual' && (
@@ -294,22 +333,16 @@ export default function BillingPage() {
 
           <Card className="bg-card border-border shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Payment Method</CardTitle>
+              <CardTitle className="text-sm">Safe & Secure Checkout</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/20">
-                <CreditCard className="size-5 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-xs font-bold">•••• •••• •••• 4242</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Expires 12/28</p>
-                </div>
-                <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold">Edit</Button>
-              </div>
-              
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground leading-tight italic">
                 <ShieldCheck className="size-3 shrink-0" />
                 Payments processed securely via Stripe. Automated receipts will be sent to your billing email.
               </div>
+              <p className="text-[10px] text-muted-foreground">
+                You will be redirected to Stripe to complete your purchase. You can apply promotional codes on the checkout page.
+              </p>
             </CardContent>
           </Card>
 
