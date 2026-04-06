@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         const companyId = session.metadata?.companyId;
         const locationLimit = parseInt(session.metadata?.locationLimit || '0');
 
-        // Initial provisioning on checkout completion
+        // Initial provisioning on checkout completion if logic requires it
         if (companyId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const companyRef = doc(firestore, 'companies', companyId);
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
-        // The most reliable event for both first-time provisioning and renewals
+        // The definitive provisioning event for both initial payments and renewals
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
           const companyId = subscription.metadata?.companyId;
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
             const companyRef = doc(firestore, 'companies', companyId);
             await updateDoc(companyRef, {
               'subscription.status': 'active',
-              'subscription.locationLimit': locationLimit, // Ensure capacity is synchronized on every payment
+              'subscription.locationLimit': locationLimit,
               'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
               'subscription.updatedAt': new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -117,6 +117,12 @@ export async function POST(req: Request) {
         }
         break;
       }
+
+      // Acknowledge pre-payment events to keep logs clean
+      case 'invoice.created':
+      case 'invoice.finalized':
+        // No action required, just return 200 OK
+        break;
 
       default:
         console.log(`Unhandled event type ${event.type}`);
