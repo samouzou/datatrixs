@@ -74,23 +74,23 @@ export default function AppLayout({
       return
     }
 
-    // 2. Email Verification Guard
+    // 2. Mandatory Email Verification Guard
     if (user && !user.emailVerified && !isVerifyPage && !isLoginPage) {
       router.push("/verify-email")
       return
     }
 
-    // Don't interrupt if already on a setup or billing page
+    // Don't interrupt if already on a setup or billing page or still loading
     if (isAllowedRoute || isUserLoading || isCompaniesLoading) return;
 
     // 3. Organization Guard (Require at least one holding entity)
-    if (user && companies !== null && companies.length === 0) {
+    if (user && user.emailVerified && companies !== null && companies.length === 0) {
       router.push("/settings/holding")
       return;
     }
 
     // 4. License Guard (Require active subscription for protected routes)
-    if (activeCompany && !isSubscriptionActive) {
+    if (user && user.emailVerified && activeCompany && !isSubscriptionActive) {
       toast({
         variant: "destructive",
         title: "Subscription Required",
@@ -112,7 +112,7 @@ export default function AppLayout({
     isVerifyPage
   ])
 
-  if (isUserLoading || (isCompaniesLoading && !companies && !isVerifyPage)) {
+  if (isUserLoading || (isCompaniesLoading && !companies && !isVerifyPage && user?.emailVerified)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="size-8 animate-spin text-primary" />

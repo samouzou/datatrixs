@@ -51,7 +51,7 @@ export default function VerifyEmailPage() {
     if (!user) return;
     setIsChecking(true);
     try {
-      // Reload user to get latest emailVerified status
+      // Reload user to get latest emailVerified status from Firebase Auth server
       await user.reload();
       if (user.emailVerified) {
         toast({

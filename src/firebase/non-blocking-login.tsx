@@ -75,12 +75,16 @@ export function initiateEmailSignUp(
 ): void {
   createUserWithEmailAndPassword(authInstance, email, password)
     .then((userCredential) => {
-      // Set the display name on the auth object immediately
+      // 1. Set the display name on the auth object immediately
       const fullName = `${profileData.firstName} ${profileData.lastName}`.trim();
       updateProfile(userCredential.user, { displayName: fullName });
 
-      // Send verification email immediately
-      sendEmailVerification(userCredential.user).catch(err => console.error("Failed to send verification email", err));
+      // 2. Send verification email immediately (Mandatory Requirement)
+      sendEmailVerification(userCredential.user)
+        .then(() => console.log("[Auth] Verification email dispatched."))
+        .catch(err => console.error("[Auth] Failed to send verification email", err));
+
+      // 3. Ensure the profile record exists in Firestore
       ensureUserProfile(db, userCredential.user, profileData);
     })
     .catch((error) => {
