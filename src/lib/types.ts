@@ -98,6 +98,7 @@ export type SavedAnalysis = {
     xAxisLabel?: string;
     yAxisLabel?: string;
   };
+  rawSpreadsheetData?: string;
   companyMembers: Record<string, CompanyRole>;
   createdAt: string;
 };

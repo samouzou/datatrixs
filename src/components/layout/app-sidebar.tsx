@@ -30,52 +30,7 @@ import {
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase"
 import { doc } from "firebase/firestore"
 import { UserProfile } from "@/lib/types"
-
-const mainNavItems = [
-  {
-    title: "Global Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Locations",
-    href: "/locations",
-    icon: MapPin,
-  },
-  {
-    title: "Reports & Exports",
-    href: "/reports",
-    icon: FilePieChart,
-  },
-  {
-    title: "AI Financial Analyst",
-    href: "/analyst",
-    icon: MessageSquare,
-  },
-  {
-    title: "Saved Library",
-    href: "/library",
-    icon: Library,
-  },
-]
-
-const adminNavItems = [
-  {
-    title: "Holding Structure",
-    href: "/settings/holding",
-    icon: Building2,
-  },
-  {
-    title: "Billing",
-    href: "/settings/billing",
-    icon: CreditCard,
-  },
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
-]
+import { useVertical } from "@/contexts/vertical-context"
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -83,6 +38,7 @@ export function AppSidebar() {
   const auth = useAuth()
   const { user } = useUser()
   const firestore = useFirestore()
+  const vertical = useVertical()
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -90,9 +46,55 @@ export function AppSidebar() {
   }, [firestore, user]);
   const { data: profile } = useDoc<UserProfile>(userProfileRef);
 
-  const displayName = profile 
-    ? `${profile.firstName} ${profile.lastName}`.trim() 
+  const displayName = profile
+    ? `${profile.firstName} ${profile.lastName}`.trim()
     : user?.displayName || user?.email?.split('@')[0];
+
+  const mainNavItems = [
+    {
+      title: "Global Dashboard",
+      href: "/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      title: vertical.unitsLabel,
+      href: "/locations",
+      icon: MapPin,
+    },
+    {
+      title: "Reports & Exports",
+      href: "/reports",
+      icon: FilePieChart,
+    },
+    {
+      title: "AI Financial Analyst",
+      href: "/analyst",
+      icon: MessageSquare,
+    },
+    {
+      title: "Saved Library",
+      href: "/library",
+      icon: Library,
+    },
+  ]
+
+  const adminNavItems = [
+    {
+      title: `${vertical.organizationLabel} Structure`,
+      href: "/settings/holding",
+      icon: Building2,
+    },
+    {
+      title: "Billing",
+      href: "/settings/billing",
+      icon: CreditCard,
+    },
+    {
+      title: "Settings",
+      href: "/settings",
+      icon: Settings,
+    },
+  ]
 
   const handleSignOut = async () => {
     await auth.signOut()

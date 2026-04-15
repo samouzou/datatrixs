@@ -205,7 +205,7 @@ export default function ReportsPage() {
             <FilePieChart className="size-6 text-accent" />
             <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Reports & Exports</h2>
           </div>
-          <p className="text-muted-foreground">Generate tailored financial documentation and structured data for your portfolio.</p>
+          <p className="text-muted-foreground">Generate tailored financial documentation and structured data for your organization.</p>
         </div>
       </div>
 

@@ -451,7 +451,7 @@ export default function LocationsPage() {
             ) : (
               <div className="grid grid-cols-2 gap-4 py-4">
                 <div className="grid gap-2 col-span-2">
-                  <Label htmlFor="company">Parent Holding Company</Label>
+                  <Label htmlFor="company">Parent Organization</Label>
                   <Select onValueChange={setCompanyId} value={companyId}>
                     <SelectTrigger><SelectValue placeholder="Select a company" /></SelectTrigger>
                     <SelectContent>

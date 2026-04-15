@@ -30,7 +30,7 @@ export default function IntegrationsPage() {
     {
       id: "ns",
       name: "Oracle NetSuite",
-      description: "Enterprise-grade ERP integration for multi-subsidiary holdings.",
+      description: "Enterprise-grade ERP integration for multi-subsidiary and complex organizations.",
       status: "disconnected",
       type: "cloud",
       lastSync: "N/A"
@@ -46,7 +46,7 @@ export default function IntegrationsPage() {
     {
       id: "excel",
       name: "Excel / CSV Loader",
-      description: "Manual upload for locations using legacy or custom accounting.",
+      description: "Manual upload for business units using legacy or custom accounting.",
       status: "connected",
       type: "manual",
       lastSync: "1 day ago"
@@ -61,7 +61,7 @@ export default function IntegrationsPage() {
             <Database className="size-6 text-primary" />
             <h2 className="text-3xl font-bold tracking-tight text-white font-headline">Data Integrations</h2>
           </div>
-          <p className="text-muted-foreground">Connect and manage your locations' financial data sources.</p>
+          <p className="text-muted-foreground">Connect and manage your financial data sources across all business units.</p>
         </div>
         <Button className="bg-accent text-background hover:bg-accent/90">
           <Plus className="mr-2 size-4" /> Add Connection

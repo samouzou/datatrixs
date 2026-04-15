@@ -10,6 +10,11 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
+const HistoryMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+});
+
 const AiFinancialQueryAnalysisInputSchema = z.object({
   query: z.string().describe('The natural language financial query from the user.'),
   financialData: z
@@ -23,6 +28,10 @@ const AiFinancialQueryAnalysisInputSchema = z.object({
     .describe(
       'Additional context such as the current date or specific user preferences. Example: "Current date is 2023-10-26."'
     ),
+  history: z
+    .array(HistoryMessageSchema)
+    .optional()
+    .describe('Recent conversation history (last few exchanges) to enable follow-up questions.'),
 });
 export type AiFinancialQueryAnalysisInput = z.infer<typeof AiFinancialQueryAnalysisInputSchema>;
 
@@ -72,19 +81,29 @@ const prompt = ai.definePrompt({
   name: 'aiFinancialQueryAnalysisPrompt',
   input: { schema: AiFinancialQueryAnalysisInputSchema },
   output: { schema: AiFinancialQueryAnalysisOutputSchema },
-  prompt: `You are an expert financial analyst for Datatrixs, a private equity firm. Your task is to analyze financial data for various retail locations and the entire holding company, and provide clear, concise, and actionable insights based on user queries.
+  prompt: `You are an expert financial analyst for Datatrixs. Your task is to analyze financial data and provide clear, concise, and actionable insights based on user queries.
+
+{{#if context}}Business Context: {{{context}}}{{/if}}
 
 Financial Data: {{{financialData}}}
-User Query: {{{query}}}
-{{#if context}}Context: {{{context}}}{{/if}}
+
+{{#if history}}
+Conversation so far (use this to answer follow-up questions):
+{{#each history}}
+{{this.role}}: {{{this.content}}}
+{{/each}}
+{{/if}}
+
+Current User Query: {{{query}}}
 
 CRITICAL DATA HANDLING RULES:
 1. The provided data is NORMALIZED. Each record contains a 'metric' name (e.g., "Revenue", "Net Profit", "COGS") and a 'value'.
 2. When answering queries or generating CSVs, look for these specific 'metric' labels in the data.
 3. If the user asks for a table or spreadsheet involving multiple metrics, PIVOT the data so that Location/Period are rows and the Metrics (Revenue, Profit, etc.) are COLUMNS.
+4. For follow-up questions ("now break that down", "which of those", "compare that"), resolve the reference using the conversation history above.
 
 CRITICAL FORMATTING & STRUCTURE RULES:
-1. Always use compact currency notation in your 'answer' and 'rawSpreadsheetData'. 
+1. Always use compact currency notation in your 'answer' and 'rawSpreadsheetData'.
    - Use 'K' for thousands (e.g., $450K)
    - Use 'M' for millions (e.g., $1.2M)
 2. In the 'results' array, provide raw numeric values (no suffixes) for chart processing.

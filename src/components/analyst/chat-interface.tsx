@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { FinancialRecord, Company, SavedAnalysis } from "@/lib/types"
+import { useVertical } from "@/contexts/vertical-context"
 
 type Message = {
   id: string
@@ -37,11 +38,100 @@ function parseCSV(csvString: string) {
   if (!csvString) return { headers: [], data: [] };
   const lines = csvString.trim().split('\n');
   if (lines.length === 0) return { headers: [], data: [] };
-  
+
   const headers = lines[0].split(',').map(h => h.trim());
   const data = lines.slice(1).map(line => line.split(',').map(c => c.trim()));
-  
+
   return { headers, data };
+}
+
+// Detects whether a line is a markdown table row (starts and ends with |)
+function isTableRow(line: string) {
+  return line.trim().startsWith('|') && line.trim().endsWith('|');
+}
+
+// Detects separator rows like |---|---|
+function isSeparatorRow(line: string) {
+  return isTableRow(line) && /^\|[\s|:\-]+\|$/.test(line.trim());
+}
+
+type ContentBlock = { type: 'text'; value: string } | { type: 'table'; lines: string[] };
+
+function parseMessageContent(content: string): ContentBlock[] {
+  // Normalize escaped newlines the model sometimes emits
+  const normalized = content.replace(/\\n/g, '\n');
+  const lines = normalized.split('\n');
+  const blocks: ContentBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (isTableRow(lines[i])) {
+      // Collect contiguous table lines
+      const tableLines: string[] = [];
+      while (i < lines.length && isTableRow(lines[i])) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      // Only treat as a real table if there's a separator row (2nd line)
+      if (tableLines.length >= 2 && isSeparatorRow(tableLines[1])) {
+        blocks.push({ type: 'table', lines: tableLines });
+      } else {
+        blocks.push({ type: 'text', value: tableLines.join('\n') });
+      }
+    } else {
+      // Collect contiguous non-table lines
+      const textLines: string[] = [];
+      while (i < lines.length && !isTableRow(lines[i])) {
+        textLines.push(lines[i]);
+        i++;
+      }
+      const text = textLines.join('\n').trim();
+      if (text) blocks.push({ type: 'text', value: text });
+    }
+  }
+
+  return blocks;
+}
+
+function MarkdownTable({ lines }: { lines: string[] }) {
+  const headers = lines[0].split('|').filter(Boolean).map(s => s.trim());
+  const rows = lines.slice(2).map(line => line.split('|').filter(Boolean).map(s => s.trim()));
+
+  return (
+    <div className="rounded-md border border-border overflow-hidden my-2">
+      <table className="min-w-full text-xs">
+        <thead>
+          <tr className="bg-muted/50">
+            {headers.map((h, i) => (
+              <th key={i} className="px-3 py-2 text-left font-bold uppercase tracking-wider text-muted-foreground">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-t border-border hover:bg-muted/30">
+              {row.map((cell, j) => (
+                <td key={j} className="px-3 py-2">{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MessageContent({ content }: { content: string }) {
+  const blocks = parseMessageContent(content);
+  return (
+    <div className="space-y-1">
+      {blocks.map((block, i) =>
+        block.type === 'table'
+          ? <MarkdownTable key={i} lines={block.lines} />
+          : <p key={i} className="leading-relaxed whitespace-pre-wrap">{block.value}</p>
+      )}
+    </div>
+  );
 }
 
 interface ChatInterfaceProps {
@@ -53,6 +143,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
   const { user } = useUser()
   const firestore = useFirestore()
   const { toast } = useToast()
+  const vertical = useVertical()
   
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -76,7 +167,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm your Datatrixs Financial Analyst. I have access to your normalized portfolio data. I can generate spreadsheets, identify trends, or compare margins across your locations. What data can I compile for you today?"
+      content: `Hello! I'm your Datatrixs Financial Analyst. I have access to your normalized financial data. I can generate spreadsheets, identify trends, or compare performance across your ${vertical.unitsLabel.toLowerCase()}. What data can I compile for you today?`
     }
   ])
   const [input, setInput] = React.useState("")
@@ -102,6 +193,9 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     }
   }, [externalQuery, onQueryProcessed]);
 
+  // Number of prior exchanges (user + assistant pairs) to include as history
+  const HISTORY_WINDOW = 4;
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim() || loading || isRecordsLoading) return
@@ -111,6 +205,13 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       role: "user",
       content: input
     }
+
+    // Capture history before updating state — skip the initial welcome message (id "1")
+    // Take the last HISTORY_WINDOW * 2 messages (each exchange = user + assistant)
+    const historySnapshot = messages
+      .filter(m => m.id !== "1")
+      .slice(-(HISTORY_WINDOW * 2))
+      .map(m => ({ role: m.role, content: m.content }));
 
     setMessages(prev => [...prev, userMessage])
     setInput("")
@@ -127,7 +228,8 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       const result = await aiFinancialQueryAnalysis({
         query: input,
         financialData: JSON.stringify(aiData),
-        context: `Current date is ${new Date().toLocaleDateString()}. Data is real-time from your portfolio.`
+        context: `Current date is ${new Date().toLocaleDateString()}. This is ${vertical.aiContext}.`,
+        history: historySnapshot.length > 0 ? historySnapshot : undefined,
       })
 
       const assistantMessage: Message = {
@@ -171,6 +273,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
       content: message.data.answer,
       results: message.data.results || [],
       suggestedChart: message.data.suggestedChart,
+      rawSpreadsheetData: message.data.rawSpreadsheetData,
       companyMembers: membership,
       createdAt: new Date().toISOString()
     };
@@ -210,8 +313,8 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                     ? "bg-primary text-white rounded-tr-none" 
                     : "bg-muted text-foreground rounded-tl-none border border-border"
                 )}>
-                  {m.content}
-                  
+                  {m.role === "assistant" ? <MessageContent content={m.content} /> : m.content}
+
                   {m.role === "assistant" && m.data && (
                     <Button 
                       onClick={() => handleSaveResult(m)}

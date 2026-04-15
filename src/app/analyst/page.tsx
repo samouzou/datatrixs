@@ -4,13 +4,69 @@ import * as React from "react"
 import { ChatInterface } from "@/components/analyst/chat-interface"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Bot, Info } from "lucide-react"
+import { useVertical } from "@/contexts/vertical-context"
+import { BusinessVertical } from "@/lib/types"
+
+const SAMPLE_QUERIES: Record<BusinessVertical, string[]> = {
+  retail: [
+    "Which location had the highest margin last period?",
+    "Compare revenue trends across my locations",
+    "Export a performance table for all active stores",
+    "What is the total profit for the current year?",
+    "Identify any locations with declining revenue",
+    "Breakdown operating expenses by location",
+  ],
+  hardware: [
+    "Which product line had the highest gross margin last quarter?",
+    "Compare revenue trends across my product lines",
+    "Export a performance table for all product lines",
+    "What is the total profit for the current year?",
+    "Identify product lines with declining revenue",
+    "Breakdown COGS by product line",
+  ],
+  saas: [
+    "Which client accounts have the highest MRR this quarter?",
+    "Compare churn rate trends across my client accounts",
+    "Export an ARR summary table for all clients",
+    "What is total recurring revenue for the current year?",
+    "Identify clients with declining revenue",
+    "Breakdown operating expenses by workspace",
+  ],
+  services: [
+    "Which engagements had the highest utilization rate last period?",
+    "Compare revenue trends across my engagements",
+    "Export a performance summary for all active engagements",
+    "What is total billable revenue for the current year?",
+    "Identify engagements with declining gross margin",
+    "Breakdown operating expenses by practice",
+  ],
+  biotech: [
+    "Which program has the highest R&D burn rate this quarter?",
+    "Compare clinical trial costs across my programs",
+    "Export a financial summary for all active programs",
+    "What is total R&D expenditure for the current year?",
+    "Identify programs where costs are exceeding prior periods",
+    "Breakdown operating expenses by research program",
+  ],
+  other: [
+    "Which unit had the highest margin last period?",
+    "Compare revenue trends across my units",
+    "Export a performance table for all active units",
+    "What is the total profit for the current year?",
+    "Identify any units with declining revenue",
+    "Breakdown operating expenses by unit",
+  ],
+};
 
 export default function AnalystPage() {
+  const vertical = useVertical()
   const [selectedQuery, setSelectedQuery] = React.useState<string | undefined>();
 
   const handleQueryClick = (query: string) => {
     setSelectedQuery(query);
   };
+
+  const sampleQueries = SAMPLE_QUERIES[vertical.id];
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -19,14 +75,14 @@ export default function AnalystPage() {
           <Bot className="size-6 text-accent" />
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">AI Financial Analyst</h2>
         </div>
-        <p className="text-muted-foreground">Ask questions about your holdings, request reports, or generate spreadsheet data based on your normalized records.</p>
+        <p className="text-muted-foreground">Ask questions about your {vertical.unitsLabel.toLowerCase()}, request reports, or generate spreadsheet data based on your normalized records.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <ChatInterface 
-            externalQuery={selectedQuery} 
-            onQueryProcessed={() => setSelectedQuery(undefined)} 
+          <ChatInterface
+            externalQuery={selectedQuery}
+            onQueryProcessed={() => setSelectedQuery(undefined)}
           />
         </div>
         <div className="space-y-6">
@@ -39,14 +95,7 @@ export default function AnalystPage() {
               <CardDescription className="text-xs">Try asking these to explore your data:</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6 space-y-2">
-              {[
-                "Which location had the highest margin last period?",
-                "Compare revenue trends across my locations",
-                "Export a performance table for all active stores",
-                "What is the total portfolio profit for the current year?",
-                "Identify any locations with declining revenue",
-                "Breakdown operating expenses by location"
-              ].map((query, i) => (
+              {sampleQueries.map((query, i) => (
                 <button 
                   key={i} 
                   onClick={() => handleQueryClick(query)}
@@ -61,7 +110,7 @@ export default function AnalystPage() {
           <Card className="bg-primary/5 border-primary/20 p-6">
             <h4 className="text-sm font-bold text-primary mb-2">Expert Tip</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              You can ask for data in specific formats. For example: "Give me a breakdown of COGS for my top 3 locations in a table format."
+              {`You can ask for data in specific formats. For example: "Give me a breakdown of COGS for my top 3 ${vertical.unitsLabel.toLowerCase()} in a table format."`}
             </p>
           </Card>
         </div>

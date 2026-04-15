@@ -52,7 +52,7 @@ const sortPeriods = (periods: string[]) => {
 };
 
 const displayPeriod = (p: string) => {
-  if (p === 'all') return "Portfolio View (All Time)";
+  if (p === 'all') return "All Time";
   if (p === 'latest') return "Latest Period";
   if (p.includes('-Q')) {
     const [y, q] = p.split('-');
@@ -299,7 +299,7 @@ export default function DashboardPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="latest">Latest Period (Auto)</SelectItem>
-                <SelectItem value="all">Portfolio View (All Time)</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
                 {availablePeriods.slice().reverse().map(p => (
                   <SelectItem key={p} value={p}>{displayPeriod(p)}</SelectItem>
                 ))}
@@ -355,7 +355,7 @@ export default function DashboardPage() {
               <p className="text-[11px] leading-relaxed text-foreground font-medium">
                 {unhealthyLocs?.length 
                   ? `${unhealthyLocs[0].name} reporting delay (>72h).`
-                  : `Portfolio optimized. Current ${selectedPeriod === 'all' ? 'All-Time' : 'Period'} targets are tracking against plan.`}
+                  : `All systems healthy. Current ${selectedPeriod === 'all' ? 'all-time' : 'period'} targets are tracking against plan.`}
               </p>
             </div>
           </CardContent>

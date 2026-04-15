@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { query, collection, where, orderBy, doc } from "firebase/firestore"
+import { query, collection, where, doc } from "firebase/firestore"
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { SavedReport, SavedAnalysis } from "@/lib/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
@@ -67,22 +67,22 @@ export default function LibraryPage() {
     if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports')) return null;
     return query(
       collection(firestore, "saved_reports"),
-      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
-      orderBy("createdAt", "desc")
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
   }, [firestore, user?.uid, activeTab]); 
-  const { data: reports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
+  const { data: rawReports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
+  const reports = React.useMemo(() => rawReports?.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? null, [rawReports]);
 
   // Query ad-hoc analyses
   const analysesQuery = useMemoFirebase(() => {
     if (!firestore || !user || activeTab !== 'analysis') return null;
     return query(
       collection(firestore, "saved_analysis"),
-      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]),
-      orderBy("createdAt", "desc")
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
   }, [firestore, user?.uid, activeTab]); 
-  const { data: analyses, isLoading: isLoadingAnalyses } = useCollection<SavedAnalysis>(analysesQuery);
+  const { data: rawAnalyses, isLoading: isLoadingAnalyses } = useCollection<SavedAnalysis>(analysesQuery);
+  const analyses = React.useMemo(() => rawAnalyses?.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? null, [rawAnalyses]);
 
   const handleDelete = (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -253,7 +253,7 @@ function SavedAnalysisCard({ item, onDelete }: { item: SavedAnalysis, onDelete: 
               </div>
               {item.suggestedChart && item.results && (
                 <div className="p-4 border border-border rounded-xl bg-card">
-                  <ChartView 
+                  <ChartView
                     type={item.suggestedChart.type}
                     title={item.suggestedChart.title}
                     data={item.results}
@@ -262,6 +262,21 @@ function SavedAnalysisCard({ item, onDelete }: { item: SavedAnalysis, onDelete: 
                   />
                 </div>
               )}
+              {item.rawSpreadsheetData && (() => {
+                const lines = item.rawSpreadsheetData.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                const data = lines.slice(1).map(l => l.split(',').map(c => c.trim()));
+                return (
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <SpreadsheetView
+                      title="Spreadsheet Data"
+                      headers={headers}
+                      data={data}
+                      className="border-none rounded-none"
+                    />
+                  </div>
+                );
+              })()}
             </div>
           </DialogContent>
         </Dialog>
