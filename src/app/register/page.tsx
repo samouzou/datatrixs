@@ -128,7 +128,7 @@ export default function RegisterPage() {
           {step === 1 ? (
             <>
               <CardTitle className="text-2xl font-bold font-headline text-foreground">Create an account</CardTitle>
-              <CardDescription>Get started with Datatrixs portfolio management</CardDescription>
+              <CardDescription>Get started with Datatrixs financial intelligence</CardDescription>
             </>
           ) : (
             <>

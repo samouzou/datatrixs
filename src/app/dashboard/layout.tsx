@@ -108,7 +108,7 @@ export default function AppLayout({
       toast({
         variant: "destructive",
         title: "Subscription Required",
-        description: "Please activate your Portfolio Core license to access this feature."
+        description: "Please activate your license to access this feature."
       });
       router.push("/settings/billing?restricted=true")
     }

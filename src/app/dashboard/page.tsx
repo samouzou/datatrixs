@@ -267,7 +267,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <Building2 className="size-8 text-primary" />
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Performance Overview</h2>
             <div className="flex items-center gap-2 mt-1">
               <CalendarIcon className="size-3 text-muted-foreground" />
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{latestPeriodLabel}</p>
@@ -314,7 +314,7 @@ export default function DashboardPage() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KpiCard 
-          label="Portfolio Revenue" 
+          label="Total Revenue"
           value={formatCompactNumber(kpis.revenue.val)} 
           change={kpis.revenue.change} 
           trend={kpis.revenue.trend} 

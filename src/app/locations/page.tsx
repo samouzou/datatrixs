@@ -396,13 +396,13 @@ export default function LocationsPage() {
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage Locations</h2>
           <div className="flex items-center gap-3">
-            <p className="text-muted-foreground">Standardizing financials across your private equity portfolio.</p>
+            <p className="text-muted-foreground">Standardizing financials across your business units.</p>
             {activeCompany?.subscription && (
               <Badge variant="outline" className={cn(
                 "h-6 px-3 text-[10px] uppercase font-bold tracking-widest",
                 isLimitReached ? "border-destructive/50 text-destructive bg-destructive/5" : "border-primary/30 text-primary bg-primary/5"
               )}>
-                {currentUnitCount} / {locationLimit} Licenses Used
+                {currentUnitCount} / {locationLimit} Unit Licenses Used
               </Badge>
             )}
           </div>
@@ -423,11 +423,11 @@ export default function LocationsPage() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>{isLimitReached ? "Portfolio Capacity Reached" : "Add Business Location"}</DialogTitle>
+              <DialogTitle>{isLimitReached ? "Capacity Reached" : "Add Business Unit"}</DialogTitle>
               <DialogDescription>
-                {isLimitReached 
-                  ? "You have exhausted your current Entity Connection Licenses." 
-                  : "Register a new retail or service location."}
+                {isLimitReached
+                  ? "You have used all available unit licenses."
+                  : "Register a new business unit and connect its data source."}
               </DialogDescription>
             </DialogHeader>
             
@@ -439,7 +439,7 @@ export default function LocationsPage() {
                 <div className="space-y-2">
                   <h3 className="font-bold text-lg">Expansion Required</h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    You have used all {locationLimit} of your **Entity Connection Licenses**. To manage more units, please expand your capacity.
+                    You have used all {locationLimit} unit licenses. To manage more units, please expand your capacity.
                   </p>
                 </div>
                 <Button asChild className="bg-primary">

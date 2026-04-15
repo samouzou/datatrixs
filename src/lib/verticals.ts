@@ -16,6 +16,8 @@ export type VerticalConfig = {
   aiContext: string;
   /** Default metric names pre-loaded in the data upload mapping step */
   defaultMetrics: string[];
+  /** Label used for the organizational grouping concept (replaces "Holding") */
+  organizationLabel: string;
 };
 
 export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
@@ -29,6 +31,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Metric: 'inventory value',
     aiContext: 'a portfolio of retail locations managed by a private equity holding firm',
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Operating Expenses', 'Inventory Value'],
+    organizationLabel: 'Group',
   },
   hardware: {
     id: 'hardware',
@@ -40,6 +43,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Metric: 'gross margin',
     aiContext: 'a hardware product and distribution business with multiple product lines',
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Gross Margin', 'Inventory Value', 'Units Sold'],
+    organizationLabel: 'Division',
   },
   saas: {
     id: 'saas',
@@ -51,6 +55,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Metric: 'churn rate',
     aiContext: 'a SaaS business with recurring subscription revenue and multiple client accounts',
     defaultMetrics: ['Revenue', 'Net Profit', 'MRR', 'ARR', 'Operating Expenses', 'Churn Rate', 'CAC'],
+    organizationLabel: 'Workspace',
   },
   services: {
     id: 'services',
@@ -62,6 +67,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Metric: 'utilization rate',
     aiContext: 'a professional services business with client engagements and project-based revenue',
     defaultMetrics: ['Revenue', 'Net Profit', 'Operating Expenses', 'Gross Margin', 'Utilization Rate'],
+    organizationLabel: 'Practice',
   },
   biotech: {
     id: 'biotech',
@@ -73,6 +79,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Metric: 'r&d burn',
     aiContext: 'a biotech or life sciences company with research programs and product pipelines',
     defaultMetrics: ['Revenue', 'R&D Expense', 'Clinical Trial Costs', 'SG&A Expense', 'Operating Income', 'COGS', 'Gross Margin', 'WIP Inventory'],
+    organizationLabel: 'Institute',
   },
   other: {
     id: 'other',
@@ -84,6 +91,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Metric: 'operating margin',
     aiContext: 'a diversified business portfolio',
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Operating Expenses', 'Gross Margin'],
+    organizationLabel: 'Organization',
   },
 };
 

@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BusinessVertical, Company, CompanyInvitation, CompanyRole, UserProfile } from "@/lib/types"
 import { VERTICALS, getVerticalConfig } from "@/lib/verticals"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
@@ -124,6 +125,7 @@ export default function HoldingStructurePage() {
   }, [firestore, user]);
 
   const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
+  const vertical = getVerticalConfig(companies?.[0]?.vertical);
 
   // Query for pending invitations for current user. 
   const invitationsQuery = useMemoFirebase(() => {
@@ -298,30 +300,30 @@ export default function HoldingStructurePage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Building2 className="size-6 text-primary" />
-            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Holding Structure</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">{vertical.organizationLabel} Structure</h2>
           </div>
-          <p className="text-muted-foreground">Manage your parent organizations and corporate entities.</p>
+          <p className="text-muted-foreground">Manage your organizations and business entities.</p>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="mr-2 size-4" /> Add Parent Entity
+              <Plus className="mr-2 size-4" /> Add Organization
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Holding Company</DialogTitle>
+              <DialogTitle>Add Organization</DialogTitle>
               <DialogDescription>
-                Define a new parent organization for your portfolio management.
+                Define a new organization to group your business units.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="name">Entity Name</Label>
-                <Input 
-                  id="name" 
-                  placeholder="e.g., Datatrixs Strategic Holdings" 
+                <Label htmlFor="name">Organization Name</Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., Datatrixs Group"
                   value={newCompanyName}
                   onChange={(e) => setNewCompanyName(e.target.value)}
                 />
@@ -469,7 +471,7 @@ export default function HoldingStructurePage() {
           {!companies?.length && (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl">
               <Building2 className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-muted-foreground">No holding entities found. Define a parent company to begin organizing your portfolio.</p>
+              <p className="text-muted-foreground">No organizations found. Add one to begin grouping your business units.</p>
             </div>
           )}
         </div>
@@ -478,10 +480,10 @@ export default function HoldingStructurePage() {
       <Dialog open={!!editingCompany} onOpenChange={(open) => !open && setEditingCompany(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{currentUserRole === 'admin' ? 'Manage Holding Structure' : 'View Team Structure'}</DialogTitle>
+            <DialogTitle>{currentUserRole === 'admin' ? `Manage ${vertical.organizationLabel}` : 'View Team'}</DialogTitle>
             <DialogDescription>
-              {currentUserRole === 'admin' 
-                ? 'Configure organizational details and access control for this holding entity.'
+              {currentUserRole === 'admin'
+                ? 'Configure details and access control for this organization.'
                 : 'View details and active members for this organization.'}
             </DialogDescription>
           </DialogHeader>
