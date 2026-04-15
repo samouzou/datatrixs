@@ -4,8 +4,8 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'Datatrixs - Financial Intelligence for PE',
-  description: 'Manage financials of multiple retail locations with AI-powered insights.',
+  title: 'Datatrixs - AI Financial Intelligence',
+  description: 'Unified financial intelligence platform with AI-powered insights across all your business units.',
 };
 
 export default function RootLayout({

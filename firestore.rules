@@ -93,7 +93,7 @@ service cloud.firestore {
     }
 
     match /saved_reports/{reportId} {
-      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
@@ -101,7 +101,7 @@ service cloud.firestore {
     }
 
     match /saved_analysis/{analysisId} {
-      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || resource.data.userId == request.auth.uid || isAppAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || isAppAdmin();

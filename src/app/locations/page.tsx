@@ -14,6 +14,7 @@ import {
   AlertCircle, 
   ClipboardList, 
   Database,
+  Layers,
   ArrowRight,
   History,
   FileText,
@@ -24,7 +25,7 @@ import {
   Zap
 } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
-import { collection, query, where, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
+import { collection, query, where, doc, setDoc, deleteDoc, writeBatch, getDocs } from "firebase/firestore"
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { cn } from "@/lib/utils"
 import { 
@@ -41,6 +42,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Company, Location, FinancialRecord, FinancialMetric } from "@/lib/types"
+import { getVerticalConfig } from "@/lib/verticals"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
@@ -53,12 +55,13 @@ import {
 } from "@/components/ui/table"
 import Link from "next/link"
 
-const INITIAL_FINANCIAL_METRICS = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
+const FALLBACK_METRICS = ["Revenue", "Net Profit", "COGS", "Operating Expenses", "Inventory Value"];
 
 // Mock Ledger Data for API Simulations
 const MOCK_LEDGERS = {
   QuickBooks: ["Sales: Retail", "Cost of Goods Sold", "Gross Profit", "Total Expenses", "Warehouse Inventory", "Operating Income"],
-  NetSuite: ["Total Revenue (USD)", "Cost of Sales", "Net Income", "SG&A Expenses", "On-Hand Inventory", "EBITDA"]
+  NetSuite: ["Total Revenue (USD)", "Cost of Sales", "Net Income", "SG&A Expenses", "On-Hand Inventory", "EBITDA"],
+  SageIntacct: ["Net Revenue", "Cost of Revenue", "R&D Expense", "Clinical Trial Costs", "SG&A Expense", "Operating Income", "WIP Inventory"]
 };
 
 // Normalization Utility for Periods
@@ -95,19 +98,20 @@ export default function LocationsPage() {
   const [isUploadOpen, setIsUploadOpen] = React.useState(false)
   const [uploadStep, setUploadStep] = React.useState<"source" | "input" | "mapping">("source")
   const [uploadingLocation, setUploadingLocation] = React.useState<Location | null>(null)
-  const [selectedSource, setSelectedSource] = React.useState<'Manual' | 'QuickBooks' | 'NetSuite' | 'Excel'>('Manual')
+  const [selectedSource, setSelectedSource] = React.useState<'Manual' | 'QuickBooks' | 'NetSuite' | 'SageIntacct' | 'Excel'>('Manual')
   const [csvContent, setCsvContent] = React.useState("")
   const [isConnecting, setIsConnecting] = React.useState(false)
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   
-  const [availableMetrics, setAvailableMetrics] = React.useState<string[]>(INITIAL_FINANCIAL_METRICS)
+  const [availableMetrics, setAvailableMetrics] = React.useState<string[]>(FALLBACK_METRICS)
   const [isAddingMetric, setIsAddingMetric] = React.useState(false)
   const [newMetricName, setNewMetricName] = React.useState("")
 
   const [headers, setHeaders] = React.useState<string[]>([])
   const [mapping, setMapping] = React.useState<Record<string, string | "ignore">>({})
   const [periodColumn, setPeriodColumn] = React.useState<string>("")
+  const [programColumn, setProgramColumn] = React.useState<string>("")
 
   const [name, setName] = React.useState("")
   const [companyId, setCompanyId] = React.useState("")
@@ -202,12 +206,14 @@ export default function LocationsPage() {
     setHeaders([]);
     setMapping({});
     setPeriodColumn("");
-    
+    setProgramColumn("");
+
+    const verticalMetrics = getVerticalConfig(parentCompany?.vertical).defaultMetrics;
     const companyMetrics = parentCompany?.customMetrics || [];
-    setAvailableMetrics([...INITIAL_FINANCIAL_METRICS, ...companyMetrics]);
+    setAvailableMetrics([...verticalMetrics, ...companyMetrics.filter(m => !verticalMetrics.includes(m))]);
   };
 
-  const handleSourceSelect = (source: 'Manual' | 'QuickBooks' | 'NetSuite' | 'Excel') => {
+  const handleSourceSelect = (source: 'Manual' | 'QuickBooks' | 'NetSuite' | 'SageIntacct' | 'Excel') => {
     setSelectedSource(source);
     if (source === 'Manual' || source === 'Excel') {
       setUploadStep("input");
@@ -215,7 +221,7 @@ export default function LocationsPage() {
       setIsConnecting(true);
       setTimeout(() => {
         setIsConnecting(false);
-        const mockHeaders = ["Period", ...MOCK_LEDGERS[source as 'QuickBooks' | 'NetSuite']];
+        const mockHeaders = ["Period", ...MOCK_LEDGERS[source as 'QuickBooks' | 'NetSuite' | 'SageIntacct']];
         setHeaders(mockHeaders);
         setPeriodColumn("Period");
         
@@ -260,9 +266,17 @@ export default function LocationsPage() {
     setHeaders(firstLine);
     const initialMapping: Record<string, string | "ignore"> = {};
     let suggestedPeriod = "";
+    let suggestedProgram = "";
     firstLine.forEach(h => {
       const lowerH = h.toLowerCase();
-      if (lowerH.includes('period') || lowerH.includes('date') || lowerH.includes('month') || lowerH.includes('quarter')) suggestedPeriod = h;
+      if (lowerH.includes('period') || lowerH.includes('date') || lowerH.includes('month') || lowerH.includes('quarter')) {
+        suggestedPeriod = h;
+        return;
+      }
+      if (lowerH === 'class' || lowerH === 'program' || lowerH === 'segment') {
+        suggestedProgram = h;
+        return;
+      }
       const match = availableMetrics.find(m => {
         const lowerM = m.toLowerCase();
         return lowerH.includes(lowerM) || lowerM.includes(lowerH);
@@ -271,6 +285,7 @@ export default function LocationsPage() {
     });
     setMapping(initialMapping);
     setPeriodColumn(suggestedPeriod);
+    setProgramColumn(suggestedProgram);
     setUploadStep("mapping");
   };
 
@@ -312,13 +327,15 @@ export default function LocationsPage() {
         const rawPeriod = rowObj[periodColumn];
         if (!rawPeriod) continue;
         const normalizedPeriod = normalizePeriod(rawPeriod);
+        const programValue = programColumn ? (rowObj[programColumn] || '').trim() : '';
         Object.entries(mapping).forEach(([colName, metric]) => {
-          if (metric === "ignore" || colName === periodColumn) return;
+          if (metric === "ignore" || colName === periodColumn || colName === programColumn) return;
           const valStr = rowObj[colName];
           const valNum = parseAccountingNumber(valStr);
           if (!isNaN(valNum)) {
             const metricSlug = metric.toLowerCase().replace(/\s+/g, '_');
-            const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metricSlug}`;
+            const programSlug = programValue ? `_${programValue.toLowerCase().replace(/\s+/g, '_')}` : '';
+            const deterministicId = `${uploadingLocation.id}_${normalizedPeriod}_${metricSlug}${programSlug}`;
             const recordRef = doc(firestore, "financial_records", deterministicId);
             const record: FinancialRecord = {
               id: deterministicId,
@@ -327,6 +344,7 @@ export default function LocationsPage() {
               period: normalizedPeriod,
               metric: metric as FinancialMetric,
               value: valNum,
+              ...(programValue ? { program: programValue } : {}),
               companyMembers: uploadingLocation.companyMembers,
               createdAt: now
             };
@@ -355,19 +373,36 @@ export default function LocationsPage() {
     }
   };
 
+  const handleDeleteLocation = async (loc: Location) => {
+    if (!firestore) return;
+    const batch = writeBatch(firestore);
+
+    // Delete the location itself
+    batch.delete(doc(firestore, "locations", loc.id));
+
+    // Cascade delete all financial records for this location
+    const recordsSnap = await getDocs(
+      query(collection(firestore, "financial_records"), where("locationId", "==", loc.id))
+    );
+    recordsSnap.docs.forEach(d => batch.delete(d.ref));
+
+    await batch.commit();
+    toast({ title: "Location Removed", description: `${loc.name} and its financial data have been deleted.` });
+  };
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage Locations</h2>
           <div className="flex items-center gap-3">
-            <p className="text-muted-foreground">Standardizing financials across your private equity portfolio.</p>
+            <p className="text-muted-foreground">Standardizing financials across your business units.</p>
             {activeCompany?.subscription && (
               <Badge variant="outline" className={cn(
                 "h-6 px-3 text-[10px] uppercase font-bold tracking-widest",
                 isLimitReached ? "border-destructive/50 text-destructive bg-destructive/5" : "border-primary/30 text-primary bg-primary/5"
               )}>
-                {currentUnitCount} / {locationLimit} Licenses Used
+                {currentUnitCount} / {locationLimit} Unit Licenses Used
               </Badge>
             )}
           </div>
@@ -388,11 +423,11 @@ export default function LocationsPage() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>{isLimitReached ? "Portfolio Capacity Reached" : "Add Business Location"}</DialogTitle>
+              <DialogTitle>{isLimitReached ? "Capacity Reached" : "Add Business Unit"}</DialogTitle>
               <DialogDescription>
-                {isLimitReached 
-                  ? "You have exhausted your current Entity Connection Licenses." 
-                  : "Register a new retail or service location."}
+                {isLimitReached
+                  ? "You have used all available unit licenses."
+                  : "Register a new business unit and connect its data source."}
               </DialogDescription>
             </DialogHeader>
             
@@ -404,7 +439,7 @@ export default function LocationsPage() {
                 <div className="space-y-2">
                   <h3 className="font-bold text-lg">Expansion Required</h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    You have used all {locationLimit} of your **Entity Connection Licenses**. To manage more units, please expand your capacity.
+                    You have used all {locationLimit} unit licenses. To manage more units, please expand your capacity.
                   </p>
                 </div>
                 <Button asChild className="bg-primary">
@@ -416,7 +451,7 @@ export default function LocationsPage() {
             ) : (
               <div className="grid grid-cols-2 gap-4 py-4">
                 <div className="grid gap-2 col-span-2">
-                  <Label htmlFor="company">Parent Holding Company</Label>
+                  <Label htmlFor="company">Parent Organization</Label>
                   <Select onValueChange={setCompanyId} value={companyId}>
                     <SelectTrigger><SelectValue placeholder="Select a company" /></SelectTrigger>
                     <SelectContent>
@@ -476,7 +511,7 @@ export default function LocationsPage() {
                   <CardDescription>{loc.addressLine1}, {loc.city}, {loc.state} {loc.zipCode}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteDoc(doc(firestore, "locations", loc.id))}><Trash2 className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeleteLocation(loc)}><Trash2 className="size-4" /></Button>
                   <Button variant="ghost" size="icon" className="text-muted-foreground"><MoreVertical className="size-4" /></Button>
                 </div>
               </CardHeader>
@@ -531,6 +566,7 @@ export default function LocationsPage() {
                 { id: 'Manual', name: 'Manual Entry / CSV', icon: ClipboardList, desc: 'Paste or upload ledger snapshots.' },
                 { id: 'QuickBooks', name: 'QuickBooks Online', icon: Cloud, desc: 'Direct API sync with Intuit.' },
                 { id: 'NetSuite', name: 'Oracle NetSuite', icon: Database, desc: 'Enterprise ERP integration.' },
+                { id: 'SageIntacct', name: 'Sage Intacct', icon: Layers, desc: 'Multi-dimensional GL with class & department.' },
                 { id: 'Excel', name: 'Excel Loader', icon: FileText, desc: 'Import from .XLSX workbooks.' }
               ].map((s) => (
                 <button
@@ -601,16 +637,26 @@ export default function LocationsPage() {
             <div className="space-y-6 py-4">
               <div className="grid gap-4">
                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/10 flex items-center justify-between">
-                  <div>
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 block">1. Source Period Normalization</Label>
-                    <Select value={periodColumn} onValueChange={setPeriodColumn}>
-                      <SelectTrigger className="bg-background border-border h-11 w-[300px]">
-                        <SelectValue placeholder="Select period column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 block">1. Period Column</Label>
+                      <Select value={periodColumn} onValueChange={setPeriodColumn}>
+                        <SelectTrigger className="bg-background border-border h-11 w-[200px]">
+                          <SelectValue placeholder="Select period column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {programColumn && (
+                      <div>
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-accent mb-2 block">Program Dimension</Label>
+                        <div className="h-11 flex items-center gap-2 px-3 rounded-md bg-accent/10 border border-accent/20 text-sm font-medium text-accent">
+                          <Layers className="size-3" /> {programColumn}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Connected via</p>
@@ -660,7 +706,7 @@ export default function LocationsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {headers.filter(h => h !== periodColumn).map((h) => (
+                        {headers.filter(h => h !== periodColumn && h !== programColumn).map((h) => (
                           <TableRow key={h} className="group">
                             <TableCell className="text-xs font-medium py-3">{h}</TableCell>
                             <TableCell className="text-right">

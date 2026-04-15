@@ -112,7 +112,7 @@ export default function SettingsPage() {
       setIsSaving(false);
       toast({
         title: "Profile Updated",
-        description: "Your holding company settings have been saved."
+        description: "Your organization settings have been saved."
       });
     }, 500);
   }
@@ -129,15 +129,15 @@ export default function SettingsPage() {
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="space-y-1">
         <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Global Settings</h2>
-        <p className="text-muted-foreground">Manage your holding company and global financial configurations.</p>
+        <p className="text-muted-foreground">Manage your organization and global financial configurations.</p>
       </div>
       
       <div className="grid gap-6">
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="bg-card/50 border-border shadow-sm">
             <CardHeader>
-              <CardTitle>Holding Company Profile</CardTitle>
-              <CardDescription>Fundamental details about the parent entity.</CardDescription>
+              <CardTitle>Organization Profile</CardTitle>
+              <CardDescription>Fundamental details about your organization.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4">
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                     <DialogHeader>
                       <DialogTitle>Standardized COA Normalization Rules</DialogTitle>
                       <DialogDescription>
-                        Datatrixs maps disparate ledger accounts into these five core dimensions to enable portfolio-wide aggregation.
+                        Datatrixs maps disparate ledger accounts into these five core dimensions to enable company-wide aggregation.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">

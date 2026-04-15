@@ -20,6 +20,7 @@ import {
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
 import { FinancialRecord, Location } from "@/lib/types"
+import { useVertical } from "@/contexts/vertical-context"
 import { cn } from "@/lib/utils"
 import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2, Building2, Calendar as CalendarIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -51,7 +52,7 @@ const sortPeriods = (periods: string[]) => {
 };
 
 const displayPeriod = (p: string) => {
-  if (p === 'all') return "Portfolio View (All Time)";
+  if (p === 'all') return "All Time";
   if (p === 'latest') return "Latest Period";
   if (p.includes('-Q')) {
     const [y, q] = p.split('-');
@@ -73,7 +74,9 @@ const displayPeriod = (p: string) => {
 export default function DashboardPage() {
   const { user } = useUser()
   const firestore = useFirestore()
+  const vertical = useVertical()
   const [selectedPeriod, setSelectedPeriod] = React.useState<string>("latest")
+  const [selectedProgram, setSelectedProgram] = React.useState<string>("all")
 
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -113,9 +116,15 @@ export default function DashboardPage() {
 
     if (!records || records.length === 0) return defaultData;
 
+    const activeRecords = selectedProgram === 'all'
+      ? records
+      : records.filter(r => (r.program || '') === selectedProgram);
+
+    if (activeRecords.length === 0) return defaultData;
+
     const periodMap: Record<string, { revenue: number; profit: number; inventory: number; locRevenues: Record<string, number> }> = {};
-    
-    records.forEach(r => {
+
+    activeRecords.forEach(r => {
       const metric = r.metric.toLowerCase();
       if (!periodMap[r.period]) {
         periodMap[r.period] = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
@@ -160,7 +169,7 @@ export default function DashboardPage() {
     let prevData;
 
     if (targetPeriod === "all") {
-      latestData = records.reduce((acc, r) => {
+      latestData = activeRecords.reduce((acc, r) => {
         const metric = r.metric.toLowerCase();
         if (metric === 'revenue' || metric.includes('revenue')) {
           acc.revenue += r.value;
@@ -220,7 +229,13 @@ export default function DashboardPage() {
       latestPeriodLabel: displayPeriod(targetPeriod || "No Data"),
       availablePeriods: sortedPeriods
     };
-  }, [records, locations, selectedPeriod]);
+  }, [records, locations, selectedPeriod, selectedProgram]);
+
+  const availablePrograms = React.useMemo(() => {
+    if (!records) return [];
+    const programs = new Set(records.map(r => r.program).filter(Boolean));
+    return Array.from(programs) as string[];
+  }, [records]);
 
   const getBarColor = (value: number) => {
     if (value === 0) return "hsl(var(--destructive))";
@@ -252,7 +267,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <Building2 className="size-8 text-primary" />
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Portfolio Performance</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Performance Overview</h2>
             <div className="flex items-center gap-2 mt-1">
               <CalendarIcon className="size-3 text-muted-foreground" />
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{latestPeriodLabel}</p>
@@ -260,6 +275,22 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center space-x-4">
+          {availablePrograms.length > 0 && (
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Program</span>
+              <Select value={selectedProgram} onValueChange={setSelectedProgram}>
+                <SelectTrigger className="w-[180px] h-9 bg-card border-border">
+                  <SelectValue placeholder="All Programs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Programs</SelectItem>
+                  {availablePrograms.map(p => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex flex-col items-end gap-1">
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fiscal Period</span>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -268,7 +299,7 @@ export default function DashboardPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="latest">Latest Period (Auto)</SelectItem>
-                <SelectItem value="all">Portfolio View (All Time)</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
                 {availablePeriods.slice().reverse().map(p => (
                   <SelectItem key={p} value={p}>{displayPeriod(p)}</SelectItem>
                 ))}
@@ -283,7 +314,7 @@ export default function DashboardPage() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KpiCard 
-          label="Portfolio Revenue" 
+          label="Total Revenue"
           value={formatCompactNumber(kpis.revenue.val)} 
           change={kpis.revenue.change} 
           trend={kpis.revenue.trend} 
@@ -304,11 +335,11 @@ export default function DashboardPage() {
           trend={kpis.margin.trend} 
           suffix="%" 
         />
-        <KpiCard 
-          label="Inventory Turn" 
-          value={kpis.turn.val.toFixed(1)} 
-          change={kpis.turn.change} 
-          trend={kpis.turn.trend} 
+        <KpiCard
+          label={vertical.kpi4Label}
+          value={kpis.turn.val.toFixed(1)}
+          change={kpis.turn.change}
+          trend={kpis.turn.trend}
         />
         
         <Card className="bg-primary/5 border-primary/20 shadow-sm relative overflow-hidden">
@@ -324,7 +355,7 @@ export default function DashboardPage() {
               <p className="text-[11px] leading-relaxed text-foreground font-medium">
                 {unhealthyLocs?.length 
                   ? `${unhealthyLocs[0].name} reporting delay (>72h).`
-                  : `Portfolio optimized. Current ${selectedPeriod === 'all' ? 'All-Time' : 'Period'} targets are tracking against plan.`}
+                  : `All systems healthy. Current ${selectedPeriod === 'all' ? 'all-time' : 'period'} targets are tracking against plan.`}
               </p>
             </div>
           </CardContent>
@@ -371,8 +402,8 @@ export default function DashboardPage() {
         
         <Card className="col-span-3 bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle>Unit Contribution ({selectedPeriod === 'latest' ? 'Current' : displayPeriod(selectedPeriod)})</CardTitle>
-            <CardDescription>Revenue share per authorized location</CardDescription>
+            <CardTitle>{vertical.unitsLabel} Contribution ({selectedPeriod === 'latest' ? 'Current' : displayPeriod(selectedPeriod)})</CardTitle>
+            <CardDescription>Revenue share per authorized {vertical.unitLabel.toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -463,7 +494,7 @@ export default function DashboardPage() {
         {!locations?.length && (
           <Card className="col-span-full py-12 flex flex-col items-center justify-center border-dashed border-2">
             <Loader2 className="size-12 text-muted-foreground opacity-20 mb-4 animate-spin" />
-            <p className="text-muted-foreground font-medium">No normalized locations found.</p>
+            <p className="text-muted-foreground font-medium">No normalized {vertical.unitsLabel.toLowerCase()} found.</p>
           </Card>
         )}
       </div>

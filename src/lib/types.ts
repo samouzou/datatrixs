@@ -1,6 +1,8 @@
 
 export type UserRole = 'Admin' | 'Analyst' | 'LocationManager';
 
+export type BusinessVertical = 'retail' | 'hardware' | 'saas' | 'services' | 'biotech' | 'other';
+
 export type UserProfile = {
   id: string;
   externalAuthIdentifier: string;
@@ -34,6 +36,7 @@ export type Company = {
   reportingCurrency?: string;
   members: Record<string, CompanyRole>; 
   customMetrics?: string[]; 
+  vertical?: BusinessVertical;
   stripeCustomerId?: string; // Persistent link to Stripe billing
   subscription?: CompanySubscription;
   createdAt: string;
@@ -63,7 +66,7 @@ export type Location = {
   phoneNumber: string;
   companyMembers: Record<string, CompanyRole>; 
   integrationStatus: 'connected' | 'pending' | 'disconnected';
-  integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
+  integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'SageIntacct' | 'Manual';
   lastSync?: string;
   lastRawData?: string;
   createdAt: string;
@@ -95,6 +98,7 @@ export type SavedAnalysis = {
     xAxisLabel?: string;
     yAxisLabel?: string;
   };
+  rawSpreadsheetData?: string;
   companyMembers: Record<string, CompanyRole>;
   createdAt: string;
 };
@@ -105,9 +109,10 @@ export type FinancialRecord = {
   id: string;
   locationId: string;
   locationName: string;
-  period: string; 
+  period: string;
   metric: FinancialMetric;
   value: number;
-  companyMembers: Record<string, CompanyRole>; 
+  program?: string; // e.g. "Clinical Trial", "Commercial" — from Class column in Sage Intacct exports
+  companyMembers: Record<string, CompanyRole>;
   createdAt: string;
 };
