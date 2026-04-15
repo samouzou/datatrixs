@@ -8,7 +8,9 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase"
 import { collection, query, where, doc } from "firebase/firestore"
 import { Company, UserProfile } from "@/lib/types"
-import { Loader2, ShieldAlert } from "lucide-react"
+import { getVerticalConfig } from "@/lib/verticals"
+import { VerticalProvider } from "@/contexts/vertical-context"
+import { Clock, Loader2, ShieldAlert } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function AppLayout({
@@ -40,6 +42,17 @@ export default function AppLayout({
 
   const activeCompany = companies?.[0];
   const isSubscriptionActive = activeCompany?.subscription?.status === 'active' || activeCompany?.subscription?.status === 'trialing';
+  const verticalConfig = getVerticalConfig(activeCompany?.vertical);
+
+  const GRACE_PERIOD_DAYS = 7;
+  const graceDaysRemaining = React.useMemo(() => {
+    if (!activeCompany?.createdAt) return 0;
+    const created = new Date(activeCompany.createdAt).getTime();
+    const expiry = created + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+    const remaining = Math.ceil((expiry - Date.now()) / (24 * 60 * 60 * 1000));
+    return Math.max(0, remaining);
+  }, [activeCompany]);
+  const isInGracePeriod = graceDaysRemaining > 0;
   
   const isBillingPage = pathname === '/settings/billing';
   const isHoldingPage = pathname === '/settings/holding';
@@ -90,7 +103,8 @@ export default function AppLayout({
     }
 
     // 4. License Guard (Require active subscription for protected routes)
-    if (user && user.emailVerified && activeCompany && !isSubscriptionActive) {
+    // Grace period: new companies get 7 days to explore before being gated
+    if (user && user.emailVerified && activeCompany && !isSubscriptionActive && !isInGracePeriod) {
       toast({
         variant: "destructive",
         title: "Subscription Required",
@@ -99,14 +113,15 @@ export default function AppLayout({
       router.push("/settings/billing?restricted=true")
     }
   }, [
-    user, 
-    isUserLoading, 
-    activeCompany, 
-    isSubscriptionActive, 
-    isAllowedRoute, 
-    isCompaniesLoading, 
-    companies, 
-    router, 
+    user,
+    isUserLoading,
+    activeCompany,
+    isSubscriptionActive,
+    isInGracePeriod,
+    isAllowedRoute,
+    isCompaniesLoading,
+    companies,
+    router,
     toast,
     pathname,
     isVerifyPage
@@ -128,6 +143,7 @@ export default function AppLayout({
   }
 
   return (
+    <VerticalProvider value={verticalConfig}>
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden bg-background">
         <AppSidebar />
@@ -135,11 +151,18 @@ export default function AppLayout({
           <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/50 backdrop-blur-sm px-6">
             <SidebarTrigger className="-ml-1" />
             
-            {!isSubscriptionActive && activeCompany && (
-              <div className="ml-4 flex items-center gap-2 px-3 py-1 rounded-full bg-destructive/10 text-destructive text-[10px] font-bold uppercase tracking-widest border border-destructive/20 animate-pulse">
-                <ShieldAlert className="size-3" />
-                License Inactive
-              </div>
+            {activeCompany && !isSubscriptionActive && (
+              isInGracePeriod ? (
+                <div className="ml-4 flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-[10px] font-bold uppercase tracking-widest border border-yellow-500/20">
+                  <Clock className="size-3" />
+                  {graceDaysRemaining}d trial remaining
+                </div>
+              ) : (
+                <div className="ml-4 flex items-center gap-2 px-3 py-1 rounded-full bg-destructive/10 text-destructive text-[10px] font-bold uppercase tracking-widest border border-destructive/20 animate-pulse">
+                  <ShieldAlert className="size-3" />
+                  License Inactive
+                </div>
+              )
             )}
 
             <div className="ml-auto flex items-center gap-4">
@@ -165,5 +188,6 @@ export default function AppLayout({
         </SidebarInset>
       </div>
     </SidebarProvider>
+    </VerticalProvider>
   )
 }

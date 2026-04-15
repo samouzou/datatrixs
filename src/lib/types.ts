@@ -1,6 +1,8 @@
 
 export type UserRole = 'Admin' | 'Analyst' | 'LocationManager';
 
+export type BusinessVertical = 'retail' | 'hardware' | 'saas' | 'services' | 'biotech' | 'other';
+
 export type UserProfile = {
   id: string;
   externalAuthIdentifier: string;
@@ -34,6 +36,7 @@ export type Company = {
   reportingCurrency?: string;
   members: Record<string, CompanyRole>; 
   customMetrics?: string[]; 
+  vertical?: BusinessVertical;
   stripeCustomerId?: string; // Persistent link to Stripe billing
   subscription?: CompanySubscription;
   createdAt: string;

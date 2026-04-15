@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Company, CompanyInvitation, CompanyRole, UserProfile } from "@/lib/types"
+import { BusinessVertical, Company, CompanyInvitation, CompanyRole, UserProfile } from "@/lib/types"
+import { VERTICALS, getVerticalConfig } from "@/lib/verticals"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
@@ -90,16 +91,28 @@ export default function HoldingStructurePage() {
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [newCompanyName, setNewCompanyName] = React.useState("")
   const [newCompanyDesc, setNewCompanyDesc] = React.useState("")
+  const [newCompanyVertical, setNewCompanyVertical] = React.useState<BusinessVertical>('retail')
 
   // Edit/Manage Modal State
   const [editingCompany, setEditingCompany] = React.useState<Company | null>(null)
   const [editName, setEditName] = React.useState("")
   const [editDesc, setEditDesc] = React.useState("")
+  const [editVertical, setEditVertical] = React.useState<BusinessVertical>('retail')
   
   // Invite State
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState<CompanyRole>("member")
   const [isProcessingInvite, setIsProcessingInvite] = React.useState<string | null>(null)
+
+  // Pre-populate vertical from signup selection if present
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pending = localStorage.getItem('pendingVertical') as BusinessVertical | null
+      if (pending && VERTICALS[pending]) {
+        setNewCompanyVertical(pending)
+      }
+    }
+  }, [])
 
   // Query for companies. Filtered by membership to satisfy security rules.
   const companiesQuery = useMemoFirebase(() => {
@@ -132,13 +145,18 @@ export default function HoldingStructurePage() {
       id: companyRef.id,
       name: newCompanyName,
       description: newCompanyDesc,
+      vertical: newCompanyVertical,
       members: { [user.uid]: 'admin' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
     setDocumentNonBlocking(companyRef, companyData, { merge: true });
-    
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('pendingVertical')
+    }
+
     setIsCreateOpen(false);
     setNewCompanyName("");
     setNewCompanyDesc("");
@@ -151,6 +169,7 @@ export default function HoldingStructurePage() {
     updateDocumentNonBlocking(companyRef, {
       name: editName,
       description: editDesc,
+      vertical: editVertical,
       updatedAt: new Date().toISOString()
     });
 
@@ -258,6 +277,7 @@ export default function HoldingStructurePage() {
     setEditingCompany(company);
     setEditName(company.name);
     setEditDesc(company.description || "");
+    setEditVertical(company.vertical || 'retail');
   };
 
   const getUserRoleInCompany = (company: Company): CompanyRole => {
@@ -308,12 +328,27 @@ export default function HoldingStructurePage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="desc">Description (Optional)</Label>
-                <Textarea 
-                  id="desc" 
-                  placeholder="Briefly describe this organization's focus..." 
+                <Textarea
+                  id="desc"
+                  placeholder="Briefly describe this organization's focus..."
                   value={newCompanyDesc}
                   onChange={(e) => setNewCompanyDesc(e.target.value)}
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-vertical">Business Type</Label>
+                <Select value={newCompanyVertical} onValueChange={(v) => setNewCompanyVertical(v as BusinessVertical)}>
+                  <SelectTrigger id="new-vertical">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(VERTICALS).map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.label} — {v.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>
@@ -369,9 +404,14 @@ export default function HoldingStructurePage() {
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div className="space-y-1">
                     <CardTitle className="text-lg text-foreground">{entity.name}</CardTitle>
-                    <CardDescription className="text-[10px] uppercase tracking-wider font-bold text-accent">
-                      {role === 'admin' ? 'Administrator' : 'Authorized Member'}
-                    </CardDescription>
+                    <div className="flex items-center gap-2">
+                      <CardDescription className="text-[10px] uppercase tracking-wider font-bold text-accent">
+                        {role === 'admin' ? 'Administrator' : 'Authorized Member'}
+                      </CardDescription>
+                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-bold uppercase tracking-widest border-primary/30 text-primary">
+                        {getVerticalConfig(entity.vertical).label}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button 
@@ -455,8 +495,8 @@ export default function HoldingStructurePage() {
             <TabsContent value="profile" className="space-y-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Legal Entity Name</Label>
-                <Input 
-                  id="edit-name" 
+                <Input
+                  id="edit-name"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   readOnly={currentUserRole !== 'admin'}
@@ -465,14 +505,37 @@ export default function HoldingStructurePage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-desc">Business Focus & Description</Label>
-                <Textarea 
-                  id="edit-desc" 
-                  rows={4}
+                <Textarea
+                  id="edit-desc"
+                  rows={3}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
                   readOnly={currentUserRole !== 'admin'}
                   className={currentUserRole !== 'admin' ? 'bg-muted' : ''}
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-vertical">Business Type</Label>
+                {currentUserRole === 'admin' ? (
+                  <Select value={editVertical} onValueChange={(v) => setEditVertical(v as BusinessVertical)}>
+                    <SelectTrigger id="edit-vertical">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(VERTICALS).map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.label} — {v.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={getVerticalConfig(editVertical).label}
+                    readOnly
+                    className="bg-muted"
+                  />
+                )}
               </div>
             </TabsContent>
 

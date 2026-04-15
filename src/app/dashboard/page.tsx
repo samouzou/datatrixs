@@ -20,6 +20,7 @@ import {
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
 import { FinancialRecord, Location } from "@/lib/types"
+import { useVertical } from "@/contexts/vertical-context"
 import { cn } from "@/lib/utils"
 import { AlertCircle, Zap, ShieldAlert, ShieldCheck, Loader2, Building2, Calendar as CalendarIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -73,6 +74,7 @@ const displayPeriod = (p: string) => {
 export default function DashboardPage() {
   const { user } = useUser()
   const firestore = useFirestore()
+  const vertical = useVertical()
   const [selectedPeriod, setSelectedPeriod] = React.useState<string>("latest")
 
   const recordsQuery = useMemoFirebase(() => {
@@ -304,11 +306,11 @@ export default function DashboardPage() {
           trend={kpis.margin.trend} 
           suffix="%" 
         />
-        <KpiCard 
-          label="Inventory Turn" 
-          value={kpis.turn.val.toFixed(1)} 
-          change={kpis.turn.change} 
-          trend={kpis.turn.trend} 
+        <KpiCard
+          label={vertical.kpi4Label}
+          value={kpis.turn.val.toFixed(1)}
+          change={kpis.turn.change}
+          trend={kpis.turn.trend}
         />
         
         <Card className="bg-primary/5 border-primary/20 shadow-sm relative overflow-hidden">
@@ -371,8 +373,8 @@ export default function DashboardPage() {
         
         <Card className="col-span-3 bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle>Unit Contribution ({selectedPeriod === 'latest' ? 'Current' : displayPeriod(selectedPeriod)})</CardTitle>
-            <CardDescription>Revenue share per authorized location</CardDescription>
+            <CardTitle>{vertical.unitsLabel} Contribution ({selectedPeriod === 'latest' ? 'Current' : displayPeriod(selectedPeriod)})</CardTitle>
+            <CardDescription>Revenue share per authorized {vertical.unitLabel.toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -463,7 +465,7 @@ export default function DashboardPage() {
         {!locations?.length && (
           <Card className="col-span-full py-12 flex flex-col items-center justify-center border-dashed border-2">
             <Loader2 className="size-12 text-muted-foreground opacity-20 mb-4 animate-spin" />
-            <p className="text-muted-foreground font-medium">No normalized locations found.</p>
+            <p className="text-muted-foreground font-medium">No normalized {vertical.unitsLabel.toLowerCase()} found.</p>
           </Card>
         )}
       </div>
