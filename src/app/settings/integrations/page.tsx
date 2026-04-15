@@ -36,6 +36,14 @@ export default function IntegrationsPage() {
       lastSync: "N/A"
     },
     {
+      id: "intacct",
+      name: "Sage Intacct",
+      description: "Multi-dimensional GL with native class, department, and project tracking — ideal for biotech and life sciences.",
+      status: "disconnected",
+      type: "cloud",
+      lastSync: "N/A"
+    },
+    {
       id: "excel",
       name: "Excel / CSV Loader",
       description: "Manual upload for locations using legacy or custom accounting.",

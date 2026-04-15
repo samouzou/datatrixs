@@ -76,6 +76,7 @@ export default function DashboardPage() {
   const firestore = useFirestore()
   const vertical = useVertical()
   const [selectedPeriod, setSelectedPeriod] = React.useState<string>("latest")
+  const [selectedProgram, setSelectedProgram] = React.useState<string>("all")
 
   const recordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -115,9 +116,15 @@ export default function DashboardPage() {
 
     if (!records || records.length === 0) return defaultData;
 
+    const activeRecords = selectedProgram === 'all'
+      ? records
+      : records.filter(r => (r.program || '') === selectedProgram);
+
+    if (activeRecords.length === 0) return defaultData;
+
     const periodMap: Record<string, { revenue: number; profit: number; inventory: number; locRevenues: Record<string, number> }> = {};
-    
-    records.forEach(r => {
+
+    activeRecords.forEach(r => {
       const metric = r.metric.toLowerCase();
       if (!periodMap[r.period]) {
         periodMap[r.period] = { revenue: 0, profit: 0, inventory: 0, locRevenues: {} };
@@ -162,7 +169,7 @@ export default function DashboardPage() {
     let prevData;
 
     if (targetPeriod === "all") {
-      latestData = records.reduce((acc, r) => {
+      latestData = activeRecords.reduce((acc, r) => {
         const metric = r.metric.toLowerCase();
         if (metric === 'revenue' || metric.includes('revenue')) {
           acc.revenue += r.value;
@@ -222,7 +229,13 @@ export default function DashboardPage() {
       latestPeriodLabel: displayPeriod(targetPeriod || "No Data"),
       availablePeriods: sortedPeriods
     };
-  }, [records, locations, selectedPeriod]);
+  }, [records, locations, selectedPeriod, selectedProgram]);
+
+  const availablePrograms = React.useMemo(() => {
+    if (!records) return [];
+    const programs = new Set(records.map(r => r.program).filter(Boolean));
+    return Array.from(programs) as string[];
+  }, [records]);
 
   const getBarColor = (value: number) => {
     if (value === 0) return "hsl(var(--destructive))";
@@ -262,6 +275,22 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center space-x-4">
+          {availablePrograms.length > 0 && (
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Program</span>
+              <Select value={selectedProgram} onValueChange={setSelectedProgram}>
+                <SelectTrigger className="w-[180px] h-9 bg-card border-border">
+                  <SelectValue placeholder="All Programs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Programs</SelectItem>
+                  {availablePrograms.map(p => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex flex-col items-end gap-1">
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fiscal Period</span>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>

@@ -66,7 +66,7 @@ export type Location = {
   phoneNumber: string;
   companyMembers: Record<string, CompanyRole>; 
   integrationStatus: 'connected' | 'pending' | 'disconnected';
-  integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'Manual';
+  integrationType: 'QuickBooks' | 'Excel' | 'NetSuite' | 'SageIntacct' | 'Manual';
   lastSync?: string;
   lastRawData?: string;
   createdAt: string;
@@ -108,9 +108,10 @@ export type FinancialRecord = {
   id: string;
   locationId: string;
   locationName: string;
-  period: string; 
+  period: string;
   metric: FinancialMetric;
   value: number;
-  companyMembers: Record<string, CompanyRole>; 
+  program?: string; // e.g. "Clinical Trial", "Commercial" — from Class column in Sage Intacct exports
+  companyMembers: Record<string, CompanyRole>;
   createdAt: string;
 };
