@@ -107,5 +107,13 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId) || isAppAdmin();
       allow delete: if isOwner(resource.data.userId) || isAppAdmin();
     }
+
+    match /financial_plans/{planId} {
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow create: if isSignedIn() && isCompanyMember(request.resource.data.companyMembers);
+      allow update: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
+      allow delete: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
+    }
   }
 }

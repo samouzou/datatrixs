@@ -105,6 +105,20 @@ export type SavedAnalysis = {
 
 export type FinancialMetric = string;
 
+export type FinancialPlan = {
+  id: string;
+  companyId: string;
+  locationId: string;
+  locationName: string;
+  period: string;
+  metric: string;
+  plannedValue: number;
+  version: string;
+  companyMembers: Record<string, CompanyRole>;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type FinancialRecord = {
   id: string;
   locationId: string;

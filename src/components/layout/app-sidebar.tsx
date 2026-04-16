@@ -4,17 +4,18 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { 
-  LayoutDashboard, 
-  MapPin, 
-  FilePieChart, 
-  MessageSquare, 
-  Settings, 
+import {
+  LayoutDashboard,
+  MapPin,
+  FilePieChart,
+  MessageSquare,
+  Settings,
   LogOut,
   Building2,
   Database,
   Library,
-  CreditCard
+  CreditCard,
+  TrendingUp,
 } from "lucide-react"
 
 import {
@@ -65,6 +66,11 @@ export function AppSidebar() {
       title: "Reports & Exports",
       href: "/reports",
       icon: FilePieChart,
+    },
+    {
+      title: "FP&A",
+      href: "/fpa",
+      icon: TrendingUp,
     },
     {
       title: "AI Financial Analyst",
