@@ -119,6 +119,31 @@ export type FinancialPlan = {
   updatedAt: string;
 };
 
+export type PipelineStage =
+  | 'Site Identified'
+  | 'LOI Signed'
+  | 'Lease Executed'
+  | 'Under Construction'
+  | 'Pre-Opening'
+  | 'Open';
+
+export type UnitPipeline = {
+  id: string;
+  companyId: string;
+  unitName: string;
+  market: string;
+  stage: PipelineStage;
+  expectedOpenDate: string;       // ISO date string
+  capexBudget: number;            // total budgeted CapEx
+  capexDeployed: number;          // CapEx spent to date
+  auvUnderwrite: number;          // projected annual unit volume at maturity
+  ebitdaTargetPct: number;        // target EBITDA margin at maturity (%)
+  notes: string;
+  companyMembers: Record<string, CompanyRole>;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type FinancialRecord = {
   id: string;
   locationId: string;

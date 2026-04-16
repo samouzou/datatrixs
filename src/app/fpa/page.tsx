@@ -3,10 +3,11 @@
 import * as React from "react"
 import {
   TrendingUp, ArrowUpRight, ArrowDownRight, Target, GitCompare,
-  FilePen, ChevronRight, Loader2, Cpu, Layers,
+  FilePen, ChevronRight, Loader2, Cpu, Layers, Route,
 } from "lucide-react"
 import { ForecastTab } from "@/components/fpa/forecast-tab"
 import { ScenarioTab } from "@/components/fpa/scenario-tab"
+import { PipelineTab } from "@/components/fpa/pipeline-tab"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { query, collection, where, doc, writeBatch } from "firebase/firestore"
-import { FinancialRecord, FinancialPlan, Company } from "@/lib/types"
+import { FinancialRecord, FinancialPlan, UnitPipeline, Company } from "@/lib/types"
 import { useVertical } from "@/contexts/vertical-context"
 import { cn } from "@/lib/utils"
 import {
@@ -262,6 +263,12 @@ export default function FpaPage() {
   }, [firestore, user]);
   const { data: companies } = useCollection<Company>(companiesQuery);
 
+  const pipelineQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, "unit_pipeline"), where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]));
+  }, [firestore, user]);
+  const { data: pipelineUnits } = useCollection<UnitPipeline>(pipelineQuery);
+
   // ── Derived ──
   const locations  = React.useMemo(() => getLocations(records ?? []), [records]);
   // Include periods from both actuals and saved plans (so forecast periods appear in the selector)
@@ -487,6 +494,9 @@ export default function FpaPage() {
           </TabsTrigger>
           <TabsTrigger value="scenarios" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <Layers className="size-3.5" /> Scenario Manager
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
+            <Route className="size-3.5" /> Unit Pipeline
           </TabsTrigger>
         </TabsList>
 
@@ -788,6 +798,17 @@ export default function FpaPage() {
             vertical={vertical}
             locations={locations}
             periods={periods}
+          />
+        </TabsContent>
+
+        {/* ── Unit Pipeline ── */}
+        <TabsContent value="pipeline">
+          <PipelineTab
+            units={pipelineUnits ?? []}
+            companies={companies ?? []}
+            user={user}
+            firestore={firestore}
+            vertical={vertical}
           />
         </TabsContent>
       </Tabs>
