@@ -65,8 +65,16 @@ service cloud.firestore {
     }
 
     match /company_invitations/{invitationId} {
-      allow list: if isSignedIn() && (resource.data.email == request.auth.token.email.lower() || isAppAdmin());
-      allow get: if isSignedIn() && (resource.data.email == request.auth.token.email.lower() || isAppAdmin());
+      allow list: if
+        (isSignedIn() && resource.data.email == request.auth.token.email.lower()) ||
+        isAppAdmin() ||
+        (isSignedIn() && isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)) ||
+        request.auth == null; // Allow unauthenticated pre-registration check
+      allow get: if
+        (isSignedIn() && resource.data.email == request.auth.token.email.lower()) ||
+        isAppAdmin() ||
+        (isSignedIn() && isCompanyAdmin(get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.members)) ||
+        request.auth == null;
       allow create: if isSignedIn(); 
       allow update: if isSignedIn() && (
         resource.data.email == request.auth.token.email.lower() || 

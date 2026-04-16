@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Mail, Lock, User, Loader2, Store, Cpu, Cloud, Briefcase, Building2, FlaskConical, ChevronRight } from "lucide-react"
+import { Mail, Lock, User, Loader2, Store, Cpu, Cloud, Briefcase, Building2, FlaskConical, ChevronRight, PartyPopper } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,6 +14,7 @@ import { initiateEmailSignUp } from "@/firebase/non-blocking-login"
 import { BusinessVertical } from "@/lib/types"
 import { VERTICALS, VerticalConfig } from "@/lib/verticals"
 import { cn } from "@/lib/utils"
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore"
 
 const VERTICAL_ICONS: Record<BusinessVertical, React.ElementType> = {
   retail: Store,
@@ -70,6 +71,7 @@ export default function RegisterPage() {
   const [password, setPassword] = React.useState("")
   const [selectedVertical, setSelectedVertical] = React.useState<BusinessVertical | null>(null)
   const [loading, setLoading] = React.useState(false)
+  const [invitedCompanyName, setInvitedCompanyName] = React.useState<string | null>(null)
   const auth = useAuth()
   const db = useFirestore()
   const { user, isUserLoading } = useUser()
@@ -81,8 +83,53 @@ export default function RegisterPage() {
     }
   }, [user, isUserLoading, router])
 
-  const handleCredentialsSubmit = (e: React.FormEvent) => {
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
+
+    try {
+      // Check for pending invitations before showing the vertical picker
+      const invitesSnap = await getDocs(
+        query(
+          collection(db, "company_invitations"),
+          where("email", "==", email.toLowerCase()),
+          where("status", "==", "pending")
+        )
+      )
+
+      if (!invitesSnap.empty) {
+        const invite = invitesSnap.docs[0].data()
+        const companyRef = doc(db, "companies", invite.companyId)
+        const companySnap = await getDoc(companyRef)
+
+        if (companySnap.exists()) {
+          const companyData = companySnap.data()
+          const vertical = companyData.vertical as BusinessVertical
+
+          // Store vertical so company creation picks it up, then skip step 2
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('pendingVertical', vertical)
+          }
+
+          setInvitedCompanyName(companyData.name ?? null)
+          setSelectedVertical(vertical)
+          setLoading(false)
+
+          // Give user a brief moment to see the banner, then auto-submit
+          setTimeout(() => {
+            const nameParts = name.trim().split(' ')
+            const firstName = nameParts[0] || ''
+            const lastName = nameParts.slice(1).join(' ') || ''
+            initiateEmailSignUp(auth, db, email, password, { firstName, lastName })
+          }, 1800)
+          return
+        }
+      }
+    } catch {
+      // Invitation lookup is best-effort; fall through to normal step 2
+    }
+
+    setLoading(false)
     setStep(2)
   }
 
@@ -139,6 +186,15 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {invitedCompanyName && (
+            <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+              <PartyPopper className="size-5 shrink-0 text-primary" />
+              <p className="text-sm text-foreground">
+                You&apos;ve been invited to <span className="font-semibold text-primary">{invitedCompanyName}</span> — creating your account now&hellip;
+              </p>
+              <Loader2 className="size-4 shrink-0 animate-spin text-primary ml-auto" />
+            </div>
+          )}
           {step === 1 ? (
             <form onSubmit={handleCredentialsSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -185,8 +241,9 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                Continue <ChevronRight className="ml-2 size-4" />
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
+                {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                Continue {!loading && <ChevronRight className="ml-2 size-4" />}
               </Button>
             </form>
           ) : (

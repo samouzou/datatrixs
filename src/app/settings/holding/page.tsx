@@ -3,9 +3,9 @@
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell } from "lucide-react"
+import { Building2, Plus, Users, Shield, Loader2, Trash2, Settings2, Save, X, Mail, Check, Bell, Clock, CheckCircle2, XCircle, ChevronDown } from "lucide-react"
 import { useCollection, useFirestore, useUser, useMemoFirebase, useDoc } from "@/firebase"
-import { collection, query, where, doc, getDocs, writeBatch } from "firebase/firestore"
+import { collection, query, where, doc, getDocs, writeBatch, deleteField, updateDoc } from "firebase/firestore"
 import { 
   Dialog, 
   DialogContent, 
@@ -27,18 +27,17 @@ import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
 import { Badge } from "@/components/ui/badge"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
-function MemberRow({ 
-  uid, 
-  role, 
-  isCurrent, 
-  onRemove, 
-  canManage 
-}: { 
-  uid: string, 
-  role: string, 
-  isCurrent: boolean,
-  onRemove: () => void,
+function MemberRow({
+  uid, role, isCurrent, onRemove, onChangeRole, canManage,
+}: {
+  uid: string
+  role: string
+  isCurrent: boolean
+  onRemove: () => void
+  onChangeRole: (newRole: CompanyRole) => void
   canManage: boolean
 }) {
   const firestore = useFirestore();
@@ -46,15 +45,15 @@ function MemberRow({
     if (!firestore || !uid) return null;
     return doc(firestore, "users", uid);
   }, [firestore, uid]);
-  
+
   const { data: profile, isLoading } = useDoc<UserProfile>(userRef);
 
-  const initials = profile 
+  const initials = profile
     ? `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`.toUpperCase()
     : uid.substring(0, 2).toUpperCase();
 
-  const fullName = profile 
-    ? `${profile.firstName} ${profile.lastName}`.trim() 
+  const fullName = profile
+    ? `${profile.firstName} ${profile.lastName}`.trim()
     : (isLoading ? "Loading..." : "Unknown User");
 
   const email = profile?.email || "";
@@ -71,14 +70,31 @@ function MemberRow({
             {isCurrent && <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-bold uppercase tracking-widest border-primary/30 text-primary">Me</Badge>}
           </div>
           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate">
-            {role} {email && `• ${email}`}
+            {email && `${email} · `}{role}
           </p>
         </div>
       </div>
       {canManage && !isCurrent && (
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={onRemove}>
-          <X className="size-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground capitalize">
+                {role} <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onChangeRole('admin')} className={cn(role === 'admin' && 'font-bold text-primary')}>
+                Admin
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onChangeRole('member')} className={cn(role === 'member' && 'font-bold text-primary')}>
+                Member
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={onRemove}>
+            <X className="size-3.5" />
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -127,7 +143,7 @@ export default function HoldingStructurePage() {
   const { data: companies, isLoading } = useCollection<Company>(companiesQuery);
   const vertical = getVerticalConfig(companies?.[0]?.vertical);
 
-  // Query for pending invitations for current user. 
+  // Invitations received by current user (pending only)
   const invitationsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.email) return null;
     return query(
@@ -136,8 +152,17 @@ export default function HoldingStructurePage() {
       where("status", "==", "pending")
     );
   }, [firestore, user]);
-
   const { data: invitations } = useCollection<CompanyInvitation>(invitationsQuery);
+
+  // Invitations sent by admins for the current company (all statuses)
+  const sentInvitationsQuery = useMemoFirebase(() => {
+    if (!firestore || !user || !companies?.[0]) return null;
+    return query(
+      collection(firestore, "company_invitations"),
+      where("companyId", "==", companies[0].id)
+    );
+  }, [firestore, user, companies]);
+  const { data: sentInvitations } = useCollection<CompanyInvitation>(sentInvitationsQuery);
 
   const handleCreateCompany = () => {
     if (!firestore || !user || !newCompanyName.trim()) return;
@@ -203,6 +228,30 @@ export default function HoldingStructurePage() {
     setInviteRole("member");
   };
 
+  const handleDeclineInvite = async (invite: CompanyInvitation) => {
+    if (!firestore) return;
+    setIsProcessingInvite(invite.id);
+    await updateDoc(doc(firestore, "company_invitations", invite.id), { status: 'declined' });
+    setIsProcessingInvite(null);
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    if (!firestore) return;
+    await updateDoc(doc(firestore, "company_invitations", inviteId), { status: 'cancelled' });
+  };
+
+  const handleRemoveMember = async (company: Company, uid: string) => {
+    if (!firestore) return;
+    const companyRef = doc(firestore, "companies", company.id);
+    await updateDoc(companyRef, { [`members.${uid}`]: deleteField() });
+  };
+
+  const handleChangeRole = async (company: Company, uid: string, newRole: CompanyRole) => {
+    if (!firestore) return;
+    const companyRef = doc(firestore, "companies", company.id);
+    await updateDoc(companyRef, { [`members.${uid}`]: newRole, updatedAt: new Date().toISOString() });
+  };
+
   const handleAcceptInvite = async (invite: CompanyInvitation) => {
     if (!firestore || !user) return;
     setIsProcessingInvite(invite.id);
@@ -227,13 +276,11 @@ export default function HoldingStructurePage() {
 
       // 3. Synchronize Membership to all existing Locations
       const locationsQuery = query(
-        collection(firestore, "locations"), 
+        collection(firestore, "locations"),
         where("companyId", "==", invite.companyId)
       );
-      
       const locationsSnap = await getDocs(locationsQuery);
       const locationIds: string[] = [];
-      
       locationsSnap.docs.forEach(locDoc => {
         locationIds.push(locDoc.id);
         batch.update(locDoc.ref, {
@@ -242,22 +289,45 @@ export default function HoldingStructurePage() {
         });
       });
 
-      // 4. Deep Synchronize Membership to existing Financial Records
-      // This ensures the dashboard calculations "unlock" for the new member immediately.
+      // 4. Deep sync: Financial Records
       for (const locId of locationIds) {
-        const recordsQuery = query(
+        const recordsSnap = await getDocs(query(
           collection(firestore, "financial_records"),
           where("locationId", "==", locId)
-        );
-        const recordsSnap = await getDocs(recordsQuery);
-        recordsSnap.docs.forEach(recordDoc => {
-          batch.update(recordDoc.ref, {
-            [`companyMembers.${user.uid}`]: invite.role
-          });
+        ));
+        recordsSnap.docs.forEach(d => {
+          batch.update(d.ref, { [`companyMembers.${user.uid}`]: invite.role });
         });
       }
 
-      // 5. Commit all updates as a single atomic job
+      // 5. Deep sync: Financial Plans (FP&A budgets + forecasts)
+      const plansSnap = await getDocs(query(
+        collection(firestore, "financial_plans"),
+        where("companyId", "==", invite.companyId)
+      ));
+      plansSnap.docs.forEach(d => {
+        batch.update(d.ref, { [`companyMembers.${user.uid}`]: invite.role });
+      });
+
+      // 6. Deep sync: Unit Pipeline
+      const pipelineSnap = await getDocs(query(
+        collection(firestore, "unit_pipeline"),
+        where("companyId", "==", invite.companyId)
+      ));
+      pipelineSnap.docs.forEach(d => {
+        batch.update(d.ref, { [`companyMembers.${user.uid}`]: invite.role });
+      });
+
+      // 7. Deep sync: Covenant Snapshots
+      const covenantsSnap = await getDocs(query(
+        collection(firestore, "covenant_snapshots"),
+        where("companyId", "==", invite.companyId)
+      ));
+      covenantsSnap.docs.forEach(d => {
+        batch.update(d.ref, { [`companyMembers.${user.uid}`]: invite.role });
+      });
+
+      // 8. Commit all updates as a single atomic job
       await batch.commit();
 
     } catch (e: any) {
@@ -383,7 +453,13 @@ export default function HoldingStructurePage() {
                     {isProcessingInvite === invite.id ? <Loader2 className="size-3 animate-spin mr-2" /> : <Check className="mr-2 size-3" />}
                     Accept
                   </Button>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" disabled={isProcessingInvite === invite.id}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeclineInvite(invite)}
+                    disabled={isProcessingInvite === invite.id}
+                  >
                     Decline
                   </Button>
                 </CardContent>
@@ -576,17 +652,62 @@ export default function HoldingStructurePage() {
                   {editingCompany && Object.entries(editingCompany.members || {}).map(([uid, role]) => {
                     const displayRole = typeof role === 'boolean' ? (role ? 'admin' : 'member') : role;
                     return (
-                      <MemberRow 
+                      <MemberRow
                         key={uid}
                         uid={uid}
                         role={displayRole}
                         isCurrent={uid === user?.uid}
-                        onRemove={() => {}} // Placeholder for removal logic
+                        onRemove={() => handleRemoveMember(editingCompany, uid)}
+                        onChangeRole={(newRole) => handleChangeRole(editingCompany, uid, newRole)}
                         canManage={currentUserRole === 'admin'}
                       />
                     );
                   })}
                 </div>
+
+                {/* Sent invitations */}
+                {currentUserRole === 'admin' && sentInvitations && sentInvitations.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sent Invitations</p>
+                    {sentInvitations.map(inv => {
+                      const statusMeta = {
+                        pending:   { icon: <Clock className="size-3" />,        label: 'Pending',   cls: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
+                        accepted:  { icon: <CheckCircle2 className="size-3" />, label: 'Accepted',  cls: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
+                        declined:  { icon: <XCircle className="size-3" />,      label: 'Declined',  cls: 'text-destructive bg-destructive/10 border-destructive/20' },
+                        cancelled: { icon: <X className="size-3" />,            label: 'Cancelled', cls: 'text-muted-foreground bg-muted/50 border-border' },
+                      }[inv.status] ?? { icon: null, label: inv.status, cls: 'text-muted-foreground' }
+
+                      return (
+                        <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="size-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                              {inv.email[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{inv.email}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">{inv.role}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={cn("inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border", statusMeta.cls)}>
+                              {statusMeta.icon} {statusMeta.label}
+                            </span>
+                            {inv.status === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleCancelInvite(inv.id)}
+                              >
+                                <X className="size-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
