@@ -77,7 +77,7 @@ export type SavedReport = {
   id: string;
   userId: string;
   title: string;
-  type: 'Financial Report' | 'Data Export';
+  type: 'Financial Report' | 'Data Export' | 'Financial Package';
   summary: string;
   content: string; 
   companyMembers: Record<string, CompanyRole>; 

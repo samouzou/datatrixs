@@ -2,15 +2,16 @@
 'use client';
 
 import * as React from "react"
-import { 
-  FilePieChart, 
-  Download, 
-  Plus, 
-  FileText, 
-  Table as TableIcon, 
+import {
+  FilePieChart,
+  Download,
+  Plus,
+  FileText,
+  Table as TableIcon,
   Sparkles,
   Loader2,
-  Save
+  Save,
+  PackageOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,11 +29,13 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
+import { PackageTab } from "@/components/reports/package-tab"
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase"
 import { query, collection, where, doc } from "firebase/firestore"
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { SavedReport, FinancialRecord, Company } from "@/lib/types"
+import { SavedReport, FinancialRecord, FinancialPlan, Company } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { useVertical } from "@/contexts/vertical-context"
 
 function MarkdownTable({ content }: { content: string }) {
   const lines = content.trim().split('\n');
@@ -71,6 +74,7 @@ export default function ReportsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
   const { toast } = useToast()
+  const vertical = useVertical()
   
   const [reportQuery, setReportQuery] = React.useState("")
   const [exportQuery, setExportQuery] = React.useState("")
@@ -97,6 +101,15 @@ export default function ReportsPage() {
     );
   }, [firestore, user]);
   const { data: companies } = useCollection<Company>(companiesQuery);
+
+  const plansQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, "financial_plans"),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user]);
+  const { data: plans } = useCollection<FinancialPlan>(plansQuery);
 
   const aiContext = React.useMemo(() => {
     if (!records) return "[]";
@@ -213,6 +226,9 @@ export default function ReportsPage() {
         <TabsList className="bg-card/50 border border-border p-1 h-12">
           <TabsTrigger value="reports" className="px-6 data-[state=active]:bg-primary h-10">AI Report Builder</TabsTrigger>
           <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Explorer</TabsTrigger>
+          <TabsTrigger value="packages" className="px-6 data-[state=active]:bg-primary h-10 gap-2">
+            <PackageOpen className="size-4" /> Financial Packages
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="reports" className="space-y-6 animate-in fade-in duration-300">
@@ -318,6 +334,17 @@ export default function ReportsPage() {
               />
             </div>
           )}
+        </TabsContent>
+        <TabsContent value="packages" className="space-y-6 animate-in fade-in duration-300">
+          <PackageTab
+            records={records ?? []}
+            plans={plans ?? []}
+            companies={companies ?? []}
+            user={user}
+            firestore={firestore}
+            vertical={vertical}
+            onSaved={title => toast({ title: "Saved to Library", description: `"${title}" is now available in your Saved Library.` })}
+          />
         </TabsContent>
       </Tabs>
     </div>

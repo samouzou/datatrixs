@@ -19,15 +19,20 @@ interface SpreadsheetViewProps {
   headers: string[];
   data: string[][];
   title?: string;
+  filename?: string;
   className?: string;
 }
 
 const formatCompactValue = (val: string) => {
   if (!val) return "";
-  // If it's already formatted (contains K, M, or $), return as is
-  if (/[KkMm$]/.test(val)) return val;
-  
-  const num = Number(val.replace(/[^0-9.-]+/g, ""));
+  // Already formatted or is a percentage — return as-is
+  if (/[KkMm$%]/.test(val)) return val;
+
+  const stripped = val.replace(/[^0-9.-]+/g, "");
+  // No digits at all (e.g. metric names like "Revenue") — plain text
+  if (!stripped) return val;
+
+  const num = Number(stripped);
   if (isNaN(num)) return val;
 
   const absNum = Math.abs(num);
@@ -36,8 +41,21 @@ const formatCompactValue = (val: string) => {
   return `$${num.toLocaleString()}`;
 };
 
-export function SpreadsheetView({ headers, data, title, className }: SpreadsheetViewProps) {
+export function SpreadsheetView({ headers, data, title, filename, className }: SpreadsheetViewProps) {
   const [searchTerm, setSearchTerm] = React.useState("");
+
+  function handleDownload() {
+    const csv = [headers, ...data]
+      .map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${filename ?? title ?? 'export'}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const filteredData = React.useMemo(() => {
     if (!searchTerm) return data;
@@ -70,8 +88,8 @@ export function SpreadsheetView({ headers, data, title, className }: Spreadsheet
               className="pl-9 h-9 w-[200px] bg-muted/30 border-border text-xs focus-visible:ring-primary"
             />
           </div>
-          <Button variant="outline" size="sm" className="h-9 border-border text-xs hover:bg-accent hover:text-accent-foreground">
-            <Download className="size-3.5 mr-2" /> Export CSV
+          <Button variant="outline" size="sm" className="h-9 border-border text-xs hover:bg-accent hover:text-accent-foreground" onClick={handleDownload}>
+            <Download className="size-3.5 mr-2" /> Download CSV
           </Button>
         </div>
       </div>

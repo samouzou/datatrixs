@@ -2,15 +2,16 @@
 'use client';
 
 import * as React from "react"
-import { 
-  Library, 
-  FileText, 
-  Table as TableIcon, 
+import {
+  Library,
+  FileText,
+  Table as TableIcon,
   Sparkles,
   Loader2,
   ArrowRight,
   Trash2,
   Download,
+  PackageOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -64,12 +65,12 @@ export default function LibraryPage() {
 
   // Query formal reports & exports
   const reportsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports')) return null;
+    if (!firestore || !user || (activeTab !== 'reports' && activeTab !== 'exports' && activeTab !== 'packages')) return null;
     return query(
       collection(firestore, "saved_reports"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
-  }, [firestore, user?.uid, activeTab]); 
+  }, [firestore, user?.uid, activeTab]);
   const { data: rawReports, isLoading: isLoadingReports } = useCollection<SavedReport>(reportsQuery);
   const reports = React.useMemo(() => rawReports?.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? null, [rawReports]);
 
@@ -105,6 +106,9 @@ export default function LibraryPage() {
         <TabsList className="bg-card/50 border border-border p-1 h-12">
           <TabsTrigger value="reports" className="px-6 data-[state=active]:bg-primary h-10">Formal Reports</TabsTrigger>
           <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Exports</TabsTrigger>
+          <TabsTrigger value="packages" className="px-6 data-[state=active]:bg-primary h-10 gap-2">
+            <PackageOpen className="size-4" /> Financial Packages
+          </TabsTrigger>
           <TabsTrigger value="analysis" className="px-6 data-[state=active]:bg-primary h-10">Analyst Insights</TabsTrigger>
         </TabsList>
 
@@ -134,6 +138,20 @@ export default function LibraryPage() {
               />
             ))}
             {!isLoadingReports && activeTab === 'exports' && !reports?.some(r => r.type === 'Data Export') && <EmptyState text="No data exports compiled yet." />}
+            {isLoadingReports && <LoadingState />}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="packages" className="animate-in fade-in duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reports?.filter(r => r.type === 'Financial Package').map((item) => (
+              <SavedPackageCard
+                key={item.id}
+                item={item}
+                onDelete={() => handleDelete("saved_reports", item.id)}
+              />
+            ))}
+            {!isLoadingReports && activeTab === 'packages' && !reports?.some(r => r.type === 'Financial Package') && <EmptyState text="No financial packages saved yet." />}
             {isLoadingReports && <LoadingState />}
           </div>
         </TabsContent>
@@ -283,6 +301,106 @@ function SavedAnalysisCard({ item, onDelete }: { item: SavedAnalysis, onDelete: 
         <Button variant="ghost" size="icon" className="size-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={onDelete}>
           <Trash2 className="size-3.5" />
         </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Parse a CSV line correctly — respects quoted cells containing commas */
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+      else inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      cells.push(current.trim())
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  cells.push(current.trim())
+  return cells
+}
+
+
+function SavedPackageCard({ item, onDelete }: { item: SavedReport; onDelete: () => void }) {
+  const { headers, rows } = React.useMemo(() => {
+    const lines = item.content.split('\n').filter(Boolean)
+    const headers = parseCsvLine(lines[0] ?? '')
+    const rows = lines.slice(1).map(parseCsvLine)
+    return { headers, rows }
+  }, [item.content])
+
+  return (
+    <Card className="bg-card/20 border-border hover:border-primary/50 hover:bg-card/40 transition-all group flex flex-col h-full">
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start">
+          <Badge variant="secondary" className="text-[10px] uppercase tracking-tight bg-primary/10 text-primary border-primary/20">
+            Financial Package
+          </Badge>
+          <span className="text-[10px] text-muted-foreground">
+            {new Date(item.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+        <CardTitle className="text-sm mt-3 text-foreground font-medium leading-tight flex items-center gap-2">
+          <PackageOpen className="size-4 text-primary" />
+          <span className="truncate">{item.title}</span>
+        </CardTitle>
+        <CardDescription className="text-xs pt-1 line-clamp-2">{item.summary}</CardDescription>
+      </CardHeader>
+      <CardContent className="mt-auto pt-0 flex justify-between items-center">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="link" size="sm" className="p-0 h-auto text-xs text-primary/80 hover:text-primary">
+              Open Package <ArrowRight className="ml-1 size-3" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>{item.title}</DialogTitle>
+              <DialogDescription>Saved {new Date(item.createdAt).toLocaleString()}</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="rounded-xl border border-border overflow-hidden">
+                <SpreadsheetView
+                  title={item.title}
+                  filename={item.title}
+                  headers={headers}
+                  data={rows}
+                  className="border-none rounded-none"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => downloadCsv(item.content, item.title)}
+          >
+            <Download className="size-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="size-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={onDelete}>
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
