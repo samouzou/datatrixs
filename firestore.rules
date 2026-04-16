@@ -116,6 +116,14 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
     }
 
+    match /covenant_snapshots/{snapId} {
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow create: if isSignedIn() && isCompanyMember(request.resource.data.companyMembers);
+      allow update: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
+      allow delete: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
+    }
+
     match /unit_pipeline/{unitId} {
       allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());

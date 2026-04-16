@@ -144,6 +144,25 @@ export type UnitPipeline = {
   updatedAt: string;
 };
 
+export type CovenantSnapshot = {
+  id: string;                    // {companyId}_{period}
+  companyId: string;
+  period: string;
+  totalDebt: number;
+  cash: number;
+  interestExpense: number;
+  fixedCharges: number;          // rent + interest + lease payments
+  companyMembers: Record<string, CompanyRole>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CovenantThresholds = {
+  netLeverageCeiling: number;    // breach ABOVE this (e.g. 5.0x)
+  interestCoverageFloor: number; // breach BELOW this (e.g. 2.0x)
+  fccrFloor: number;             // breach BELOW this (e.g. 1.1x)
+};
+
 export type FinancialRecord = {
   id: string;
   locationId: string;
