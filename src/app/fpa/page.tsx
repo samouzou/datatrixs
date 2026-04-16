@@ -171,7 +171,7 @@ function buildWaterfall(
   return entries;
 }
 
-function WaterfallTooltip({ active, payload, label }: any) {
+function WaterfallTooltip({ active, payload, label, bridgeLabel }: any) {
   if (!active || !payload?.length) return null;
   const entry = payload[0]?.payload as WaterfallEntry;
   if (!entry) return null;
@@ -180,7 +180,7 @@ function WaterfallTooltip({ active, payload, label }: any) {
     <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs space-y-1 min-w-[120px]">
       <p className="font-bold text-foreground">{label}</p>
       {entry.isTotal ? (
-        <p className="text-muted-foreground">EBITDA: <span className="text-foreground font-bold">{fmtCurrency(entry.total)}</span></p>
+        <p className="text-muted-foreground">{bridgeLabel ?? 'EBITDA'}: <span className="text-foreground font-bold">{fmtCurrency(entry.total)}</span></p>
       ) : (
         <p className={cn("font-bold", delta >= 0 ? "text-emerald-500" : "text-destructive")}>
           Impact: {delta >= 0 ? '+' : ''}{fmtCurrency(delta)}
@@ -192,10 +192,10 @@ function WaterfallTooltip({ active, payload, label }: any) {
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 
-function KpiCard({ title, actual, planned }: { title: string; actual: number; planned: number }) {
+function KpiCard({ title, actual, planned, goodDirection = 'up' }: { title: string; actual: number; planned: number; goodDirection?: 'up' | 'down' }) {
   const hasPlanned = planned !== 0;
   const varPct = hasPlanned ? ((actual - planned) / Math.abs(planned)) * 100 : null;
-  const isGood = !hasPlanned || actual >= planned;
+  const isGood = !hasPlanned || (goodDirection === 'up' ? actual >= planned : actual <= planned);
   const progress = hasPlanned ? Math.min(100, Math.max(0, (actual / planned) * 100)) : 0;
 
   return (
@@ -460,31 +460,40 @@ export default function FpaPage() {
 
       {/* KPI summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard title="Total Revenue"  actual={totalActualRevenue}  planned={totalPlannedRevenue} />
-        <KpiCard title="Net Profit"     actual={totalActualProfit}   planned={totalPlannedProfit} />
-
-        {/* Net Margin card — manual since it's a % not $ */}
-        <Card className="bg-card/50 border-border">
-          <CardHeader className="pb-1">
-            <CardDescription className="text-[10px] uppercase tracking-widest font-semibold">Net Margin %</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-bold">{actualMarginPct.toFixed(1)}%</span>
-              {plannedMarginPct > 0 && (
-                <span className={cn("flex items-center text-sm font-bold mb-0.5", marginIsGood ? "text-emerald-500" : "text-destructive")}>
-                  {marginIsGood ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
-                  {fmtPct(actualMarginPct - plannedMarginPct)}
-                </span>
-              )}
-            </div>
-            {plannedMarginPct > 0 ? (
-              <p className="text-[10px] text-muted-foreground">Budget: {plannedMarginPct.toFixed(1)}%</p>
-            ) : (
-              <p className="text-[10px] text-muted-foreground italic">Set budgets to compare</p>
-            )}
-          </CardContent>
-        </Card>
+        {vertical.kpiCards ? (
+          vertical.kpiCards.map(card => {
+            const actual  = rows.reduce((s, r) => s + card.metrics.reduce((ms, m) => ms + (r.actual[m]  ?? 0), 0), 0);
+            const planned = rows.reduce((s, r) => s + card.metrics.reduce((ms, m) => ms + (r.planned[m] ?? 0), 0), 0);
+            return <KpiCard key={card.title} title={card.title} actual={actual} planned={planned} goodDirection={card.goodDirection} />;
+          })
+        ) : (
+          <>
+            <KpiCard title="Total Revenue" actual={totalActualRevenue} planned={totalPlannedRevenue} />
+            <KpiCard title="Net Profit"    actual={totalActualProfit}  planned={totalPlannedProfit} />
+            {/* Net Margin card — manual since it's a % not $ */}
+            <Card className="bg-card/50 border-border">
+              <CardHeader className="pb-1">
+                <CardDescription className="text-[10px] uppercase tracking-widest font-semibold">Net Margin %</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold">{actualMarginPct.toFixed(1)}%</span>
+                  {plannedMarginPct > 0 && (
+                    <span className={cn("flex items-center text-sm font-bold mb-0.5", marginIsGood ? "text-emerald-500" : "text-destructive")}>
+                      {marginIsGood ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
+                      {fmtPct(actualMarginPct - plannedMarginPct)}
+                    </span>
+                  )}
+                </div>
+                {plannedMarginPct > 0 ? (
+                  <p className="text-[10px] text-muted-foreground">Budget: {plannedMarginPct.toFixed(1)}%</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground italic">Set budgets to compare</p>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -494,7 +503,7 @@ export default function FpaPage() {
             <Target    className="size-3.5" /> Plan vs. Actual
           </TabsTrigger>
           <TabsTrigger value="bridge" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
-            <GitCompare className="size-3.5" /> EBITDA Bridge
+            <GitCompare className="size-3.5" /> {vertical.bridgeLabel} Bridge
           </TabsTrigger>
           <TabsTrigger value="forecast" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <Cpu className="size-3.5" /> Forecast Builder
@@ -707,16 +716,16 @@ export default function FpaPage() {
           {waterfallData.length === 0 ? (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl">
               <GitCompare className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-muted-foreground italic">Select two different periods to generate a bridge.</p>
+              <p className="text-muted-foreground italic">Select two different periods to generate a {vertical.bridgeLabel} bridge.</p>
             </div>
           ) : (
             <Card className="bg-card/30 border-border p-6 space-y-4">
               <div>
                 <h3 className="font-bold text-foreground">
-                  EBITDA Bridge: {fmtShortPeriod(bridgeFrom)} → {fmtShortPeriod(bridgeTo)}
+                  {vertical.bridgeLabel} Bridge: {fmtShortPeriod(bridgeFrom)} → {fmtShortPeriod(bridgeTo)}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Waterfall showing each driver of change in EBITDA between the two periods.
+                  Waterfall showing each driver of change in {vertical.bridgeLabel} between the two periods.
                 </p>
               </div>
               <ResponsiveContainer width="100%" height={340}>
@@ -735,7 +744,7 @@ export default function FpaPage() {
                     tickFormatter={v => fmtCurrency(v)}
                     width={64}
                   />
-                  <Tooltip content={<WaterfallTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
+                  <Tooltip content={(props) => <WaterfallTooltip {...props} bridgeLabel={vertical.bridgeLabel} />} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
                   <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} />
                   {/* Invisible lift bar */}
                   <Bar dataKey="base" stackId="a" fill="transparent" />

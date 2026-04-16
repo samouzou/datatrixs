@@ -120,12 +120,20 @@ export type FinancialPlan = {
 };
 
 export type PipelineStage =
+  // Retail / physical unit stages
   | 'Site Identified'
   | 'LOI Signed'
   | 'Lease Executed'
   | 'Under Construction'
   | 'Pre-Opening'
-  | 'Open';
+  | 'Open'
+  // Biotech / clinical stages
+  | 'Preclinical'
+  | 'Phase 1'
+  | 'Phase 2'
+  | 'Phase 3'
+  | 'Filed'
+  | 'Approved';
 
 export type UnitPipeline = {
   id: string;

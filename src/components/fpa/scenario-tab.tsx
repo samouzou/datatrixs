@@ -17,7 +17,7 @@ import { doc, writeBatch } from "firebase/firestore"
 import type { Firestore } from "firebase/firestore"
 import type { User } from "firebase/auth"
 import { FinancialRecord, FinancialPlan, Company } from "@/lib/types"
-import type { VerticalConfig } from "@/lib/verticals"
+import type { VerticalConfig, ForecastLabels } from "@/lib/verticals"
 import { cn } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -212,11 +212,12 @@ function AssumptionRow({
 // ─── Scenario card ────────────────────────────────────────────────────────────
 
 function ScenarioCard({
-  scenario, onChange, rows,
+  scenario, onChange, rows, forecastLabels,
 }: {
   scenario: ScenarioConfig
   onChange: (partial: Partial<ScenarioConfig>) => void
   rows: ForecastRow[]
+  forecastLabels: ForecastLabels
 }) {
   const lastRow = rows[rows.length - 1]
 
@@ -242,7 +243,7 @@ function ScenarioCard({
                 : lastRow.ebitdaMarginPct >= 8 ? "bg-amber-500/15 text-amber-500"
                 : "bg-destructive/15 text-destructive"
             )}>
-              {lastRow.ebitdaMarginPct.toFixed(1)}% EBITDA
+              {lastRow.ebitdaMarginPct.toFixed(1)}% {forecastLabels.profitLabel}
             </span>
           )}
         </div>
@@ -250,7 +251,7 @@ function ScenarioCard({
           <div className="mt-2 space-y-0.5">
             <p className="text-xl font-bold">{fmtCurrency(lastRow.revenue)}</p>
             <CardDescription className="text-[10px]">
-              Revenue at end of forecast · EBITDA {fmtCurrency(lastRow.ebitda)}
+              Revenue at end of forecast · {forecastLabels.profitLabel} {fmtCurrency(lastRow.ebitda)}
             </CardDescription>
           </div>
         )}
@@ -258,9 +259,9 @@ function ScenarioCard({
       <CardContent className="px-4 pb-4">
         <div className="h-px bg-border mb-3" />
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">Assumptions</p>
-        <AssumptionRow label="SSS Growth / Period" value={scenario.sssPct} onChange={v => onChange({ sssPct: v })} suffix="%" step={0.5} min={-20} max={30} />
+        <AssumptionRow label={forecastLabels.scenarioGrowthLabel} value={scenario.sssPct} onChange={v => onChange({ sssPct: v })} suffix="%" step={0.5} min={-20} max={30} />
         <AssumptionRow label="New Units / Period" value={scenario.newUnitsPerPeriod} onChange={v => onChange({ newUnitsPerPeriod: Math.max(0, Math.round(v)) })} suffix="" step={1} min={0} max={50} />
-        <AssumptionRow label="AUV" value={scenario.auv} onChange={v => onChange({ auv: Math.max(0, Math.round(v)) })} suffix="" step={10000} min={0} max={10000000} />
+        <AssumptionRow label={forecastLabels.scenarioNewUnitValueLabel} value={scenario.auv} onChange={v => onChange({ auv: Math.max(0, Math.round(v)) })} suffix="" step={10000} min={0} max={10000000} />
         <div className="h-px bg-border/50 my-2" />
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">Cost Structure</p>
         <AssumptionRow label="COGS %" value={scenario.cogsPct} onChange={v => onChange({ cogsPct: v })} suffix="%" step={0.5} min={0} max={100} />
@@ -312,45 +313,15 @@ export function ScenarioTab({
   const [isSaving, setIsSaving] = React.useState(false)
   const [savedMsg, setSavedMsg] = React.useState('')
 
-  // Scenarios state — keyed by id
-  const [scenarios, setScenarios] = React.useState<ScenarioConfig[]>([
-    {
-      id: 'bear',
-      name: 'Bear',
-      color: 'hsl(var(--destructive))',
-      badgeClass: 'border-destructive/20',
-      sssPct: -1.0,
-      newUnitsPerPeriod: 0,
-      cogsPct: 40,
-      laborPct: 30,
-      opexPct: 14,
-      auv: 0,
-    },
-    {
-      id: 'base',
-      name: 'Base',
-      color: 'hsl(var(--primary))',
-      badgeClass: 'border-primary/20',
-      sssPct: 3.0,
-      newUnitsPerPeriod: 0,
-      cogsPct: 38,
-      laborPct: 28,
-      opexPct: 12,
-      auv: 0,
-    },
-    {
-      id: 'bull',
-      name: 'Bull',
-      color: 'hsl(142 71% 45%)',
-      badgeClass: 'border-emerald-500/20',
-      sssPct: 7.0,
-      newUnitsPerPeriod: 1,
-      cogsPct: 36,
-      laborPct: 26,
-      opexPct: 11,
-      auv: 0,
-    },
-  ])
+  // Scenarios state — seeded from vertical defaults
+  const [scenarios, setScenarios] = React.useState<ScenarioConfig[]>(() => {
+    const d = vertical.scenarioDefaults
+    return [
+      { id: 'bear', name: 'Bear', color: 'hsl(var(--destructive))', badgeClass: 'border-destructive/20',  ...d.bear },
+      { id: 'base', name: 'Base', color: 'hsl(var(--primary))',     badgeClass: 'border-primary/20',      ...d.base },
+      { id: 'bull', name: 'Bull', color: 'hsl(142 71% 45%)',        badgeClass: 'border-emerald-500/20',  ...d.bull },
+    ]
+  })
 
   function updateScenario(id: ScenarioId, partial: Partial<ScenarioConfig>) {
     setScenarios(prev => prev.map(s => s.id === id ? { ...s, ...partial } : s))
@@ -558,6 +529,7 @@ export function ScenarioTab({
                 scenario={s}
                 onChange={partial => updateScenario(s.id, partial)}
                 rows={forecastMap[s.id]}
+                forecastLabels={vertical.forecastLabels}
               />
             ))}
           </div>
@@ -568,7 +540,7 @@ export function ScenarioTab({
               <div>
                 <h3 className="font-bold text-foreground">Scenario Comparison</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Side-by-side {chartMetric === 'revenue' ? 'Revenue' : 'EBITDA'} trajectory across all scenarios.
+                  Side-by-side {chartMetric === 'revenue' ? 'Revenue' : vertical.forecastLabels.profitLabel} trajectory across all scenarios.
                 </p>
               </div>
               <div className="flex gap-1">
@@ -583,7 +555,7 @@ export function ScenarioTab({
                         : "border-border text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {m === 'revenue' ? 'Revenue' : 'EBITDA'}
+                    {m === 'revenue' ? 'Revenue' : vertical.forecastLabels.profitLabel}
                   </button>
                 ))}
               </div>
@@ -648,9 +620,9 @@ export function ScenarioTab({
                     format={fmtCurrency}
                     higherIsBetter
                   />
-                  {/* EBITDA */}
+                  {/* Profit metric */}
                   <CompRow
-                    label="EBITDA (final period)"
+                    label={`${vertical.forecastLabels.profitLabel} (final period)`}
                     baseValue={baseEbitda}
                     scenarios={scenarios}
                     forecastMap={forecastMap}
@@ -658,9 +630,9 @@ export function ScenarioTab({
                     format={fmtCurrency}
                     higherIsBetter
                   />
-                  {/* EBITDA margin */}
+                  {/* Profit margin */}
                   <CompRow
-                    label="EBITDA Margin % (final)"
+                    label={`${vertical.forecastLabels.profitPctLabel} (final)`}
                     baseValue={baseRevenue > 0 ? (baseEbitda / baseRevenue) * 100 : 0}
                     scenarios={scenarios}
                     forecastMap={forecastMap}

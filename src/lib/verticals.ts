@@ -1,5 +1,66 @@
 import { BusinessVertical } from '@/lib/types';
 
+export type ForecastLabels = {
+  growthRateLabel: string;
+  newUnitValueLabel: string;
+  profitLabel: string;
+  profitPctLabel: string;
+  scenarioGrowthLabel: string;
+  scenarioNewUnitValueLabel: string;
+  chartTitle: string;
+};
+
+export type ScenarioDefault = {
+  sssPct: number;
+  newUnitsPerPeriod: number;
+  cogsPct: number;
+  laborPct: number;
+  opexPct: number;
+  auv: number;
+};
+
+export type ScenarioDefaults = {
+  bear: ScenarioDefault;
+  base: ScenarioDefault;
+  bull: ScenarioDefault;
+};
+
+export type PipelineIconKey =
+  | 'building' | 'chevron' | 'calendar' | 'alert' | 'trending' | 'check'
+  | 'flask' | 'activity' | 'file-check' | 'shield-check';
+
+export type PipelineStageDef = {
+  name: string;
+  color: string;
+  bgClass: string;
+  borderClass: string;
+  iconKey: PipelineIconKey;
+};
+
+export type PipelineFieldLabels = {
+  unitNameLabel: string;
+  unitNamePlaceholder: string;
+  marketLabel: string;
+  marketPlaceholder: string;
+  budgetLabel: string;
+  spendLabel: string;
+  valueLabel: string;
+  valueSub: string;
+  returnLabel: string;
+  returnAggLabel: string;
+  milestoneLabel: string;
+  completedStage: string;
+  notesPlaceholder: string;
+};
+
+export type KpiCardDef = {
+  title: string;
+  /** One or more metric names to sum from financial_records */
+  metrics: string[];
+  /** Whether higher actual vs budget is good (green) or bad (red) */
+  goodDirection: 'up' | 'down';
+};
+
 export type VerticalConfig = {
   id: BusinessVertical;
   label: string;
@@ -18,6 +79,100 @@ export type VerticalConfig = {
   defaultMetrics: string[];
   /** Label used for the organizational grouping concept (replaces "Holding") */
   organizationLabel: string;
+  /** Label for the waterfall bridge chart (default 'EBITDA') */
+  bridgeLabel: string;
+  /** Override the 3 summary KPI cards on the FP&A page. Omit to use generic Revenue/Profit/Margin. */
+  kpiCards?: KpiCardDef[];
+  /** Ordered pipeline stages for this vertical */
+  pipelineStages: PipelineStageDef[];
+  /** Field and label config for the pipeline tab */
+  pipelineLabels: PipelineFieldLabels;
+  /** Label overrides for the Forecast Builder tab */
+  forecastLabels: ForecastLabels;
+  /** Default assumption seeds for the three scenario cards */
+  scenarioDefaults: ScenarioDefaults;
+};
+
+const RETAIL_FORECAST_LABELS: ForecastLabels = {
+  growthRateLabel: 'Same-Store Sales Growth %',
+  newUnitValueLabel: 'Target AUV at Maturity',
+  profitLabel: 'EBITDA',
+  profitPctLabel: 'EBITDA %',
+  scenarioGrowthLabel: 'SSS Growth / Period',
+  scenarioNewUnitValueLabel: 'AUV',
+  chartTitle: 'Revenue & EBITDA Trajectory',
+};
+
+const RETAIL_SCENARIO_DEFAULTS: ScenarioDefaults = {
+  bear: { sssPct: -1.0, newUnitsPerPeriod: 0, cogsPct: 40, laborPct: 30, opexPct: 14, auv: 0 },
+  base: { sssPct:  3.0, newUnitsPerPeriod: 0, cogsPct: 38, laborPct: 28, opexPct: 12, auv: 0 },
+  bull: { sssPct:  7.0, newUnitsPerPeriod: 1, cogsPct: 36, laborPct: 26, opexPct: 11, auv: 0 },
+};
+
+const BIOTECH_FORECAST_LABELS: ForecastLabels = {
+  growthRateLabel: 'Revenue Growth %',
+  newUnitValueLabel: 'Milestone / Licensing Value',
+  profitLabel: 'Operating Income/(Loss)',
+  profitPctLabel: 'Op. Income %',
+  scenarioGrowthLabel: 'Revenue Growth / Period',
+  scenarioNewUnitValueLabel: 'Milestone Value',
+  chartTitle: 'Revenue & Operating Loss Trajectory',
+};
+
+const BIOTECH_SCENARIO_DEFAULTS: ScenarioDefaults = {
+  bear: { sssPct: -15, newUnitsPerPeriod: 0, cogsPct: 0, laborPct: 65, opexPct: 25, auv:         0 },
+  base: { sssPct:   5, newUnitsPerPeriod: 0, cogsPct: 0, laborPct: 60, opexPct: 20, auv:         0 },
+  bull: { sssPct:  25, newUnitsPerPeriod: 1, cogsPct: 0, laborPct: 55, opexPct: 18, auv: 5_000_000 },
+};
+
+const RETAIL_PIPELINE_STAGES: PipelineStageDef[] = [
+  { name: 'Site Identified',    color: '#94a3b8', bgClass: 'bg-slate-500/10',   borderClass: 'border-slate-500/30',   iconKey: 'building'   },
+  { name: 'LOI Signed',         color: '#a78bfa', bgClass: 'bg-violet-500/10',  borderClass: 'border-violet-500/30',  iconKey: 'chevron'    },
+  { name: 'Lease Executed',     color: '#60a5fa', bgClass: 'bg-blue-500/10',    borderClass: 'border-blue-500/30',    iconKey: 'calendar'   },
+  { name: 'Under Construction', color: '#fb923c', bgClass: 'bg-orange-500/10',  borderClass: 'border-orange-500/30',  iconKey: 'alert'      },
+  { name: 'Pre-Opening',        color: '#facc15', bgClass: 'bg-yellow-500/10',  borderClass: 'border-yellow-500/30',  iconKey: 'trending'   },
+  { name: 'Open',               color: '#4ade80', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/30', iconKey: 'check'      },
+];
+
+const RETAIL_PIPELINE_LABELS: PipelineFieldLabels = {
+  unitNameLabel: 'Unit Name',
+  unitNamePlaceholder: 'e.g. Austin – Domain',
+  marketLabel: 'Market / City',
+  marketPlaceholder: 'e.g. Austin, TX',
+  budgetLabel: 'CapEx Budget',
+  spendLabel: 'CapEx Deployed',
+  valueLabel: 'AUV Underwrite',
+  valueSub: 'at portfolio maturity',
+  returnLabel: 'Target EBITDA %',
+  returnAggLabel: 'Projected EBITDA',
+  milestoneLabel: 'Expected Open Date',
+  completedStage: 'Open',
+  notesPlaceholder: 'Landlord contacts, co-tenancy requirements, timeline risks…',
+};
+
+const BIOTECH_PIPELINE_STAGES: PipelineStageDef[] = [
+  { name: 'Preclinical', color: '#94a3b8', bgClass: 'bg-slate-500/10',   borderClass: 'border-slate-500/30',   iconKey: 'flask'       },
+  { name: 'Phase 1',     color: '#a78bfa', bgClass: 'bg-violet-500/10',  borderClass: 'border-violet-500/30',  iconKey: 'activity'    },
+  { name: 'Phase 2',     color: '#60a5fa', bgClass: 'bg-blue-500/10',    borderClass: 'border-blue-500/30',    iconKey: 'activity'    },
+  { name: 'Phase 3',     color: '#fb923c', bgClass: 'bg-orange-500/10',  borderClass: 'border-orange-500/30',  iconKey: 'activity'    },
+  { name: 'Filed',       color: '#facc15', bgClass: 'bg-yellow-500/10',  borderClass: 'border-yellow-500/30',  iconKey: 'file-check'  },
+  { name: 'Approved',    color: '#4ade80', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/30', iconKey: 'shield-check'},
+];
+
+const BIOTECH_PIPELINE_LABELS: PipelineFieldLabels = {
+  unitNameLabel: 'Program Name',
+  unitNamePlaceholder: 'e.g. BXT-001',
+  marketLabel: 'Indication',
+  marketPlaceholder: 'e.g. NSCLC, Type 2 Diabetes',
+  budgetLabel: 'R&D Budget',
+  spendLabel: 'Spend to Date',
+  valueLabel: 'Peak Sales Potential',
+  valueSub: 'if approved',
+  returnLabel: 'Prob. of Success %',
+  returnAggLabel: 'Avg. PoS',
+  milestoneLabel: 'Expected Readout / Approval',
+  completedStage: 'Approved',
+  notesPlaceholder: 'CRO partners, trial sites, regulatory strategy, key risks…',
 };
 
 export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
@@ -32,6 +187,11 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     aiContext: 'a portfolio of retail locations managed by a private equity holding firm',
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Operating Expenses', 'Inventory Value'],
     organizationLabel: 'Group',
+    bridgeLabel: 'EBITDA',
+    pipelineStages: RETAIL_PIPELINE_STAGES,
+    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    forecastLabels: RETAIL_FORECAST_LABELS,
+    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
   hardware: {
     id: 'hardware',
@@ -44,6 +204,11 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     aiContext: 'a hardware product and distribution business with multiple product lines',
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Gross Margin', 'Inventory Value', 'Units Sold'],
     organizationLabel: 'Division',
+    bridgeLabel: 'EBITDA',
+    pipelineStages: RETAIL_PIPELINE_STAGES,
+    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    forecastLabels: RETAIL_FORECAST_LABELS,
+    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
   saas: {
     id: 'saas',
@@ -56,6 +221,11 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     aiContext: 'a SaaS business with recurring subscription revenue and multiple client accounts',
     defaultMetrics: ['Revenue', 'Net Profit', 'MRR', 'ARR', 'Operating Expenses', 'Churn Rate', 'CAC'],
     organizationLabel: 'Workspace',
+    bridgeLabel: 'EBITDA',
+    pipelineStages: RETAIL_PIPELINE_STAGES,
+    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    forecastLabels: RETAIL_FORECAST_LABELS,
+    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
   services: {
     id: 'services',
@@ -68,6 +238,11 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     aiContext: 'a professional services business with client engagements and project-based revenue',
     defaultMetrics: ['Revenue', 'Net Profit', 'Operating Expenses', 'Gross Margin', 'Utilization Rate'],
     organizationLabel: 'Practice',
+    bridgeLabel: 'EBITDA',
+    pipelineStages: RETAIL_PIPELINE_STAGES,
+    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    forecastLabels: RETAIL_FORECAST_LABELS,
+    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
   biotech: {
     id: 'biotech',
@@ -80,6 +255,16 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     aiContext: 'a biotech or life sciences company with research programs and product pipelines',
     defaultMetrics: ['Revenue', 'R&D Expense', 'Clinical Trial Costs', 'SG&A Expense', 'Operating Income', 'COGS', 'Gross Margin', 'WIP Inventory'],
     organizationLabel: 'Institute',
+    bridgeLabel: 'Operating Loss',
+    kpiCards: [
+      { title: 'Total R&D Burn', metrics: ['R&D Expense', 'Clinical Trial Costs'], goodDirection: 'down' },
+      { title: 'SG&A Expense',   metrics: ['SG&A Expense'],                        goodDirection: 'down' },
+      { title: 'Operating Income', metrics: ['Operating Income'],                  goodDirection: 'up'  },
+    ],
+    pipelineStages: BIOTECH_PIPELINE_STAGES,
+    pipelineLabels: BIOTECH_PIPELINE_LABELS,
+    forecastLabels: BIOTECH_FORECAST_LABELS,
+    scenarioDefaults: BIOTECH_SCENARIO_DEFAULTS,
   },
   other: {
     id: 'other',
@@ -92,6 +277,11 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     aiContext: 'a diversified business portfolio',
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Operating Expenses', 'Gross Margin'],
     organizationLabel: 'Organization',
+    bridgeLabel: 'EBITDA',
+    pipelineStages: RETAIL_PIPELINE_STAGES,
+    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    forecastLabels: RETAIL_FORECAST_LABELS,
+    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
 };
 

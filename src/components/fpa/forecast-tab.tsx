@@ -186,9 +186,10 @@ function ForecastTooltip({ active, payload, label }: any) {
 // ─── Metric row in the P&L table ─────────────────────────────────────────────
 
 function PnlRow({
-  label, baseValue, rows, formatter, isSubRow = false, isHighlight = false, isDim = false,
+  label, dataKey, baseValue, rows, formatter, isSubRow = false, isHighlight = false, isDim = false,
 }: {
   label: string
+  dataKey?: string
   baseValue: number | null
   rows: ForecastRow[]
   formatter: (v: number) => string
@@ -196,6 +197,7 @@ function PnlRow({
   isHighlight?: boolean
   isDim?: boolean
 }) {
+  const key = dataKey ?? label
   return (
     <tr className={cn(
       "border-b border-border/50",
@@ -213,7 +215,7 @@ function PnlRow({
       {/* Forecast periods */}
       {rows.map((row, i) => {
         let val: number
-        switch (label) {
+        switch (key) {
           case 'Revenue':         val = row.revenue; break
           case 'Comp Revenue':    val = row.compRevenue; break
           case 'New Unit Rev.':   val = row.newUnitRevenue; break
@@ -229,13 +231,13 @@ function PnlRow({
         }
         const prevVal = i === 0 ? (baseValue ?? 0) : (() => {
           const prevRow = rows[i - 1]
-          switch (label) {
+          switch (key) {
             case 'Revenue': return prevRow.revenue
             case 'EBITDA':  return prevRow.ebitda
             default:        return null
           }
         })()
-        const showDelta = (label === 'Revenue' || label === 'EBITDA') && prevVal !== null
+        const showDelta = (key === 'Revenue' || key === 'EBITDA') && prevVal !== null
         const delta = showDelta ? ((val - (prevVal as number)) / Math.abs(prevVal as number || 1)) * 100 : null
 
         return (
@@ -496,9 +498,7 @@ export function ForecastTab({
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">
-                    {vertical.id === 'saas' ? 'MRR Growth %' : vertical.id === 'biotech' ? 'Program Revenue Growth %' : 'Same-Store Sales Growth %'}
-                  </Label>
+                  <Label className="text-xs">{vertical.forecastLabels.growthRateLabel}</Label>
                   <span className="text-xs font-bold text-primary">{sssPct.toFixed(1)}%</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -545,7 +545,7 @@ export function ForecastTab({
                 <>
                   <Separator />
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Target AUV at Maturity</Label>
+                    <Label className="text-xs text-muted-foreground">{vertical.forecastLabels.newUnitValueLabel}</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                       <Input
@@ -604,7 +604,7 @@ export function ForecastTab({
               <div className="pt-1 space-y-1">
                 {[
                   { label: 'Gross Margin %', value: 100 - cogsPct },
-                  { label: 'EBITDA Margin %', value: 100 - cogsPct - laborPct - opexPct },
+                  { label: vertical.forecastLabels.profitPctLabel, value: 100 - cogsPct - laborPct - opexPct },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between text-xs">
                     <span className="text-muted-foreground">{label}</span>
@@ -649,8 +649,8 @@ export function ForecastTab({
                   <PnlRow label="Gross Margin %" baseValue={baseCogs > 0 ? ((baseGrossProfit/baseRevenue)*100) : null} rows={forecastRows} formatter={v => `${v.toFixed(1)}%`} isDim />
                   <PnlRow label="Labor"         baseValue={baseLabor || null} rows={forecastRows} formatter={fmtCurrency} />
                   <PnlRow label="OpEx"          baseValue={baseOpex || null}  rows={forecastRows} formatter={fmtCurrency} />
-                  <PnlRow label="EBITDA"        baseValue={baseEbitda}     rows={forecastRows} formatter={fmtCurrency} isHighlight />
-                  <PnlRow label="EBITDA %"      baseValue={baseRevenue > 0 ? (baseEbitda/baseRevenue)*100 : null} rows={forecastRows} formatter={v => `${v.toFixed(1)}%`} isDim />
+                  <PnlRow label={vertical.forecastLabels.profitLabel}    dataKey="EBITDA"   baseValue={baseEbitda}     rows={forecastRows} formatter={fmtCurrency} isHighlight />
+                  <PnlRow label={vertical.forecastLabels.profitPctLabel} dataKey="EBITDA %" baseValue={baseRevenue > 0 ? (baseEbitda/baseRevenue)*100 : null} rows={forecastRows} formatter={v => `${v.toFixed(1)}%`} isDim />
                   {hasNewUnits && <PnlRow label="Unit Count" baseValue={baseUnitCount} rows={forecastRows} formatter={v => String(Math.round(v))} isDim />}
                 </tbody>
               </table>
@@ -660,7 +660,7 @@ export function ForecastTab({
           {/* Trend chart */}
           <Card className="bg-card/30 border-border p-5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-              Revenue &amp; EBITDA Trajectory
+              {vertical.forecastLabels.chartTitle}
             </p>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -678,7 +678,7 @@ export function ForecastTab({
                   }
                 />
                 <Line
-                  type="monotone" dataKey="ebitda" name="EBITDA"
+                  type="monotone" dataKey="ebitda" name={vertical.forecastLabels.profitLabel}
                   stroke="hsl(var(--accent))" strokeWidth={2.5} strokeDasharray="5 3"
                   dot={(props: any) => props.payload.isBase
                     ? <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="hsl(var(--muted-foreground))" stroke="hsl(var(--background))" strokeWidth={2} />
@@ -716,7 +716,7 @@ export function ForecastTab({
             <div className="bg-muted/40 rounded-lg p-3 text-xs space-y-1 text-muted-foreground">
               <p>• {forecastRows.length} periods × {locations.length} {vertical.unitsLabel.toLowerCase()} × 6 metrics</p>
               <p>• Projected values allocated proportionally by base revenue share</p>
-              <p>• SSS growth: {sssPct > 0 ? '+' : ''}{sssPct}% · EBITDA target: {(100 - cogsPct - laborPct - opexPct).toFixed(1)}%</p>
+              <p>• {vertical.forecastLabels.growthRateLabel}: {sssPct > 0 ? '+' : ''}{sssPct}% · {vertical.forecastLabels.profitLabel} target: {(100 - cogsPct - laborPct - opexPct).toFixed(1)}%</p>
             </div>
           </div>
           <DialogFooter>
