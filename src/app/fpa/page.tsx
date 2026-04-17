@@ -3,7 +3,7 @@
 import * as React from "react"
 import {
   TrendingUp, ArrowUpRight, ArrowDownRight, Target, GitCompare,
-  FilePen, ChevronRight, Loader2, Cpu, Layers, Route, ShieldCheck,
+  FilePen, ChevronRight, Loader2, Cpu, Layers, Route, ShieldCheck, Sparkles,
 } from "lucide-react"
 import { ForecastTab } from "@/components/fpa/forecast-tab"
 import { ScenarioTab } from "@/components/fpa/scenario-tab"
@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { query, collection, where, doc, writeBatch } from "firebase/firestore"
 import { FinancialRecord, FinancialPlan, UnitPipeline, CovenantSnapshot, Company } from "@/lib/types"
+import { seedDemoData } from "@/lib/demo-seed"
 import { useVertical } from "@/contexts/vertical-context"
 import { cn } from "@/lib/utils"
 import {
@@ -318,6 +319,19 @@ export default function FpaPage() {
   const [newVersionName, setNewVersionName] = React.useState('');
   const [isSaving,       setIsSaving]       = React.useState(false);
 
+  // ── Demo seed ──
+  const [isSeeding, setIsSeeding] = React.useState(false);
+
+  async function handleSeedDemo() {
+    if (!firestore || !companies?.[0]) return;
+    setIsSeeding(true);
+    try {
+      await seedDemoData(firestore, companies[0]);
+    } finally {
+      setIsSeeding(false);
+    }
+  }
+
   function openBudgetDialog(loc: LocationMeta) {
     setBudgetLocation(loc);
     const existing = (plans ?? []).filter(p =>
@@ -434,6 +448,18 @@ export default function FpaPage() {
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4">
+        {!(records ?? []).length && companies?.[0] && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSeedDemo}
+            disabled={isSeeding}
+            className="h-9 gap-2 border-primary/40 text-primary hover:bg-primary/10"
+          >
+            {isSeeding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+            {isSeeding ? 'Loading sample data…' : 'Load sample data'}
+          </Button>
+        )}
         <div className="flex items-center gap-2">
           <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Period</Label>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -543,10 +569,24 @@ export default function FpaPage() {
           )}
 
           {rows.length === 0 ? (
-            <div className="text-center py-20 border-2 border-dashed border-border rounded-xl">
-              <TrendingUp className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-muted-foreground italic">No financial data found for this period.</p>
-              <p className="text-xs text-muted-foreground mt-1">Upload data from the {vertical.unitsLabel} page first.</p>
+            <div className="text-center py-20 border-2 border-dashed border-border rounded-xl space-y-4">
+              <TrendingUp className="mx-auto size-12 text-muted-foreground opacity-20" />
+              <div className="space-y-1">
+                <p className="text-muted-foreground italic">No financial data found for this period.</p>
+                <p className="text-xs text-muted-foreground">Upload data from the {vertical.unitsLabel} page, or try sample data below.</p>
+              </div>
+              {companies?.[0] && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSeedDemo}
+                  disabled={isSeeding}
+                  className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  {isSeeding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                  {isSeeding ? 'Loading sample data…' : 'Load sample data'}
+                </Button>
+              )}
             </div>
           ) : (
             <Card className="bg-card/30 border-border overflow-hidden">
