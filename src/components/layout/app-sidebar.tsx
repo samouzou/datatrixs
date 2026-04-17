@@ -73,7 +73,7 @@ export function AppSidebar() {
       icon: TrendingUp,
     },
     {
-      title: "AI Financial Analyst",
+      title: "Warren",
       href: "/analyst",
       icon: MessageSquare,
     },

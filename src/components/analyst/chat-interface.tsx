@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { Send, Bot, User, Loader2, FileSpreadsheet, BarChart3, Maximize2, Save, Check } from "lucide-react"
+import { Send, User, Loader2, FileSpreadsheet, BarChart3, Maximize2, Save, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -167,7 +167,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
     {
       id: "1",
       role: "assistant",
-      content: `Hello! I'm your Datatrixs Financial Analyst. I have access to your normalized financial data. I can generate spreadsheets, identify trends, or compare performance across your ${vertical.unitsLabel.toLowerCase()}. What data can I compile for you today?`
+      content: `Hello! I'm Warren, your AI financial analyst. I have access to your normalized financial data. I can generate spreadsheets, identify trends, or compare performance across your ${vertical.unitsLabel.toLowerCase()}. What data can I compile for you today?`
     }
   ])
   const [input, setInput] = React.useState("")
@@ -301,7 +301,7 @@ export function ChatInterface({ externalQuery, onQueryProcessed }: ChatInterface
                 "size-8 rounded-full flex items-center justify-center shrink-0",
                 m.role === "user" ? "bg-primary" : "bg-accent"
               )}>
-                {m.role === "user" ? <User className="size-5 text-white" /> : <Bot className="size-5 text-background" />}
+                {m.role === "user" ? <User className="size-5 text-white" /> : <img src="/dx-icon.svg" className="size-5" alt="Warren" />}
               </div>
               <div className={cn(
                 "max-w-[85%] space-y-2",

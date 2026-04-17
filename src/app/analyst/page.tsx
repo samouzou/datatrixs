@@ -3,7 +3,7 @@
 import * as React from "react"
 import { ChatInterface } from "@/components/analyst/chat-interface"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Bot, Info } from "lucide-react"
+import { Info } from "lucide-react"
 import { useVertical } from "@/contexts/vertical-context"
 import { BusinessVertical } from "@/lib/types"
 
@@ -72,8 +72,8 @@ export default function AnalystPage() {
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex flex-col space-y-2">
         <div className="flex items-center gap-2">
-          <Bot className="size-6 text-accent" />
-          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">AI Financial Analyst</h2>
+          <img src="/dx-icon.svg" className="size-6" alt="Warren" />
+          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Warren</h2>
         </div>
         <p className="text-muted-foreground">Ask questions about your {vertical.unitsLabel.toLowerCase()}, request reports, or generate spreadsheet data based on your normalized records.</p>
       </div>
