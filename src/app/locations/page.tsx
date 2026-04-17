@@ -4,15 +4,15 @@ import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Plus, 
-  MoreVertical, 
-  Upload, 
-  Loader2, 
-  Trash2, 
-  Check, 
-  AlertCircle, 
-  ClipboardList, 
+import {
+  Plus,
+  MoreVertical,
+  Upload,
+  Loader2,
+  Trash2,
+  Check,
+  AlertCircle,
+  ClipboardList,
   Database,
   Layers,
   ArrowRight,
@@ -22,8 +22,16 @@ import {
   Link2,
   Building2,
   Lock,
-  Zap
+  Zap,
+  Pencil
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { collection, query, where, doc, setDoc, deleteDoc, writeBatch, getDocs } from "firebase/firestore"
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
@@ -120,6 +128,15 @@ export default function LocationsPage() {
   const [state, setState] = React.useState("")
   const [zip, setZip] = React.useState("")
   const [phone, setPhone] = React.useState("")
+
+  const [isEditOpen, setIsEditOpen] = React.useState(false)
+  const [editingLocation, setEditingLocation] = React.useState<Location | null>(null)
+  const [editName, setEditName] = React.useState("")
+  const [editAddress, setEditAddress] = React.useState("")
+  const [editCity, setEditCity] = React.useState("")
+  const [editState, setEditState] = React.useState("")
+  const [editZip, setEditZip] = React.useState("")
+  const [editPhone, setEditPhone] = React.useState("")
 
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -373,6 +390,34 @@ export default function LocationsPage() {
     }
   };
 
+  const handleOpenEdit = (loc: Location) => {
+    setEditingLocation(loc)
+    setEditName(loc.name)
+    setEditAddress(loc.addressLine1 || "")
+    setEditCity(loc.city || "")
+    setEditState(loc.state || "")
+    setEditZip(loc.zipCode || "")
+    setEditPhone(loc.phoneNumber || "")
+    setIsEditOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!firestore || !editingLocation || !editName.trim()) return
+    const locRef = doc(firestore, "locations", editingLocation.id)
+    await updateDocumentNonBlocking(locRef, {
+      name: editName.trim(),
+      addressLine1: editAddress,
+      city: editCity,
+      state: editState,
+      zipCode: editZip,
+      phoneNumber: editPhone,
+      updatedAt: new Date().toISOString(),
+    })
+    toast({ title: "Location Updated", description: `${editName} has been saved.` })
+    setIsEditOpen(false)
+    setEditingLocation(null)
+  }
+
   const handleDeleteLocation = async (loc: Location) => {
     if (!firestore) return;
     const batch = writeBatch(firestore);
@@ -479,6 +524,10 @@ export default function LocationsPage() {
                   <Label htmlFor="zip">ZIP Code</Label>
                   <Input id="zip" placeholder="77001" value={zip} onChange={e => setZip(e.target.value)} />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input id="phone" placeholder="(555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                </div>
               </div>
             )}
             
@@ -511,8 +560,22 @@ export default function LocationsPage() {
                   <CardDescription>{loc.addressLine1}, {loc.city}, {loc.state} {loc.zipCode}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeleteLocation(loc)}><Trash2 className="size-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground"><MoreVertical className="size-4" /></Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setTimeout(() => handleOpenEdit(loc), 0)}>
+                        <Pencil className="size-4 mr-2" /> Edit Location
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteLocation(loc)}>
+                        <Trash2 className="size-4 mr-2" /> Delete Location
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent>
@@ -552,6 +615,45 @@ export default function LocationsPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) setEditingLocation(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Location</DialogTitle>
+            <DialogDescription>Update the details for this business unit.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="grid gap-2 col-span-2">
+              <Label htmlFor="edit-name">Location Name</Label>
+              <Input id="edit-name" placeholder="e.g., Houston West Branch" value={editName} onChange={e => setEditName(e.target.value)} />
+            </div>
+            <div className="grid gap-2 col-span-2">
+              <Label htmlFor="edit-address">Address</Label>
+              <Input id="edit-address" placeholder="123 Main St" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-city">City</Label>
+              <Input id="edit-city" placeholder="Houston" value={editCity} onChange={e => setEditCity(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-state">State</Label>
+              <Input id="edit-state" placeholder="TX" value={editState} onChange={e => setEditState(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-zip">ZIP Code</Label>
+              <Input id="edit-zip" placeholder="77001" value={editZip} onChange={e => setEditZip(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input id="edit-phone" placeholder="(555) 000-0000" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={!editName.trim()}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
         <DialogContent className="max-w-4xl">
