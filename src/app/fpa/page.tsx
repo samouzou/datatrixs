@@ -4,12 +4,13 @@ import * as React from "react"
 import {
   TrendingUp, ArrowUpRight, ArrowDownRight, Target, GitCompare,
   FilePen, ChevronRight, Loader2, Cpu, Route, ShieldCheck, Sparkles,
-  TableProperties,
+  TableProperties, Upload,
 } from "lucide-react"
 import { ForecastTab } from "@/components/fpa/forecast-tab"
 import { PipelineTab } from "@/components/fpa/pipeline-tab"
 import { CovenantTab } from "@/components/fpa/covenant-tab"
 import { LedgerTab } from "@/components/fpa/ledger-tab"
+import { ImportDialog } from "@/components/fpa/import-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -19,7 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { query, collection, where, doc, writeBatch } from "firebase/firestore"
-import { FinancialRecord, FinancialPlan, UnitPipeline, CovenantSnapshot, Company } from "@/lib/types"
+import { FinancialRecord, FinancialPlan, UnitPipeline, CovenantSnapshot, Company, Location } from "@/lib/types"
 import { seedDemoData } from "@/lib/demo-seed"
 import { useVertical } from "@/contexts/vertical-context"
 import { cn } from "@/lib/utils"
@@ -278,8 +279,21 @@ export default function FpaPage() {
   }, [firestore, user]);
   const { data: covenantSnapshots } = useCollection<CovenantSnapshot>(covenantQuery);
 
+  const locationsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, "locations"), where(`companyMembers.${user.uid}`, "in", ["admin", "member", true]));
+  }, [firestore, user]);
+  const { data: locationDocs } = useCollection<Location>(locationsQuery);
+
   // ── Derived ──
-  const locations  = React.useMemo(() => getLocations(records ?? []), [records]);
+  // Merge locations from records (for periods they appear in) with the full locations collection
+  const locations = React.useMemo(() => {
+    const fromRecords = getLocations(records ?? []);
+    const fromDocs = (locationDocs ?? []).map(l => ({ id: l.id, name: l.name }));
+    const merged = new Map<string, string>();
+    for (const l of [...fromDocs, ...fromRecords]) merged.set(l.id, l.name);
+    return Array.from(merged.entries()).map(([id, name]) => ({ id, name }));
+  }, [records, locationDocs]);
   // Include periods from both actuals and saved plans (so forecast periods appear in the selector)
   const periods    = React.useMemo(() => {
     const all = new Set<string>();
@@ -297,7 +311,6 @@ export default function FpaPage() {
   const [selectedPeriod,  setSelectedPeriod]  = React.useState('');
   const [selectedVersion, setSelectedVersion] = React.useState(DEFAULT_VERSION);
   const [activeTab,       setActiveTab]       = React.useState('pva');
-  const [selectedMetric,  setSelectedMetric]  = React.useState('Revenue');
   const [bridgeFrom,      setBridgeFrom]      = React.useState('');
   const [bridgeTo,        setBridgeTo]        = React.useState('');
 
@@ -322,6 +335,9 @@ export default function FpaPage() {
 
   // ── Demo seed ──
   const [isSeeding, setIsSeeding] = React.useState(false);
+
+  // ── Import ──
+  const [importOpen, setImportOpen] = React.useState(false);
 
   async function handleSeedDemo() {
     if (!firestore || !companies?.[0]) return;
@@ -473,6 +489,14 @@ export default function FpaPage() {
             {isSeeding ? 'Loading sample data…' : 'Load sample data'}
           </Button>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setImportOpen(true)}
+          className="h-9 gap-2"
+        >
+          <Upload className="size-3.5" /> Import CSV
+        </Button>
         <div className="flex items-center gap-2">
           <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Period</Label>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -561,26 +585,6 @@ export default function FpaPage() {
         {/* ── Plan vs. Actual ── */}
         <TabsContent value="pva" className="space-y-4">
 
-          {/* Metric pill selector */}
-          {availableMetrics.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {availableMetrics.map(m => (
-                <button
-                  key={m}
-                  onClick={() => setSelectedMetric(m)}
-                  className={cn(
-                    "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
-                    selectedMetric === m
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-
           {rows.length === 0 ? (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl space-y-4">
               <TrendingUp className="mx-auto size-12 text-muted-foreground opacity-20" />
@@ -607,131 +611,104 @@ export default function FpaPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-52">
-                        {vertical.unitLabel}
+                      <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-48 sticky left-0 bg-muted/30">
+                        Metric
                       </th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Actual</th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Budget</th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Var $</th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Var %</th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-28">
-                        Attainment
-                      </th>
-                      <th className="px-5 py-3 w-32" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {rows.map(row => {
-                      const actual  = row.actual[selectedMetric];
-                      const planned = row.planned[selectedMetric];
-                      const hasBudget  = planned !== undefined;
-                      const varDollar  = hasBudget ? (actual ?? 0) - planned : undefined;
-                      const varPct     = hasBudget && planned !== 0 ? (((actual ?? 0) - planned) / Math.abs(planned)) * 100 : undefined;
-                      const isGood     = varDollar === undefined || varDollar >= 0;
-                      const attainment = hasBudget && planned !== 0 ? Math.min(150, Math.max(0, ((actual ?? 0) / planned) * 100)) : null;
-
-                      return (
-                        <tr key={row.location.id} className="hover:bg-muted/20 transition-colors group">
-                          <td className="px-5 py-3 font-medium text-foreground">{row.location.name}</td>
-                          <td className="px-5 py-3 text-center font-medium">
-                            {actual !== undefined ? fmtCurrency(actual) : <span className="text-muted-foreground text-xs">--</span>}
-                          </td>
-                          <td className="px-5 py-3 text-center text-muted-foreground">
-                            {hasBudget ? fmtCurrency(planned) : <span className="text-xs italic">No budget</span>}
-                          </td>
-                          <td className={cn("px-5 py-3 text-center text-xs font-bold",
-                            varDollar === undefined ? "text-muted-foreground" : isGood ? "text-emerald-500" : "text-destructive"
-                          )}>
-                            {varDollar !== undefined ? `${isGood ? '+' : ''}${fmtCurrency(varDollar)}` : '--'}
-                          </td>
-                          <td className={cn("px-5 py-3 text-center text-xs font-bold",
-                            varPct === undefined ? "text-muted-foreground" : isGood ? "text-emerald-500" : "text-destructive"
-                          )}>
-                            {varPct !== undefined ? fmtPct(varPct) : '--'}
-                          </td>
-                          <td className="px-5 py-3">
-                            {attainment !== null ? (
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className={cn("h-full rounded-full", isGood ? "bg-emerald-500" : "bg-destructive")}
-                                    style={{ width: `${Math.min(100, attainment)}%` }}
-                                  />
-                                </div>
-                                <span className="text-[10px] text-muted-foreground w-8 text-right shrink-0">
-                                  {attainment.toFixed(0)}%
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">--</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3 text-right">
+                      {rows.map(row => (
+                        <th key={row.location.id} colSpan={2} className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-l border-border/50">
+                          <div className="flex items-center justify-between gap-2 min-w-[180px]">
+                            <span className="truncate">{row.location.name}</span>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
+                              className="h-6 text-[10px] px-2 shrink-0 text-primary hover:text-primary opacity-60 hover:opacity-100"
                               onClick={() => openBudgetDialog(row.location)}
                             >
                               <FilePen className="size-3 mr-1" />
-                              {hasBudget ? 'Edit' : 'Set'} Budget
+                              Budget
                             </Button>
+                          </div>
+                        </th>
+                      ))}
+                      {rows.length > 1 && (
+                        <th colSpan={2} className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-l border-border/50">
+                          <span className="min-w-[120px] block">Portfolio Total</span>
+                        </th>
+                      )}
+                    </tr>
+                    <tr className="border-b border-border/50 bg-muted/10">
+                      <th className="px-5 py-2 sticky left-0 bg-muted/10" />
+                      {rows.map(row => (
+                        <React.Fragment key={row.location.id}>
+                          <th className="px-3 py-2 text-center text-[10px] text-muted-foreground font-normal border-l border-border/30">Actual</th>
+                          <th className="px-3 py-2 text-center text-[10px] text-muted-foreground font-normal">Budget</th>
+                        </React.Fragment>
+                      ))}
+                      {rows.length > 1 && (
+                        <React.Fragment>
+                          <th className="px-3 py-2 text-center text-[10px] text-muted-foreground font-normal border-l border-border/30">Actual</th>
+                          <th className="px-3 py-2 text-center text-[10px] text-muted-foreground font-normal">Budget</th>
+                        </React.Fragment>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {availableMetrics.map(metric => {
+                      const isRevenue   = metric === 'Revenue';
+                      const isProfit    = metric === 'Net Profit' || metric === 'EBITDA' || metric === 'Operating Income';
+                      const totAct      = rows.reduce((s, r) => s + (r.actual[metric]  ?? 0), 0);
+                      const totPlan     = rows.reduce((s, r) => s + (r.planned[metric] ?? 0), 0);
+                      const anyBudget   = rows.some(r => r.planned[metric] !== undefined);
+                      return (
+                        <tr key={metric} className={cn(
+                          "hover:bg-muted/20 transition-colors",
+                          (isRevenue || isProfit) && "bg-primary/5 font-semibold"
+                        )}>
+                          <td className={cn(
+                            "px-5 py-2.5 text-xs sticky left-0 bg-card",
+                            (isRevenue || isProfit) ? "text-foreground font-semibold bg-primary/5" : "text-muted-foreground"
+                          )}>
+                            {metric}
                           </td>
+                          {rows.map(row => {
+                            const actual  = row.actual[metric];
+                            const planned = row.planned[metric];
+                            const hasBudget = planned !== undefined;
+                            const varPct = hasBudget && planned !== 0
+                              ? (((actual ?? 0) - planned) / Math.abs(planned)) * 100
+                              : undefined;
+                            const isGood = varPct === undefined || varPct >= 0;
+                            return (
+                              <React.Fragment key={row.location.id}>
+                                <td className="px-3 py-2.5 text-center text-xs font-medium border-l border-border/30">
+                                  {actual !== undefined ? fmtCurrency(actual) : <span className="text-muted-foreground/40">—</span>}
+                                </td>
+                                <td className="px-3 py-2.5 text-center text-xs">
+                                  {hasBudget ? (
+                                    <span className={cn("font-semibold", isGood ? "text-emerald-500" : "text-destructive")}>
+                                      {varPct !== undefined ? `${isGood ? '+' : ''}${varPct.toFixed(1)}%` : fmtCurrency(planned)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground/40 text-[10px] italic">—</span>
+                                  )}
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
+                          {rows.length > 1 && (
+                            <React.Fragment>
+                              <td className="px-3 py-2.5 text-center text-xs font-bold border-l border-border/30">
+                                {fmtCurrency(totAct)}
+                              </td>
+                              <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">
+                                {anyBudget ? fmtCurrency(totPlan) : <span className="text-muted-foreground/40 text-[10px] italic">—</span>}
+                              </td>
+                            </React.Fragment>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
-
-                  {/* Totals footer */}
-                  {rows.length > 1 && (() => {
-                    const totAct  = rows.reduce((s, r) => s + (r.actual[selectedMetric]  ?? 0), 0);
-                    const totPlan = rows.reduce((s, r) => s + (r.planned[selectedMetric] ?? 0), 0);
-                    const anyBudget  = rows.some(r => r.planned[selectedMetric] !== undefined);
-                    const varD = anyBudget ? totAct - totPlan : undefined;
-                    const varP = anyBudget && totPlan !== 0 ? ((totAct - totPlan) / Math.abs(totPlan)) * 100 : undefined;
-                    const isG  = varD === undefined || varD >= 0;
-                    const att  = anyBudget && totPlan !== 0 ? Math.min(150, Math.max(0, (totAct / totPlan) * 100)) : null;
-
-                    return (
-                      <tfoot>
-                        <tr className="border-t-2 border-border bg-muted/40">
-                          <td className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Portfolio Total
-                          </td>
-                          <td className="px-5 py-3 text-center font-bold">{fmtCurrency(totAct)}</td>
-                          <td className="px-5 py-3 text-center text-muted-foreground">
-                            {anyBudget ? fmtCurrency(totPlan) : '--'}
-                          </td>
-                          <td className={cn("px-5 py-3 text-center text-xs font-bold",
-                            varD === undefined ? "text-muted-foreground" : isG ? "text-emerald-500" : "text-destructive"
-                          )}>
-                            {varD !== undefined ? `${isG ? '+' : ''}${fmtCurrency(varD)}` : '--'}
-                          </td>
-                          <td className={cn("px-5 py-3 text-center text-xs font-bold",
-                            varP === undefined ? "text-muted-foreground" : isG ? "text-emerald-500" : "text-destructive"
-                          )}>
-                            {varP !== undefined ? fmtPct(varP) : '--'}
-                          </td>
-                          <td className="px-5 py-3">
-                            {att !== null ? (
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className={cn("h-full rounded-full", isG ? "bg-emerald-500" : "bg-destructive")}
-                                    style={{ width: `${Math.min(100, att)}%` }}
-                                  />
-                                </div>
-                                <span className="text-[10px] text-muted-foreground w-8 text-right shrink-0">
-                                  {att.toFixed(0)}%
-                                </span>
-                              </div>
-                            ) : null}
-                          </td>
-                          <td />
-                        </tr>
-                      </tfoot>
-                    );
-                  })()}
                 </table>
               </div>
             </Card>
@@ -977,6 +954,15 @@ export default function FpaPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        locations={locations}
+        companies={companies ?? []}
+        user={user}
+        firestore={firestore}
+      />
     </div>
   );
 }
