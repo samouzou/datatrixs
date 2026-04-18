@@ -299,16 +299,27 @@ interface ScenarioTabProps {
   vertical: VerticalConfig
   locations: LocationMeta[]
   periods: string[]
+  hideControls?: boolean
+  externalBasePeriod?: string
+  setExternalBasePeriod?: (v: string) => void
+  externalHorizon?: number
+  setExternalHorizon?: (v: number) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function ScenarioTab({
   records, companies, user, firestore, vertical, locations, periods,
+  hideControls, externalBasePeriod, setExternalBasePeriod, externalHorizon, setExternalHorizon,
 }: ScenarioTabProps) {
 
-  const [basePeriod, setBasePeriod] = React.useState('')
-  const [horizon, setHorizon] = React.useState(4)
+  const [internalBasePeriod, setInternalBasePeriod] = React.useState('')
+  const [internalHorizon, setInternalHorizon] = React.useState(4)
+
+  const basePeriod = externalBasePeriod !== undefined ? externalBasePeriod : internalBasePeriod
+  const setBasePeriod = setExternalBasePeriod ?? setInternalBasePeriod
+  const horizon = externalHorizon !== undefined ? externalHorizon : internalHorizon
+  const setHorizon = setExternalHorizon ?? setInternalHorizon
   const [chartMetric, setChartMetric] = React.useState<'revenue' | 'ebitda'>('revenue')
   const [isSaving, setIsSaving] = React.useState(false)
   const [savedMsg, setSavedMsg] = React.useState('')
@@ -327,10 +338,11 @@ export function ScenarioTab({
     setScenarios(prev => prev.map(s => s.id === id ? { ...s, ...partial } : s))
   }
 
-  // Auto-select latest period
+  // Auto-select latest period (only when managing internal state)
   React.useEffect(() => {
-    if (periods.length && !basePeriod) setBasePeriod(periods[periods.length - 1])
-  }, [periods, basePeriod])
+    if (externalBasePeriod !== undefined) return
+    if (periods.length && !internalBasePeriod) setInternalBasePeriod(periods[periods.length - 1])
+  }, [periods, internalBasePeriod, externalBasePeriod])
 
   // Auto-populate cost %s and AUV from base period actuals, apply to all scenarios
   React.useEffect(() => {
@@ -471,32 +483,36 @@ export function ScenarioTab({
 
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Base Period</Label>
-          <Select value={basePeriod} onValueChange={setBasePeriod}>
-            <SelectTrigger className="h-9 w-36 bg-card border-border text-sm">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              {periods.map(p => <SelectItem key={p} value={p}>{fmtShortPeriod(p)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Horizon</Label>
-          <Select value={String(horizon)} onValueChange={v => setHorizon(Number(v))}>
-            <SelectTrigger className="h-9 w-28 bg-card border-border text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="4">4 periods</SelectItem>
-              <SelectItem value="6">6 periods</SelectItem>
-              <SelectItem value="8">8 periods</SelectItem>
-              <SelectItem value="12">12 periods</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
+        {!hideControls && (
+          <>
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Base Period</Label>
+              <Select value={basePeriod} onValueChange={setBasePeriod}>
+                <SelectTrigger className="h-9 w-36 bg-card border-border text-sm">
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map(p => <SelectItem key={p} value={p}>{fmtShortPeriod(p)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Horizon</Label>
+              <Select value={String(horizon)} onValueChange={v => setHorizon(Number(v))}>
+                <SelectTrigger className="h-9 w-28 bg-card border-border text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4">4 periods</SelectItem>
+                  <SelectItem value="6">6 periods</SelectItem>
+                  <SelectItem value="8">8 periods</SelectItem>
+                  <SelectItem value="12">12 periods</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+        <div className={cn("flex items-center gap-2", !hideControls && "ml-auto")}>
           {savedMsg && <span className="text-xs text-emerald-500">{savedMsg}</span>}
           <Button
             size="sm"

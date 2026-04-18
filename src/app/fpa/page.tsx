@@ -3,12 +3,13 @@
 import * as React from "react"
 import {
   TrendingUp, ArrowUpRight, ArrowDownRight, Target, GitCompare,
-  FilePen, ChevronRight, Loader2, Cpu, Layers, Route, ShieldCheck, Sparkles,
+  FilePen, ChevronRight, Loader2, Cpu, Route, ShieldCheck, Sparkles,
+  TableProperties,
 } from "lucide-react"
 import { ForecastTab } from "@/components/fpa/forecast-tab"
-import { ScenarioTab } from "@/components/fpa/scenario-tab"
 import { PipelineTab } from "@/components/fpa/pipeline-tab"
 import { CovenantTab } from "@/components/fpa/covenant-tab"
+import { LedgerTab } from "@/components/fpa/ledger-tab"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -394,11 +395,23 @@ export default function FpaPage() {
     [locations, periodRecords, periodPlans]
   );
 
-  // Metrics present in actuals for this period
+  // Metrics present in actuals for this period, sorted in income statement order
+  const METRIC_ORDER = ['Revenue', 'COGS', 'Gross Profit', 'Gross Margin', 'Labor', 'Payroll',
+    'Operating Expenses', 'SG&A Expense', 'Net Profit', 'Operating Income',
+    'R&D Expense', 'Clinical Trial Costs', 'EBITDA', 'Gross Margin %', 'Inventory Value',
+    'MRR', 'ARR', 'Churn Rate', 'CAC', 'Units Sold', 'Utilization Rate'];
   const availableMetrics = React.useMemo(() => {
     const s = new Set<string>();
     for (const r of periodRecords) s.add(r.metric);
-    return Array.from(s).sort();
+    const all = Array.from(s);
+    return all.sort((a, b) => {
+      const ai = METRIC_ORDER.indexOf(a);
+      const bi = METRIC_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
   }, [periodRecords]);
 
   // Metrics to show in budget dialog: actuals union vertical defaults
@@ -532,16 +545,16 @@ export default function FpaPage() {
             <GitCompare className="size-3.5" /> {vertical.bridgeLabel} Bridge
           </TabsTrigger>
           <TabsTrigger value="forecast" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
-            <Cpu className="size-3.5" /> Forecast Builder
-          </TabsTrigger>
-          <TabsTrigger value="scenarios" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
-            <Layers className="size-3.5" /> Scenario Manager
+            <Cpu className="size-3.5" /> Forecast
           </TabsTrigger>
           <TabsTrigger value="pipeline" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <Route className="size-3.5" /> Unit Pipeline
           </TabsTrigger>
           <TabsTrigger value="covenants" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <ShieldCheck className="size-3.5" /> Covenants
+          </TabsTrigger>
+          <TabsTrigger value="ledger" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
+            <TableProperties className="size-3.5" /> P&amp;L Ledger
           </TabsTrigger>
         </TabsList>
 
@@ -847,19 +860,6 @@ export default function FpaPage() {
           />
         </TabsContent>
 
-        {/* ── Scenario Manager ── */}
-        <TabsContent value="scenarios">
-          <ScenarioTab
-            records={records ?? []}
-            companies={companies ?? []}
-            user={user}
-            firestore={firestore}
-            vertical={vertical}
-            locations={locations}
-            periods={periods}
-          />
-        </TabsContent>
-
         {/* ── Unit Pipeline ── */}
         <TabsContent value="pipeline">
           <PipelineTab
@@ -880,6 +880,21 @@ export default function FpaPage() {
             user={user}
             firestore={firestore}
             periods={periods}
+          />
+        </TabsContent>
+
+        {/* ── P&L Ledger ── */}
+        <TabsContent value="ledger">
+          <LedgerTab
+            records={records ?? []}
+            plans={plans ?? []}
+            companies={companies ?? []}
+            user={user}
+            firestore={firestore}
+            vertical={vertical}
+            locations={locations}
+            periods={periods}
+            versions={versions}
           />
         </TabsContent>
       </Tabs>

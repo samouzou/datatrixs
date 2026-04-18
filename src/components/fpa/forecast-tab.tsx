@@ -21,6 +21,7 @@ import type { User } from "firebase/auth"
 import { FinancialRecord, FinancialPlan, Company } from "@/lib/types"
 import type { VerticalConfig } from "@/lib/verticals"
 import { cn } from "@/lib/utils"
+import { ScenarioTab } from "@/components/fpa/scenario-tab"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -290,6 +291,9 @@ export function ForecastTab({
   const [auv,         setAuv]         = React.useState(0)
   const [newUnits,    setNewUnits]    = React.useState<number[]>([])
 
+  // ── Mode ──
+  const [mode, setMode] = React.useState<'single' | 'compare'>('single')
+
   // ── Save dialog ──
   const [saveOpen,    setSaveOpen]    = React.useState(false)
   const [saveName,    setSaveName]    = React.useState('')
@@ -447,45 +451,85 @@ export function ForecastTab({
 
       {/* ── Config row ── */}
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Base Period</Label>
-          <Select value={basePeriod} onValueChange={setBasePeriod}>
-            <SelectTrigger className="h-9 w-36 bg-card border-border text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {periods.map(p => <SelectItem key={p} value={p}>{fmtShortPeriod(p)}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        {/* Mode toggle */}
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          {(['single', 'compare'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={cn(
+                "px-3 h-9 text-xs font-semibold transition-colors",
+                mode === m
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              {m === 'single' ? 'Single Forecast' : 'Scenario Compare'}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Horizon</Label>
-          <Select value={String(horizon)} onValueChange={v => setHorizon(+v)}>
-            <SelectTrigger className="h-9 w-32 bg-card border-border text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 periods</SelectItem>
-              <SelectItem value="4">4 periods</SelectItem>
-              <SelectItem value="6">6 periods</SelectItem>
-              <SelectItem value="8">8 periods</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="ml-auto">
-          <Button
-            size="sm"
-            className="bg-primary hover:bg-primary/90 h-9"
-            onClick={() => { setSaveName(''); setSaveOpen(true) }}
-            disabled={forecastRows.length === 0}
-          >
-            <Save className="size-3.5 mr-2" /> Save as Version
-          </Button>
-        </div>
+
+        {mode === 'single' && (
+          <>
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Base Period</Label>
+              <Select value={basePeriod} onValueChange={setBasePeriod}>
+                <SelectTrigger className="h-9 w-36 bg-card border-border text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map(p => <SelectItem key={p} value={p}>{fmtShortPeriod(p)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Horizon</Label>
+              <Select value={String(horizon)} onValueChange={v => setHorizon(+v)}>
+                <SelectTrigger className="h-9 w-32 bg-card border-border text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2 periods</SelectItem>
+                  <SelectItem value="4">4 periods</SelectItem>
+                  <SelectItem value="6">6 periods</SelectItem>
+                  <SelectItem value="8">8 periods</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="ml-auto">
+              <Button
+                size="sm"
+                className="bg-primary hover:bg-primary/90 h-9"
+                onClick={() => { setSaveName(''); setSaveOpen(true) }}
+                disabled={forecastRows.length === 0}
+              >
+                <Save className="size-3.5 mr-2" /> Save as Version
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* ── Main grid: assumptions + output ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-6">
+      {/* ── Compare mode: render ScenarioTab with shared controls ── */}
+      {mode === 'compare' && (
+        <ScenarioTab
+          records={records}
+          companies={companies}
+          user={user}
+          firestore={firestore}
+          vertical={vertical}
+          locations={locations}
+          periods={periods}
+          hideControls
+          externalBasePeriod={basePeriod}
+          setExternalBasePeriod={setBasePeriod}
+          externalHorizon={horizon}
+          setExternalHorizon={setHorizon}
+        />
+      )}
+
+      {/* ── Single forecast mode ── */}
+      {mode === 'single' && <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-6">
 
         {/* Assumptions panel */}
         <div className="space-y-4">
@@ -692,7 +736,7 @@ export function ForecastTab({
             </p>
           </Card>
         </div>
-      </div>
+      </div>}
 
       {/* Save dialog */}
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
