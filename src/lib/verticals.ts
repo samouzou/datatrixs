@@ -175,6 +175,47 @@ const BIOTECH_PIPELINE_LABELS: PipelineFieldLabels = {
   notesPlaceholder: 'CRO partners, trial sites, regulatory strategy, key risks…',
 };
 
+const HARDWARE_FORECAST_LABELS: ForecastLabels = {
+  growthRateLabel: 'Revenue Growth %',
+  newUnitValueLabel: 'Target Revenue / Product Line at Maturity',
+  profitLabel: 'EBITDA',
+  profitPctLabel: 'EBITDA %',
+  scenarioGrowthLabel: 'Revenue Growth / Period',
+  scenarioNewUnitValueLabel: 'Product Line Revenue',
+  chartTitle: 'Revenue & EBITDA Trajectory',
+};
+
+const HARDWARE_SCENARIO_DEFAULTS: ScenarioDefaults = {
+  bear: { sssPct:  -5, newUnitsPerPeriod: 0, cogsPct: 52, laborPct: 20, opexPct: 15, auv: 0 },
+  base: { sssPct:   8, newUnitsPerPeriod: 0, cogsPct: 48, laborPct: 18, opexPct: 12, auv: 0 },
+  bull: { sssPct:  18, newUnitsPerPeriod: 1, cogsPct: 44, laborPct: 15, opexPct: 10, auv: 0 },
+};
+
+const HARDWARE_PIPELINE_STAGES: PipelineStageDef[] = [
+  { name: 'Concept',               color: '#94a3b8', bgClass: 'bg-slate-500/10',   borderClass: 'border-slate-500/30',   iconKey: 'building'    },
+  { name: 'Design / Engineering',  color: '#a78bfa', bgClass: 'bg-violet-500/10',  borderClass: 'border-violet-500/30',  iconKey: 'trending'    },
+  { name: 'Prototype',             color: '#60a5fa', bgClass: 'bg-blue-500/10',    borderClass: 'border-blue-500/30',    iconKey: 'flask'       },
+  { name: 'Testing / Cert',        color: '#fb923c', bgClass: 'bg-orange-500/10',  borderClass: 'border-orange-500/30',  iconKey: 'shield-check'},
+  { name: 'Pre-Production',        color: '#facc15', bgClass: 'bg-yellow-500/10',  borderClass: 'border-yellow-500/30',  iconKey: 'file-check'  },
+  { name: 'Production',            color: '#4ade80', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/30', iconKey: 'check'       },
+];
+
+const HARDWARE_PIPELINE_LABELS: PipelineFieldLabels = {
+  unitNameLabel: 'Product SKU / Line',
+  unitNamePlaceholder: 'e.g. HW-X1 Pro',
+  marketLabel: 'Target Market',
+  marketPlaceholder: 'e.g. North America, EU Industrial',
+  budgetLabel: 'Development Budget',
+  spendLabel: 'Spend to Date',
+  valueLabel: 'Projected Annual Revenue',
+  valueSub: 'at full production volume',
+  returnLabel: 'Target Gross Margin %',
+  returnAggLabel: 'Projected EBITDA',
+  milestoneLabel: 'Expected Launch Date',
+  completedStage: 'Production',
+  notesPlaceholder: 'Supply chain partners, certifications required, DfM notes, key risks…',
+};
+
 export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
   retail: {
     id: 'retail',
@@ -205,10 +246,10 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Gross Margin', 'Inventory Value', 'Units Sold'],
     organizationLabel: 'Division',
     bridgeLabel: 'EBITDA',
-    pipelineStages: RETAIL_PIPELINE_STAGES,
-    pipelineLabels: RETAIL_PIPELINE_LABELS,
-    forecastLabels: RETAIL_FORECAST_LABELS,
-    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
+    pipelineStages: HARDWARE_PIPELINE_STAGES,
+    pipelineLabels: HARDWARE_PIPELINE_LABELS,
+    forecastLabels: HARDWARE_FORECAST_LABELS,
+    scenarioDefaults: HARDWARE_SCENARIO_DEFAULTS,
   },
   saas: {
     id: 'saas',

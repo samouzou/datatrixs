@@ -267,6 +267,130 @@ function buildRetailOps(company: Company, now: string): WriteOp[] {
   return ops
 }
 
+// ─── Hardware seed ────────────────────────────────────────────────────────────
+
+function buildHardwareOps(company: Company, now: string): WriteOp[] {
+  const ops: WriteOp[] = []
+  const members = company.members as Record<string, CompanyRole>
+  const BUDGET = 'Annual Budget'
+
+  type ProductLineDef = {
+    id: string; name: string
+    rev: number[]
+    revB: number[]
+    cogsPct: number; laborPct: number; opexPct: number
+  }
+
+  const lines: ProductLineDef[] = [
+    {
+      id: `demo-${company.id}-x1`,
+      name: 'Pro Series X1',
+      rev:  [865, 880, 912, 895, 920, 948, 935, 958, 940, 928, 910, 975],
+      revB: [880, 895, 925, 910, 935, 960, 948, 972, 955, 942, 925, 990],
+      cogsPct: 45, laborPct: 15, opexPct: 11,
+    },
+    {
+      id: `demo-${company.id}-g5`,
+      name: 'Industrial G5',
+      rev:  [620, 628, 635, 640, 648, 655, 650, 658, 662, 655, 648, 670],
+      revB: [630, 638, 645, 650, 658, 665, 660, 668, 672, 665, 658, 680],
+      cogsPct: 48, laborPct: 14, opexPct: 12,
+    },
+    {
+      id: `demo-${company.id}-c2`,
+      name: 'Consumer Line C2',
+      rev:  [355, 362, 378, 384, 395, 408, 415, 422, 418, 410, 430, 520],
+      revB: [380, 388, 402, 410, 420, 434, 440, 448, 445, 436, 455, 545],
+      cogsPct: 50, laborPct: 16, opexPct: 13,
+    },
+    {
+      id: `demo-${company.id}-m7`,
+      name: 'OEM Module M7',
+      rev:  [148, 162, 175, 188, 202, 218, 228, 240, 248, 255, 262, 278],
+      revB: [165, 178, 192, 206, 220, 236, 246, 258, 268, 275, 282, 298],
+      cogsPct: 52, laborPct: 18, opexPct: 14,
+    },
+  ]
+
+  const rec = (locId: string, locName: string, period: string, metric: string, value: number) => {
+    const id = `demo-${company.id}-${locId}-${period}-${slug(metric)}`
+    ops.push({ col: 'financial_records', id, data: { id, locationId: locId, locationName: locName, period, metric, value: Math.round(value * 1_000), companyMembers: members, createdAt: now } })
+  }
+
+  const plan = (locId: string, locName: string, period: string, metric: string, value: number) => {
+    const id = `demo-${company.id}-${locId}-${period}-${slug(metric)}-${slug(BUDGET)}`
+    ops.push({ col: 'financial_plans', id, data: { id, companyId: company.id, locationId: locId, locationName: locName, period, metric, plannedValue: Math.round(value * 1_000), version: BUDGET, companyMembers: members, createdAt: now, updatedAt: now } })
+  }
+
+  for (const line of lines) {
+    for (let m = 0; m < 12; m++) {
+      const period = MONTHS[m]
+      const rev = line.rev[m]
+      const cogs = rev * (line.cogsPct / 100)
+      const labor = rev * (line.laborPct / 100)
+      const opex = rev * (line.opexPct / 100)
+      const profit = rev - cogs - labor - opex
+
+      rec(line.id, line.name, period, 'Revenue', rev)
+      rec(line.id, line.name, period, 'COGS', cogs)
+      rec(line.id, line.name, period, 'Labor', labor)
+      rec(line.id, line.name, period, 'Operating Expenses', opex)
+      rec(line.id, line.name, period, 'Gross Margin', rev - cogs)
+      rec(line.id, line.name, period, 'Net Profit', profit)
+
+      const revB = line.revB[m]
+      const cogsB = revB * (line.cogsPct / 100)
+      const laborB = revB * (line.laborPct / 100)
+      const opexB = revB * (line.opexPct / 100)
+      const profitB = revB - cogsB - laborB - opexB
+
+      plan(line.id, line.name, period, 'Revenue', revB)
+      plan(line.id, line.name, period, 'COGS', cogsB)
+      plan(line.id, line.name, period, 'Labor', laborB)
+      plan(line.id, line.name, period, 'Operating Expenses', opexB)
+      plan(line.id, line.name, period, 'Gross Margin', revB - cogsB)
+      plan(line.id, line.name, period, 'Net Profit', profitB)
+    }
+  }
+
+  // Pipeline units
+  const pipelineUnits = [
+    {
+      id: `demo-${company.id}-x2`,
+      unitName: 'Pro Series X2', market: 'North America / EU',
+      stage: 'Testing / Cert', expectedOpenDate: '2026-09-01',
+      capexBudget: 1_200_000, capexDeployed: 880_000,
+      auvUnderwrite: 11_000_000, ebitdaTargetPct: 28,
+      notes: 'FCC & CE certification in progress. Pre-production tooling ordered. Launch target Q3 2026.',
+    },
+    {
+      id: `demo-${company.id}-c3`,
+      unitName: 'Consumer Line C3', market: 'North America',
+      stage: 'Prototype', expectedOpenDate: '2027-02-01',
+      capexBudget: 650_000, capexDeployed: 210_000,
+      auvUnderwrite: 6_500_000, ebitdaTargetPct: 22,
+      notes: 'EVT prototype complete. DVT phase starts Q3 2026. Retail packaging design underway.',
+    },
+  ]
+  for (const u of pipelineUnits) {
+    ops.push({ col: 'unit_pipeline', id: u.id, data: { ...u, companyId: company.id, companyMembers: members, createdAt: now, updatedAt: now } })
+  }
+
+  // Quarterly covenant snapshots
+  const covenants = [
+    { period: '2025-Q2', cash: 4_200_000, totalDebt: 9_500_000, interestExpense: 82_000, fixedCharges: 310_000 },
+    { period: '2025-Q3', cash: 4_850_000, totalDebt: 9_200_000, interestExpense: 80_000, fixedCharges: 308_000 },
+    { period: '2025-Q4', cash: 5_620_000, totalDebt: 8_900_000, interestExpense: 77_000, fixedCharges: 305_000 },
+    { period: '2026-Q1', cash: 5_980_000, totalDebt: 8_600_000, interestExpense: 74_000, fixedCharges: 302_000 },
+  ]
+  for (const c of covenants) {
+    const id = `${company.id}_${c.period}`
+    ops.push({ col: 'covenant_snapshots', id, data: { id, companyId: company.id, ...c, companyMembers: members, createdAt: now, updatedAt: now } })
+  }
+
+  return ops
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function seedDemoData(
@@ -276,7 +400,9 @@ export async function seedDemoData(
   const now = new Date().toISOString()
   const ops = company.vertical === 'biotech'
     ? buildBiotechOps(company, now)
-    : buildRetailOps(company, now)
+    : company.vertical === 'hardware'
+      ? buildHardwareOps(company, now)
+      : buildRetailOps(company, now)
 
   await commit(firestore, ops)
   return { seeded: ops.length }

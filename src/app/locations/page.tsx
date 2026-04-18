@@ -51,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Company, Location, FinancialRecord, FinancialMetric } from "@/lib/types"
 import { getVerticalConfig } from "@/lib/verticals"
+import { useVertical } from "@/contexts/vertical-context"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
@@ -101,6 +102,7 @@ export default function LocationsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
   const { toast } = useToast()
+  const vertical = useVertical()
   
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [isUploadOpen, setIsUploadOpen] = React.useState(false)
@@ -198,7 +200,7 @@ export default function LocationsPage() {
     resetForm();
     
     toast({
-      title: "Location Created",
+      title: `${vertical.unitLabel} Created`,
       description: `Successfully added ${name}.`
     });
   };
@@ -413,7 +415,7 @@ export default function LocationsPage() {
       phoneNumber: editPhone,
       updatedAt: new Date().toISOString(),
     })
-    toast({ title: "Location Updated", description: `${editName} has been saved.` })
+    toast({ title: `${vertical.unitLabel} Updated`, description: `${editName} has been saved.` })
     setIsEditOpen(false)
     setEditingLocation(null)
   }
@@ -432,16 +434,16 @@ export default function LocationsPage() {
     recordsSnap.docs.forEach(d => batch.delete(d.ref));
 
     await batch.commit();
-    toast({ title: "Location Removed", description: `${loc.name} and its financial data have been deleted.` });
+    toast({ title: `${vertical.unitLabel} Removed`, description: `${loc.name} and its financial data have been deleted.` });
   };
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage Locations</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground font-headline">Manage {vertical.unitsLabel}</h2>
           <div className="flex items-center gap-3">
-            <p className="text-muted-foreground">Standardizing financials across your business units.</p>
+            <p className="text-muted-foreground">Standardizing financials across your {vertical.unitsLabel.toLowerCase()}.</p>
             {activeCompany?.subscription && (
               <Badge variant="outline" className={cn(
                 "h-6 px-3 text-[10px] uppercase font-bold tracking-widest",
@@ -463,16 +465,16 @@ export default function LocationsPage() {
               disabled={!companies?.length}
             >
               {isLimitReached ? <Zap className="mr-2 size-4" /> : <Plus className="mr-2 size-4" />}
-              {isLimitReached ? "Expand Capacity" : "Add New Location"}
+              {isLimitReached ? "Expand Capacity" : `Add New ${vertical.unitLabel}`}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>{isLimitReached ? "Capacity Reached" : "Add Business Unit"}</DialogTitle>
+              <DialogTitle>{isLimitReached ? "Capacity Reached" : `Add ${vertical.unitLabel}`}</DialogTitle>
               <DialogDescription>
                 {isLimitReached
                   ? "You have used all available unit licenses."
-                  : "Register a new business unit and connect its data source."}
+                  : `Register a new ${vertical.unitLabel.toLowerCase()} and connect its data source.`}
               </DialogDescription>
             </DialogHeader>
             
@@ -505,8 +507,8 @@ export default function LocationsPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2 col-span-2">
-                  <Label htmlFor="name">Location Name</Label>
-                  <Input id="name" placeholder="e.g., Houston West Branch" value={name} onChange={e => setName(e.target.value)} />
+                  <Label htmlFor="name">{vertical.unitLabel} Name</Label>
+                  <Input id="name" placeholder={`e.g., ${vertical.unitLabel} name`} value={name} onChange={e => setName(e.target.value)} />
                 </div>
                 <div className="grid gap-2 col-span-2">
                   <Label htmlFor="address">Address</Label>
@@ -534,7 +536,7 @@ export default function LocationsPage() {
             {!isLimitReached && (
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateLocation} disabled={!companyId || !name.trim()}>Add Location</Button>
+                <Button onClick={handleCreateLocation} disabled={!companyId || !name.trim()}>Add {vertical.unitLabel}</Button>
               </DialogFooter>
             )}
           </DialogContent>
@@ -568,11 +570,11 @@ export default function LocationsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => setTimeout(() => handleOpenEdit(loc), 0)}>
-                        <Pencil className="size-4 mr-2" /> Edit Location
+                        <Pencil className="size-4 mr-2" /> Edit {vertical.unitLabel}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteLocation(loc)}>
-                        <Trash2 className="size-4 mr-2" /> Delete Location
+                        <Trash2 className="size-4 mr-2" /> Delete {vertical.unitLabel}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -611,7 +613,7 @@ export default function LocationsPage() {
         {!locations?.length && !isLoading && (
           <div className="text-center py-20 border-2 border-dashed border-border rounded-xl bg-card/20">
             <Building2 className="mx-auto size-12 text-muted-foreground opacity-20 mb-4" />
-            <p className="text-muted-foreground font-medium italic">No normalized locations found. Add your first unit to begin aggregation.</p>
+            <p className="text-muted-foreground font-medium italic">No normalized {vertical.unitsLabel.toLowerCase()} found. Add your first unit to begin aggregation.</p>
           </div>
         )}
       </div>
@@ -619,12 +621,12 @@ export default function LocationsPage() {
       <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) setEditingLocation(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Location</DialogTitle>
-            <DialogDescription>Update the details for this business unit.</DialogDescription>
+            <DialogTitle>Edit {vertical.unitLabel}</DialogTitle>
+            <DialogDescription>Update the details for this {vertical.unitLabel.toLowerCase()}.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="grid gap-2 col-span-2">
-              <Label htmlFor="edit-name">Location Name</Label>
+              <Label htmlFor="edit-name">{vertical.unitLabel} Name</Label>
               <Input id="edit-name" placeholder="e.g., Houston West Branch" value={editName} onChange={e => setEditName(e.target.value)} />
             </div>
             <div className="grid gap-2 col-span-2">
