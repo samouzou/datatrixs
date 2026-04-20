@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import {
-  TrendingUp, ArrowUpRight, ArrowDownRight, Target, GitCompare,
+  TrendingUp, ArrowUpRight, ArrowDownRight, GitCompare,
   FilePen, ChevronRight, Loader2, Cpu, Route, ShieldCheck, Sparkles,
-  TableProperties, Upload,
+  TableProperties, Upload, FileBarChart2, Lock,
 } from "lucide-react"
 import { ForecastTab } from "@/components/fpa/forecast-tab"
 import { PipelineTab } from "@/components/fpa/pipeline-tab"
@@ -310,7 +310,7 @@ export default function FpaPage() {
   // ── Controls ──
   const [selectedPeriod,  setSelectedPeriod]  = React.useState('');
   const [selectedVersion, setSelectedVersion] = React.useState(DEFAULT_VERSION);
-  const [activeTab,       setActiveTab]       = React.useState('pva');
+  const [activeTab,       setActiveTab]       = React.useState('forecast');
   const [bridgeFrom,      setBridgeFrom]      = React.useState('');
   const [bridgeTo,        setBridgeTo]        = React.useState('');
 
@@ -465,111 +465,37 @@ export default function FpaPage() {
     <div className="flex-1 space-y-6 p-8 pt-6">
 
       {/* Header */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="size-6 text-primary" />
-          <h2 className="text-3xl font-bold tracking-tight font-headline">FP&amp;A</h2>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="size-6 text-primary" />
+            <h2 className="text-3xl font-bold tracking-tight font-headline">FP&amp;A</h2>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Build forecasts, analyze scenarios, and review financial reports.
+          </p>
         </div>
-        <p className="text-muted-foreground">
-          Plan vs. actual performance and period-over-period analysis across your {vertical.unitsLabel.toLowerCase()}.
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-4">
-        {!(records ?? []).length && companies?.[0] && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSeedDemo}
-            disabled={isSeeding}
-            className="h-9 gap-2 border-primary/40 text-primary hover:bg-primary/10"
-          >
-            {isSeeding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-            {isSeeding ? 'Loading sample data…' : 'Load sample data'}
+        <div className="flex items-center gap-2">
+          {!(records ?? []).length && companies?.[0] && (
+            <Button variant="outline" size="sm" onClick={handleSeedDemo} disabled={isSeeding} className="h-9 gap-2 border-primary/40 text-primary hover:bg-primary/10">
+              {isSeeding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              {isSeeding ? 'Loading sample data…' : 'Load sample data'}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="h-9 gap-2">
+            <Upload className="size-3.5" /> Import CSV
           </Button>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setImportOpen(true)}
-          className="h-9 gap-2"
-        >
-          <Upload className="size-3.5" /> Import CSV
-        </Button>
-        <div className="flex items-center gap-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Period</Label>
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="h-9 w-36 bg-card border-border text-sm">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              {periods.map(p => <SelectItem key={p} value={p}>{fmtShortPeriod(p)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Version</Label>
-          <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-            <SelectTrigger className="h-9 w-44 bg-card border-border text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {versions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
-      {/* KPI summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {vertical.kpiCards ? (
-          vertical.kpiCards.map(card => {
-            const actual  = rows.reduce((s, r) => s + card.metrics.reduce((ms, m) => ms + (r.actual[m]  ?? 0), 0), 0);
-            const planned = rows.reduce((s, r) => s + card.metrics.reduce((ms, m) => ms + (r.planned[m] ?? 0), 0), 0);
-            return <KpiCard key={card.title} title={card.title} actual={actual} planned={planned} goodDirection={card.goodDirection} />;
-          })
-        ) : (
-          <>
-            <KpiCard title="Total Revenue" actual={totalActualRevenue} planned={totalPlannedRevenue} />
-            <KpiCard title="Net Profit"    actual={totalActualProfit}  planned={totalPlannedProfit} />
-            {/* Net Margin card — manual since it's a % not $ */}
-            <Card className="bg-card/50 border-border">
-              <CardHeader className="pb-1">
-                <CardDescription className="text-[10px] uppercase tracking-widest font-semibold">Net Margin %</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-end gap-2">
-                  <span className="text-2xl font-bold">{actualMarginPct.toFixed(1)}%</span>
-                  {plannedMarginPct > 0 && (
-                    <span className={cn("flex items-center text-sm font-bold mb-0.5", marginIsGood ? "text-emerald-500" : "text-destructive")}>
-                      {marginIsGood ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
-                      {fmtPct(actualMarginPct - plannedMarginPct)}
-                    </span>
-                  )}
-                </div>
-                {plannedMarginPct > 0 ? (
-                  <p className="text-[10px] text-muted-foreground">Budget: {plannedMarginPct.toFixed(1)}%</p>
-                ) : (
-                  <p className="text-[10px] text-muted-foreground italic">Set budgets to compare</p>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* Tabs */}
+      {/* Top-level tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-card/50 border border-border p-1 h-11">
-          <TabsTrigger value="pva"    className="px-5 data-[state=active]:bg-primary h-9 gap-2">
-            <Target    className="size-3.5" /> Plan vs. Actual
-          </TabsTrigger>
-          <TabsTrigger value="bridge" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
-            <GitCompare className="size-3.5" /> {vertical.bridgeLabel} Bridge
-          </TabsTrigger>
           <TabsTrigger value="forecast" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <Cpu className="size-3.5" /> Forecast
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
+            <FileBarChart2 className="size-3.5" /> Reports
           </TabsTrigger>
           <TabsTrigger value="pipeline" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <Route className="size-3.5" /> Unit Pipeline
@@ -577,13 +503,93 @@ export default function FpaPage() {
           <TabsTrigger value="covenants" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
             <ShieldCheck className="size-3.5" /> Covenants
           </TabsTrigger>
-          <TabsTrigger value="ledger" className="px-5 data-[state=active]:bg-primary h-9 gap-2">
-            <TableProperties className="size-3.5" /> P&amp;L Ledger
-          </TabsTrigger>
         </TabsList>
 
-        {/* ── Plan vs. Actual ── */}
-        <TabsContent value="pva" className="space-y-4">
+        {/* ── Reports — nested sub-tabs ── */}
+        <TabsContent value="reports">
+          <Tabs defaultValue="pva" className="space-y-4">
+            <TabsList className="bg-muted/40 border border-border/50 p-1 h-9">
+              <TabsTrigger value="pva"    className="px-4 text-xs data-[state=active]:bg-card h-7 gap-1.5">
+                Plan vs. Actual
+              </TabsTrigger>
+              <TabsTrigger value="bridge" className="px-4 text-xs data-[state=active]:bg-card h-7 gap-1.5">
+                <GitCompare className="size-3" /> {vertical.bridgeLabel} Bridge
+              </TabsTrigger>
+              <TabsTrigger value="ledger" className="px-4 text-xs data-[state=active]:bg-card h-7 gap-1.5">
+                <TableProperties className="size-3" /> P&amp;L Ledger
+              </TabsTrigger>
+              <TabsTrigger value="capex" disabled className="px-4 text-xs h-7 gap-1.5 opacity-50 cursor-not-allowed">
+                <Lock className="size-3" /> CapEx / Cash Flow
+              </TabsTrigger>
+              <TabsTrigger value="bs" disabled className="px-4 text-xs h-7 gap-1.5 opacity-50 cursor-not-allowed">
+                <Lock className="size-3" /> Balance Sheet
+              </TabsTrigger>
+            </TabsList>
+
+            {/* PvA controls (period + version + KPI cards) live here */}
+            <TabsContent value="pva" className="space-y-5">
+
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Period</Label>
+                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                    <SelectTrigger className="h-9 w-36 bg-card border-border text-sm">
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periods.map(p => <SelectItem key={p} value={p}>{fmtShortPeriod(p)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">vs. Budget</Label>
+                  <Select value={selectedVersion} onValueChange={setSelectedVersion}>
+                    <SelectTrigger className="h-9 w-44 bg-card border-border text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {versions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {rows.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {vertical.kpiCards ? (
+                    vertical.kpiCards.map(card => {
+                      const actual  = rows.reduce((s, r) => s + card.metrics.reduce((ms, m) => ms + (r.actual[m]  ?? 0), 0), 0);
+                      const planned = rows.reduce((s, r) => s + card.metrics.reduce((ms, m) => ms + (r.planned[m] ?? 0), 0), 0);
+                      return <KpiCard key={card.title} title={card.title} actual={actual} planned={planned} goodDirection={card.goodDirection} />;
+                    })
+                  ) : (
+                    <>
+                      <KpiCard title="Total Revenue" actual={totalActualRevenue} planned={totalPlannedRevenue} />
+                      <KpiCard title="Net Profit"    actual={totalActualProfit}  planned={totalPlannedProfit} />
+                      <Card className="bg-card/50 border-border">
+                        <CardHeader className="pb-1">
+                          <CardDescription className="text-[10px] uppercase tracking-widest font-semibold">Net Margin %</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex items-end gap-2">
+                            <span className="text-2xl font-bold">{actualMarginPct.toFixed(1)}%</span>
+                            {plannedMarginPct > 0 && (
+                              <span className={cn("flex items-center text-sm font-bold mb-0.5", marginIsGood ? "text-emerald-500" : "text-destructive")}>
+                                {marginIsGood ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
+                                {fmtPct(actualMarginPct - plannedMarginPct)}
+                              </span>
+                            )}
+                          </div>
+                          {plannedMarginPct > 0
+                            ? <p className="text-[10px] text-muted-foreground">Budget: {plannedMarginPct.toFixed(1)}%</p>
+                            : <p className="text-[10px] text-muted-foreground italic">Set budgets to compare</p>
+                          }
+                        </CardContent>
+                      </Card>
+                    </>
+                  )}
+                </div>
+              )}
 
           {rows.length === 0 ? (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-xl space-y-4">
@@ -824,57 +830,77 @@ export default function FpaPage() {
           )}
         </TabsContent>
 
-        {/* ── Forecast Builder ── */}
-        <TabsContent value="forecast">
-          <ForecastTab
-            records={records ?? []}
-            companies={companies ?? []}
-            user={user}
-            firestore={firestore}
-            vertical={vertical}
-            locations={locations}
-            periods={periods}
-          />
-        </TabsContent>
+          {/* ── P&L Ledger ── */}
+          <TabsContent value="ledger">
+            <LedgerTab
+              records={records ?? []}
+              plans={plans ?? []}
+              companies={companies ?? []}
+              user={user}
+              firestore={firestore}
+              vertical={vertical}
+              locations={locations}
+              periods={periods}
+              versions={versions}
+            />
+          </TabsContent>
 
-        {/* ── Unit Pipeline ── */}
-        <TabsContent value="pipeline">
-          <PipelineTab
-            units={pipelineUnits ?? []}
-            companies={companies ?? []}
-            user={user}
-            firestore={firestore}
-            vertical={vertical}
-          />
-        </TabsContent>
+          {/* ── CapEx / Cash Flow (coming soon) ── */}
+          <TabsContent value="capex">
+            <div className="text-center border-2 border-dashed border-border rounded-xl space-y-3 py-20">
+              <Lock className="mx-auto size-10 text-muted-foreground opacity-20" />
+              <p className="text-muted-foreground font-medium">CapEx / Cash Flow — Coming Soon</p>
+              <p className="text-xs text-muted-foreground">Capital expenditure and cash flow statements will appear here.</p>
+            </div>
+          </TabsContent>
 
-        {/* ── Covenant Dashboard ── */}
-        <TabsContent value="covenants">
-          <CovenantTab
-            records={records ?? []}
-            snapshots={covenantSnapshots ?? []}
-            companies={companies ?? []}
-            user={user}
-            firestore={firestore}
-            periods={periods}
-          />
-        </TabsContent>
+          {/* ── Balance Sheet (coming soon) ── */}
+          <TabsContent value="bs">
+            <div className="text-center border-2 border-dashed border-border rounded-xl space-y-3 py-20">
+              <Lock className="mx-auto size-10 text-muted-foreground opacity-20" />
+              <p className="text-muted-foreground font-medium">Balance Sheet — Coming Soon</p>
+              <p className="text-xs text-muted-foreground">Balance sheet reporting will appear here.</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </TabsContent>
 
-        {/* ── P&L Ledger ── */}
-        <TabsContent value="ledger">
-          <LedgerTab
-            records={records ?? []}
-            plans={plans ?? []}
-            companies={companies ?? []}
-            user={user}
-            firestore={firestore}
-            vertical={vertical}
-            locations={locations}
-            periods={periods}
-            versions={versions}
-          />
-        </TabsContent>
-      </Tabs>
+      {/* ── Forecast Builder ── */}
+      <TabsContent value="forecast">
+        <ForecastTab
+          records={records ?? []}
+          companies={companies ?? []}
+          user={user}
+          firestore={firestore}
+          vertical={vertical}
+          locations={locations}
+          periods={periods}
+        />
+      </TabsContent>
+
+      {/* ── Unit Pipeline ── */}
+      <TabsContent value="pipeline">
+        <PipelineTab
+          units={pipelineUnits ?? []}
+          companies={companies ?? []}
+          user={user}
+          firestore={firestore}
+          vertical={vertical}
+        />
+      </TabsContent>
+
+      {/* ── Covenant Dashboard ── */}
+      <TabsContent value="covenants">
+        <CovenantTab
+          records={records ?? []}
+          snapshots={covenantSnapshots ?? []}
+          companies={companies ?? []}
+          user={user}
+          firestore={firestore}
+          periods={periods}
+        />
+      </TabsContent>
+    </Tabs>
 
       {/* Budget Entry Dialog */}
       <Dialog open={budgetOpen} onOpenChange={setBudgetOpen}>
