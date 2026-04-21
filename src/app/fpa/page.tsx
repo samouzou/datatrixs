@@ -62,8 +62,13 @@ function fmtShortPeriod(period: string): string {
   return period;
 }
 
+function toComparablePeriod(p: string): string {
+  const m = p.match(/^(\d{4})-Q(\d)$/)
+  return m ? `${m[1]}-${String(parseInt(m[2]) * 3).padStart(2, '0')}` : p
+}
+
 function sortPeriods(periods: string[]) {
-  return [...periods].sort((a, b) => a.localeCompare(b));
+  return [...periods].sort((a, b) => toComparablePeriod(a).localeCompare(toComparablePeriod(b)));
 }
 
 // ─── Data types & utilities ──────────────────────────────────────────────────
