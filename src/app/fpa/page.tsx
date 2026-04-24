@@ -10,6 +10,7 @@ import { ForecastTab } from "@/components/fpa/forecast-tab"
 import { PipelineTab } from "@/components/fpa/pipeline-tab"
 import { CovenantTab } from "@/components/fpa/covenant-tab"
 import { LedgerTab } from "@/components/fpa/ledger-tab"
+import { CapexTab } from "@/components/fpa/capex-tab"
 import { ImportDialog } from "@/components/fpa/import-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
@@ -523,8 +524,8 @@ export default function FpaPage() {
               <TabsTrigger value="ledger" className="px-4 text-xs data-[state=active]:bg-card h-7 gap-1.5">
                 <TableProperties className="size-3" /> P&amp;L Ledger
               </TabsTrigger>
-              <TabsTrigger value="capex" disabled className="px-4 text-xs h-7 gap-1.5 opacity-50 cursor-not-allowed">
-                <Lock className="size-3" /> CapEx / Cash Flow
+              <TabsTrigger value="capex" className="px-4 text-xs data-[state=active]:bg-card h-7 gap-1.5">
+                CapEx / Cash Flow
               </TabsTrigger>
               <TabsTrigger value="bs" disabled className="px-4 text-xs h-7 gap-1.5 opacity-50 cursor-not-allowed">
                 <Lock className="size-3" /> Balance Sheet
@@ -850,13 +851,17 @@ export default function FpaPage() {
             />
           </TabsContent>
 
-          {/* ── CapEx / Cash Flow (coming soon) ── */}
+          {/* ── CapEx / Cash Flow ── */}
           <TabsContent value="capex">
-            <div className="text-center border-2 border-dashed border-border rounded-xl space-y-3 py-20">
-              <Lock className="mx-auto size-10 text-muted-foreground opacity-20" />
-              <p className="text-muted-foreground font-medium">CapEx / Cash Flow — Coming Soon</p>
-              <p className="text-xs text-muted-foreground">Capital expenditure and cash flow statements will appear here.</p>
-            </div>
+            <CapexTab
+              records={records ?? []}
+              companies={companies ?? []}
+              user={user}
+              firestore={firestore}
+              vertical={vertical}
+              locations={locations}
+              periods={periods}
+            />
           </TabsContent>
 
           {/* ── Balance Sheet (coming soon) ── */}
