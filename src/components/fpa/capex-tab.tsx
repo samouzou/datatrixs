@@ -16,7 +16,7 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import type { Firestore } from "firebase/firestore"
 import type { User } from "firebase/auth"
-import { FinancialRecord, Company } from "@/lib/types"
+import { FinancialRecord, Company, UnitPipeline } from "@/lib/types"
 import type { VerticalConfig } from "@/lib/verticals"
 import { cn } from "@/lib/utils"
 
@@ -208,11 +208,12 @@ interface CapexTabProps {
   vertical: VerticalConfig
   locations: LocationMeta[]
   periods: string[]
+  pipelineUnits: UnitPipeline[]
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function CapexTab({ records, companies, user, firestore, vertical, locations, periods }: CapexTabProps) {
+export function CapexTab({ records, companies, user, firestore, vertical, locations, periods, pipelineUnits }: CapexTabProps) {
 
   const [draftLoaded,  setDraftLoaded]  = React.useState(false)
   const [scenarios,    setScenarios]    = React.useState<ScenarioConfig[]>([])
@@ -297,6 +298,35 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
   const totalCapex   = capexRows.reduce((s, r) => s + r.totalCapex, 0)
   const totalFcf     = capexRows.reduce((s, r) => s + r.fcf,       0)
   const fcfConversion = totalEbitda > 0 ? (totalFcf / totalEbitda) * 100 : 0
+
+  // ── Pipeline reconciliation ──
+  // Committed = stage index >= 2 in vertical.pipelineStages (e.g. Lease Executed+)
+  const committedThreshold = 2
+
+  function dateToPeriod(isoDate: string): string {
+    if (!isoDate) return ''
+    const d = new Date(isoDate)
+    const y = d.getFullYear()
+    const m = d.getMonth() + 1
+    if (basePeriod.includes('-Q')) return `${y}-Q${Math.ceil(m / 3)}`
+    return `${y}-${String(m).padStart(2, '0')}`
+  }
+
+  const reconciliation = React.useMemo(() => {
+    return capexRows.map((row, i) => {
+      const forecastUnits = active?.newUnits[i] ?? 0
+      const inPeriod = pipelineUnits.filter(u => dateToPeriod(u.expectedOpenDate) === row.period)
+      const allPipeline = inPeriod.length
+      const committed = inPeriod.filter(u => {
+        const stageIdx = vertical.pipelineStages.findIndex(s => s.name === u.stage)
+        return stageIdx >= committedThreshold
+      }).length
+      const gap = forecastUnits - committed
+      const gapCapex = gap > 0 ? gap * investmentPerUnit : 0
+      return { period: row.period, label: row.label, forecastUnits, allPipeline, committed, gap, gapCapex }
+    }).filter(r => r.forecastUnits > 0 || r.allPipeline > 0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capexRows, active, pipelineUnits, vertical.pipelineStages, investmentPerUnit])
 
   // ── Unit economics ──
   const hasNewUnits = active?.newUnits.some(n => n > 0) ?? false
@@ -521,6 +551,62 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
 
         </div>
       </div>
+
+      {/* ── Pipeline Reconciliation ── */}
+      {reconciliation.length > 0 && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="font-bold text-foreground text-sm">Forecast vs. Pipeline</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Committed = {vertical.pipelineStages[committedThreshold]?.name ?? 'Stage 3'} or later · Gap shows unconfirmed CapEx exposure
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {reconciliation.map(r => {
+              const isClean = r.gap <= 0
+              return (
+                <Card key={r.period} className={cn(
+                  "bg-card/50 border-2 p-4 space-y-3",
+                  isClean ? "border-emerald-500/30" : r.gap >= 2 ? "border-destructive/40" : "border-amber-500/30"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-foreground">{r.label}</span>
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                      isClean ? "bg-emerald-500/15 text-emerald-500" : r.gap >= 2 ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-500"
+                    )}>
+                      {isClean ? 'On track' : `${r.gap} unit${r.gap !== 1 ? 's' : ''} at risk`}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Forecast assumption</span>
+                      <span className="font-semibold text-foreground">{r.forecastUnits} {r.forecastUnits === 1 ? vertical.unitLabel : vertical.unitsLabel}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">In pipeline (any stage)</span>
+                      <span className="font-semibold text-foreground">{r.allPipeline}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Committed ({vertical.pipelineStages[committedThreshold]?.name ?? 'Stage 3'}+)</span>
+                      <span className={cn("font-semibold", r.committed >= r.forecastUnits ? "text-emerald-500" : "text-amber-500")}>
+                        {r.committed}
+                      </span>
+                    </div>
+                    {r.gap > 0 && (
+                      <div className="flex justify-between pt-1.5 border-t border-border/40">
+                        <span className="text-muted-foreground">Unconfirmed CapEx</span>
+                        <span className="font-bold text-destructive">{r.gapCapex > 0 ? `$${(r.gapCapex / 1_000_000).toFixed(1)}M` : '—'}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

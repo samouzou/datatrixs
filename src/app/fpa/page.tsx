@@ -861,6 +861,7 @@ export default function FpaPage() {
               vertical={vertical}
               locations={locations}
               periods={periods}
+              pipelineUnits={pipelineUnits ?? []}
             />
           </TabsContent>
 
