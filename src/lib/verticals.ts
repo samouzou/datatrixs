@@ -51,6 +51,8 @@ export type PipelineFieldLabels = {
   milestoneLabel: string;
   completedStage: string;
   notesPlaceholder: string;
+  investmentHint: string;
+  maintenanceHint: string;
 };
 
 export type KpiCardDef = {
@@ -148,6 +150,8 @@ const RETAIL_PIPELINE_LABELS: PipelineFieldLabels = {
   milestoneLabel: 'Expected Open Date',
   completedStage: 'Open',
   notesPlaceholder: 'Landlord contacts, co-tenancy requirements, timeline risks…',
+  investmentHint: 'Buildout, equipment & pre-opening costs',
+  maintenanceHint: 'Ongoing repairs & replacements as % of revenue',
 };
 
 const BIOTECH_PIPELINE_STAGES: PipelineStageDef[] = [
@@ -173,6 +177,8 @@ const BIOTECH_PIPELINE_LABELS: PipelineFieldLabels = {
   milestoneLabel: 'Expected Readout / Approval',
   completedStage: 'Approved',
   notesPlaceholder: 'CRO partners, trial sites, regulatory strategy, key risks…',
+  investmentHint: 'Clinical trials, CRO contracts & regulatory filing costs',
+  maintenanceHint: 'Platform & overhead R&D as % of revenue',
 };
 
 const HARDWARE_FORECAST_LABELS: ForecastLabels = {
@@ -214,6 +220,8 @@ const HARDWARE_PIPELINE_LABELS: PipelineFieldLabels = {
   milestoneLabel: 'Expected Launch Date',
   completedStage: 'Production',
   notesPlaceholder: 'Supply chain partners, certifications required, DfM notes, key risks…',
+  investmentHint: 'Tooling, NRE & manufacturing setup costs',
+  maintenanceHint: 'Sustaining engineering & tooling refresh as % of revenue',
 };
 
 export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
@@ -264,7 +272,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     organizationLabel: 'Workspace',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,
-    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    pipelineLabels: { ...RETAIL_PIPELINE_LABELS, investmentHint: 'Infrastructure, tooling & onboarding costs', maintenanceHint: 'Infrastructure & platform upkeep as % of revenue' },
     forecastLabels: RETAIL_FORECAST_LABELS,
     scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
@@ -281,7 +289,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     organizationLabel: 'Practice',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,
-    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    pipelineLabels: { ...RETAIL_PIPELINE_LABELS, investmentHint: 'Talent acquisition, tooling & ramp costs', maintenanceHint: 'Overhead & tooling refresh as % of revenue' },
     forecastLabels: RETAIL_FORECAST_LABELS,
     scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
@@ -320,7 +328,7 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     organizationLabel: 'Organization',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,
-    pipelineLabels: RETAIL_PIPELINE_LABELS,
+    pipelineLabels: { ...RETAIL_PIPELINE_LABELS, investmentHint: 'Capital required to launch a new unit', maintenanceHint: 'Ongoing capital spend as % of revenue' },
     forecastLabels: RETAIL_FORECAST_LABELS,
     scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
   },
