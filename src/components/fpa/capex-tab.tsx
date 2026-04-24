@@ -226,6 +226,10 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
 
   const saveTimerRef = React.useRef<ReturnType<typeof setTimeout>>()
 
+  const fl = vertical.forecastLabels
+  // Derive a short investment label from the pipeline budget label (e.g. "CapEx Budget" → "CapEx", "R&D Budget" → "R&D")
+  const investLabel = vertical.pipelineLabels.budgetLabel.replace(/\s*Budget$/i, '').trim() || 'CapEx'
+
   // Load from forecast_drafts (scenarios + CapEx assumptions stored together)
   React.useEffect(() => {
     if (!firestore || !companies?.[0] || draftLoaded) return
@@ -337,13 +341,15 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
     ? investmentPerUnit / annualEbitdaPerUnit
     : null
 
-  // ── Chart data ──
+  // ── Chart data ── (keys derived from vertical labels so Bar dataKeys match)
+  const growthCapexKey = `Growth ${investLabel}`
+  const maintCapexKey  = `Maint. ${investLabel}`
   const chartData = capexRows.map(r => ({
-    period:         r.label,
-    'EBITDA':       r.ebitda,
-    'Growth CapEx': r.growthCapex > 0 ? r.growthCapex : null,
-    'Maint. CapEx': r.maintenanceCapex,
-    'FCF':          r.fcf,
+    period:              r.label,
+    [fl.profitLabel]:    r.ebitda,
+    [growthCapexKey]:    r.growthCapex > 0 ? r.growthCapex : null,
+    [maintCapexKey]:     r.maintenanceCapex,
+    'FCF':               r.fcf,
   }))
 
   if (!draftLoaded) {
@@ -400,8 +406,8 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
       {/* ── KPI summary ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total EBITDA',    val: fmtCurrency(totalEbitda),  color: 'text-foreground' },
-          { label: 'Total CapEx',     val: fmtCurrency(totalCapex),   color: 'text-amber-500' },
+          { label: `Total ${fl.profitLabel}`, val: fmtCurrency(totalEbitda), color: 'text-foreground' },
+          { label: `Total ${investLabel}`,  val: fmtCurrency(totalCapex),  color: 'text-amber-500' },
           { label: 'Free Cash Flow',  val: fmtCurrency(totalFcf),     color: totalFcf >= 0 ? 'text-emerald-500' : 'text-destructive' },
           { label: 'FCF Conversion',  val: `${fcfConversion.toFixed(1)}%`, color: fcfConversion >= 60 ? 'text-emerald-500' : fcfConversion >= 30 ? 'text-amber-500' : 'text-destructive' },
         ].map(({ label, val, color }) => (
@@ -429,18 +435,18 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
             </CardHeader>
             <CardContent className="space-y-0 pb-4">
               <AssumptionRow
-                label={`Investment / New ${vertical.unitLabel}`}
+                label={`${investLabel} / New ${vertical.unitLabel}`}
                 value={investmentPerUnit}
                 onChange={v => setInvestmentPerUnit(Math.max(0, Math.round(v)))}
                 suffix="" step={25_000} min={0} max={20_000_000}
-                hint="Buildout, equipment & pre-opening costs"
+                hint={vertical.pipelineLabels.investmentHint}
               />
               <AssumptionRow
-                label="Maintenance CapEx"
+                label={`Maintenance ${investLabel}`}
                 value={maintenanceCapexPct}
                 onChange={setMaintenanceCapexPct}
                 suffix="%" step={0.25} min={0} max={20}
-                hint="Ongoing upkeep as % of revenue"
+                hint={vertical.pipelineLabels.maintenanceHint}
               />
             </CardContent>
           </Card>
@@ -456,8 +462,8 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
               <CardContent className="space-y-2.5 pb-4">
                 {[
                   { label: `Investment / ${vertical.unitLabel}`,    value: fmtCurrency(investmentPerUnit) },
-                  { label: `AUV`,                                   value: active.auv > 0 ? fmtCurrency(active.auv) : '—' },
-                  { label: `Yr 1 EBITDA / ${vertical.unitLabel}`,   value: annualEbitdaPerUnit > 0 ? fmtCurrency(annualEbitdaPerUnit) : '—' },
+                  { label: fl.scenarioNewUnitValueLabel,             value: active.auv > 0 ? fmtCurrency(active.auv) : '—' },
+                  { label: `Yr 1 ${fl.profitLabel} / ${vertical.unitLabel}`, value: annualEbitdaPerUnit > 0 ? fmtCurrency(annualEbitdaPerUnit) : '—' },
                   { label: 'Est. Payback Period',                   value: paybackYears !== null ? `${paybackYears.toFixed(1)} yrs` : '—' },
                   { label: 'Cash-on-Cash Return (Yr 1)',            value: investmentPerUnit > 0 && annualEbitdaPerUnit > 0 ? `${((annualEbitdaPerUnit / investmentPerUnit) * 100).toFixed(1)}%` : '—' },
                 ].map(({ label, value }) => (
@@ -477,9 +483,9 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
           {/* Chart */}
           <Card className="bg-card/30 border-border p-5 space-y-4">
             <div>
-              <h3 className="font-bold text-foreground text-sm">EBITDA vs. CapEx — Free Cash Flow</h3>
+              <h3 className="font-bold text-foreground text-sm">{fl.profitLabel} vs. {investLabel} — Free Cash Flow</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Bars show EBITDA and CapEx breakdown · Line shows free cash flow per period
+                Bars show {fl.profitLabel} and {investLabel} breakdown · Line shows free cash flow per period
               </p>
             </div>
             <ResponsiveContainer width="100%" height={280}>
@@ -490,9 +496,9 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
                 <Tooltip content={<CapexTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="4 4" />
-                <Bar dataKey="EBITDA" fill="hsl(var(--primary))" fillOpacity={0.65} radius={[3,3,0,0]} />
-                <Bar dataKey="Growth CapEx" stackId="capex" fill="hsl(38 92% 50%)" fillOpacity={0.85} />
-                <Bar dataKey="Maint. CapEx" stackId="capex" fill="hsl(38 92% 68%)" fillOpacity={0.85} radius={[3,3,0,0]} />
+                <Bar dataKey={fl.profitLabel} fill="hsl(var(--primary))" fillOpacity={0.65} radius={[3,3,0,0]} />
+                <Bar dataKey={growthCapexKey} stackId="capex" fill="hsl(38 92% 50%)" fillOpacity={0.85} />
+                <Bar dataKey={maintCapexKey}  stackId="capex" fill="hsl(38 92% 68%)" fillOpacity={0.85} radius={[3,3,0,0]} />
                 <Line type="monotone" dataKey="FCF" stroke="hsl(142 71% 45%)" strokeWidth={2.5} dot={false} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>
@@ -505,10 +511,10 @@ export function CapexTab({ records, companies, user, firestore, vertical, locati
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-28 sticky left-0 bg-muted/30">Period</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">EBITDA</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Growth CapEx</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-amber-400/70">Maint. CapEx</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-amber-500">Total CapEx</th>
+                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{fl.profitLabel}</th>
+                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Growth {investLabel}</th>
+                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-amber-400/70">Maint. {investLabel}</th>
+                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-amber-500">Total {investLabel}</th>
                     <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-emerald-500">FCF</th>
                     <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cumul. FCF</th>
                   </tr>

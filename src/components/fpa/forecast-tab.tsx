@@ -734,7 +734,7 @@ export function ForecastTab({
                   <Separator className="my-3" />
 
                   <Label className="text-xs text-muted-foreground block mb-2">
-                    New {vertical.unitsLabel} Openings / Period
+                    New {vertical.unitsLabel} / Period
                   </Label>
                   {Object.entries(
                     forwardPeriods.reduce((acc, p, i) => {
