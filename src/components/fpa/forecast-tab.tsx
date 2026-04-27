@@ -38,6 +38,8 @@ type ScenarioConfig = {
   newUnits: number[]
   cogsPct: number
   laborPct: number
+  rentPct: number
+  marketingPct: number
   opexPct: number
   auv: number
 }
@@ -52,6 +54,8 @@ type ForecastRow = {
   grossProfit: number
   grossMarginPct: number
   labor: number
+  rent: number
+  marketing: number
   opex: number
   ebitda: number
   ebitdaMarginPct: number
@@ -147,15 +151,17 @@ function buildScenario(
     const cogs = revenue * (cfg.cogsPct / 100)
     const grossProfit = revenue - cogs
     const labor = revenue * (cfg.laborPct / 100)
+    const rent = revenue * ((cfg.rentPct ?? 0) / 100)
+    const marketing = revenue * ((cfg.marketingPct ?? 0) / 100)
     const opex = revenue * (cfg.opexPct / 100)
-    const ebitda = grossProfit - labor - opex
+    const ebitda = grossProfit - labor - rent - marketing - opex
 
     rows.push({
       period, label: fmtShortPeriod(period),
       revenue, compRevenue: runningComp, newUnitRevenue,
       cogs, grossProfit,
       grossMarginPct: revenue > 0 ? (grossProfit / revenue) * 100 : 0,
-      labor, opex, ebitda,
+      labor, rent, marketing, opex, ebitda,
       ebitdaMarginPct: revenue > 0 ? (ebitda / revenue) * 100 : 0,
       unitCount: baseUnitCount + cumulativeNewUnits,
     })
@@ -219,7 +225,7 @@ function PnlRow({ label, baseValue, rows, getVal, formatter, isHighlight = false
 }) {
   return (
     <tr className={cn("border-b border-border/40", isHighlight && "bg-primary/5 font-bold", isDim && "opacity-60")}>
-      <td className={cn("px-4 py-2.5 text-xs sticky left-0 z-10", isSubRow && "pl-8", isHighlight ? "text-foreground font-bold bg-card" : "text-muted-foreground bg-card")}>
+      <td className={cn("px-4 py-2.5 text-xs sticky left-0 z-10", isSubRow && "pl-8", isHighlight ? "text-foreground font-bold bg-muted" : "text-muted-foreground bg-card")}>
         {isSubRow && <span className="text-muted-foreground mr-1">↳</span>}
         {label}
       </td>
@@ -417,9 +423,9 @@ export function ForecastTab({
   const horizon = (TIMELINE_YEARS[timeline] ?? 1) * periodsPerYear
 
   const [scenarios, setScenarios] = React.useState<ScenarioConfig[]>([
-    { id: 'bear', name: 'Bear', color: 'hsl(var(--destructive))', activeClass: 'bg-destructive text-destructive-foreground', borderClass: 'border-destructive/30', newUnits: [], auv: 0, ...d.bear },
-    { id: 'base', name: 'Base', color: 'hsl(var(--primary))',     activeClass: 'bg-primary text-primary-foreground',         borderClass: 'border-primary/30',     newUnits: [], auv: 0, ...d.base },
-    { id: 'bull', name: 'Bull', color: 'hsl(142 71% 45%)',        activeClass: 'bg-emerald-600 text-white',                  borderClass: 'border-emerald-500/30', newUnits: [], auv: 0, ...d.bull },
+    { id: 'bear', name: 'Bear', color: 'hsl(var(--destructive))', activeClass: 'bg-destructive text-destructive-foreground', borderClass: 'border-destructive/30', newUnits: [], auv: 0, rentPct: 0, marketingPct: 0, ...d.bear },
+    { id: 'base', name: 'Base', color: 'hsl(var(--primary))',     activeClass: 'bg-primary text-primary-foreground',         borderClass: 'border-primary/30',     newUnits: [], auv: 0, rentPct: 0, marketingPct: 0, ...d.base },
+    { id: 'bull', name: 'Bull', color: 'hsl(142 71% 45%)',        activeClass: 'bg-emerald-600 text-white',                  borderClass: 'border-emerald-500/30', newUnits: [], auv: 0, rentPct: 0, marketingPct: 0, ...d.bull },
   ])
 
   function updateScenario(id: ScenarioId, partial: Partial<ScenarioConfig>) {
@@ -436,7 +442,8 @@ export function ForecastTab({
           const data = snap.data() as any
           if (data.timeline) setTimeline(data.timeline)
           if (Array.isArray(data.scenarios) && data.scenarios.length === 3) {
-            setScenarios(data.scenarios)
+            // merge so old drafts get new fields from current defaults
+            setScenarios(prev => prev.map((s, i) => ({ ...s, ...data.scenarios[i] })))
             setSkipSeed(true)
           }
         }
@@ -475,18 +482,22 @@ export function ForecastTab({
     const base = records.filter(r => r.period === basePeriod)
     const rev  = sumMetric(base, 'Revenue')
     if (rev <= 0) return
-    const cogs  = sumMetric(base, 'COGS')
-    const labor = sumMetric(base, 'Labor', 'Payroll')
-    const opex  = sumMetric(base, 'Operating Expenses', 'SG&A Expense')
+    const cogs      = sumMetric(base, 'COGS')
+    const labor     = sumMetric(base, 'Labor', 'Payroll')
+    const rent      = sumMetric(base, 'Rent', 'Rent & Occupancy', 'Facilities & Equipment', 'Infrastructure & Hosting', 'Facilities & Overhead')
+    const marketing = sumMetric(base, 'Marketing', 'Sales & Marketing', 'Business Development', 'Clinical Partnerships', 'Marketing & Sales')
+    const opex      = sumMetric(base, 'Operating Expenses', 'SG&A Expense')
     const derivedAuv = Math.round(rev / (locations.length || 1))
 
     setScenarios(prev => prev.map((s, i) => {
       const nudge = i === 0 ? 2 : i === 2 ? -2 : 0
       return {
         ...s,
-        cogsPct:  cogs  > 0 ? +((cogs  / rev) * 100 + nudge * 0.5).toFixed(1) : s.cogsPct,
-        laborPct: labor > 0 ? +((labor / rev) * 100 + nudge * 0.5).toFixed(1) : s.laborPct,
-        opexPct:  opex  > 0 ? +((opex  / rev) * 100 + nudge * 0.3).toFixed(1) : s.opexPct,
+        cogsPct:      cogs      > 0 ? +((cogs      / rev) * 100 + nudge * 0.5).toFixed(1) : s.cogsPct,
+        laborPct:     labor     > 0 ? +((labor     / rev) * 100 + nudge * 0.5).toFixed(1) : s.laborPct,
+        rentPct:      rent      > 0 ? +((rent      / rev) * 100 + nudge * 0.3).toFixed(1) : s.rentPct,
+        marketingPct: marketing > 0 ? +((marketing / rev) * 100 + nudge * 0.3).toFixed(1) : s.marketingPct,
+        opexPct:      opex      > 0 ? +((opex      / rev) * 100 + nudge * 0.3).toFixed(1) : s.opexPct,
         auv: s.auv || derivedAuv,
       }
     }))
@@ -504,15 +515,17 @@ export function ForecastTab({
   }, [horizon])
 
   // Base period data
-  const baseRecords    = React.useMemo(() => records.filter(r => r.period === basePeriod), [records, basePeriod])
-  const baseRevenue    = React.useMemo(() => sumMetric(baseRecords, 'Revenue'), [baseRecords])
-  const baseCogs       = React.useMemo(() => sumMetric(baseRecords, 'COGS'), [baseRecords])
-  const baseLabor      = React.useMemo(() => sumMetric(baseRecords, 'Labor', 'Payroll'), [baseRecords])
-  const baseOpex       = React.useMemo(() => sumMetric(baseRecords, 'Operating Expenses', 'SG&A Expense'), [baseRecords])
-  const baseNetProfit  = React.useMemo(() => sumMetric(baseRecords, 'Net Profit'), [baseRecords])
+  const baseRecords     = React.useMemo(() => records.filter(r => r.period === basePeriod), [records, basePeriod])
+  const baseRevenue     = React.useMemo(() => sumMetric(baseRecords, 'Revenue'), [baseRecords])
+  const baseCogs        = React.useMemo(() => sumMetric(baseRecords, 'COGS'), [baseRecords])
+  const baseLabor       = React.useMemo(() => sumMetric(baseRecords, 'Labor', 'Payroll'), [baseRecords])
+  const baseRent        = React.useMemo(() => sumMetric(baseRecords, 'Rent', 'Rent & Occupancy', 'Facilities & Equipment', 'Infrastructure & Hosting', 'Facilities & Overhead'), [baseRecords])
+  const baseMarketing   = React.useMemo(() => sumMetric(baseRecords, 'Marketing', 'Sales & Marketing', 'Business Development', 'Clinical Partnerships', 'Marketing & Sales'), [baseRecords])
+  const baseOpex        = React.useMemo(() => sumMetric(baseRecords, 'Operating Expenses', 'SG&A Expense'), [baseRecords])
+  const baseNetProfit   = React.useMemo(() => sumMetric(baseRecords, 'Net Profit'), [baseRecords])
   const baseGrossProfit = baseRevenue - baseCogs
-  const baseEbitda     = baseNetProfit || (baseGrossProfit - baseLabor - baseOpex)
-  const baseUnitCount  = locations.length
+  const baseEbitda      = baseNetProfit || (baseGrossProfit - baseLabor - baseRent - baseMarketing - baseOpex)
+  const baseUnitCount   = locations.length
 
   const forwardPeriods = React.useMemo(() => generateForwardPeriods(basePeriod, horizon), [basePeriod, horizon])
 
@@ -578,6 +591,8 @@ export function ForecastTab({
           ['COGS',               row.cogs],
           ['Gross Profit',       row.grossProfit],
           ['Labor',              row.labor],
+          ['Rent',               row.rent],
+          ['Marketing',          row.marketing],
           ['Operating Expenses', row.opex],
           ['Net Profit',         row.ebitda],
         ]
@@ -791,14 +806,16 @@ export function ForecastTab({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-0 pb-4">
-                  <AssumptionRow label="COGS %"  value={active.cogsPct}  onChange={v => updateScenario(active.id, { cogsPct: v })}  suffix="%" step={0.5} min={0} max={100} />
-                  <AssumptionRow label="Labor %" value={active.laborPct} onChange={v => updateScenario(active.id, { laborPct: v })} suffix="%" step={0.5} min={0} max={100} />
-                  <AssumptionRow label="OpEx %"  value={active.opexPct}  onChange={v => updateScenario(active.id, { opexPct: v })}  suffix="%" step={0.5} min={0} max={100} />
+                  <AssumptionRow label="COGS %"         value={active.cogsPct}      onChange={v => updateScenario(active.id, { cogsPct: v })}      suffix="%" step={0.5} min={0} max={100} />
+                  <AssumptionRow label="Labor %"        value={active.laborPct}     onChange={v => updateScenario(active.id, { laborPct: v })}     suffix="%" step={0.5} min={0} max={100} />
+                  <AssumptionRow label={fl.rentLabel}      value={active.rentPct ?? 0}      onChange={v => updateScenario(active.id, { rentPct: v })}      suffix="%" step={0.5} min={0} max={100} />
+                  <AssumptionRow label={fl.marketingLabel} value={active.marketingPct ?? 0} onChange={v => updateScenario(active.id, { marketingPct: v })} suffix="%" step={0.5} min={0} max={100} />
+                  <AssumptionRow label="G&A / Other %"  value={active.opexPct}      onChange={v => updateScenario(active.id, { opexPct: v })}      suffix="%" step={0.5} min={0} max={100} />
 
                   <div className="mt-4 pt-3 border-t border-border space-y-1.5">
                     {[
                       { label: 'Gross Margin %', value: 100 - active.cogsPct },
-                      { label: fl.profitPctLabel, value: 100 - active.cogsPct - active.laborPct - active.opexPct },
+                      { label: fl.profitPctLabel, value: 100 - active.cogsPct - active.laborPct - (active.rentPct ?? 0) - (active.marketingPct ?? 0) - active.opexPct },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{label}</span>
@@ -821,7 +838,7 @@ export function ForecastTab({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
-                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-36 sticky left-0 z-10 bg-card">Metric</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-36 sticky left-0 z-10 bg-muted">Metric</th>
                         <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40">
                           Actuals<br /><span className="font-normal normal-case">{fmtShortPeriod(basePeriod)}</span>
                         </th>
@@ -838,12 +855,14 @@ export function ForecastTab({
                         <PnlRow label="↳ Comp Rev."  baseValue={baseRevenue}     rows={displayRows} getVal={r => r.compRevenue}     formatter={fmtCurrency} isSubRow isDim />
                         <PnlRow label="↳ New Units"  baseValue={null}            rows={displayRows} getVal={r => r.newUnitRevenue}  formatter={fmtCurrency} isSubRow isDim />
                       </>}
-                      <PnlRow label="COGS"          baseValue={baseCogs || null} rows={displayRows} getVal={r => r.cogs}            formatter={fmtCurrency} />
-                      <PnlRow label="Gross Profit"  baseValue={baseGrossProfit}  rows={displayRows} getVal={r => r.grossProfit}     formatter={fmtCurrency} />
-                      <PnlRow label="Gross Margin"  baseValue={baseCogs > 0 ? (baseGrossProfit / baseRevenue) * 100 : null} rows={displayRows} getVal={r => r.grossMarginPct} formatter={v => `${v.toFixed(1)}%`} isDim />
-                      <PnlRow label="Labor"         baseValue={baseLabor || null} rows={displayRows} getVal={r => r.labor}          formatter={fmtCurrency} />
-                      <PnlRow label="OpEx"          baseValue={baseOpex  || null} rows={displayRows} getVal={r => r.opex}           formatter={fmtCurrency} />
-                      <PnlRow label={fl.profitLabel}     baseValue={baseEbitda}   rows={displayRows} getVal={r => r.ebitda}         formatter={fmtCurrency} isHighlight />
+                      <PnlRow label="COGS"               baseValue={baseCogs || null}      rows={displayRows} getVal={r => r.cogs}            formatter={fmtCurrency} />
+                      <PnlRow label="Gross Profit"       baseValue={baseGrossProfit}       rows={displayRows} getVal={r => r.grossProfit}     formatter={fmtCurrency} />
+                      <PnlRow label="Gross Margin"       baseValue={baseCogs > 0 ? (baseGrossProfit / baseRevenue) * 100 : null} rows={displayRows} getVal={r => r.grossMarginPct} formatter={v => `${v.toFixed(1)}%`} isDim />
+                      <PnlRow label="Labor"              baseValue={baseLabor || null}     rows={displayRows} getVal={r => r.labor}          formatter={fmtCurrency} />
+                      <PnlRow label={fl.rentLabel}       baseValue={baseRent || null}      rows={displayRows} getVal={r => r.rent}           formatter={fmtCurrency} />
+                      <PnlRow label={fl.marketingLabel}  baseValue={baseMarketing || null} rows={displayRows} getVal={r => r.marketing}      formatter={fmtCurrency} />
+                      <PnlRow label="G&A / Other"        baseValue={baseOpex || null}      rows={displayRows} getVal={r => r.opex}           formatter={fmtCurrency} />
+                      <PnlRow label={fl.profitLabel}     baseValue={baseEbitda}            rows={displayRows} getVal={r => r.ebitda}         formatter={fmtCurrency} isHighlight />
                       <PnlRow label={fl.profitPctLabel}  baseValue={baseRevenue > 0 ? (baseEbitda / baseRevenue) * 100 : null} rows={displayRows} getVal={r => r.ebitdaMarginPct} formatter={v => `${v.toFixed(1)}%`} isDim />
                       {hasNewUnits && (
                         <PnlRow label={`${vertical.unitLabel} Count`} baseValue={baseUnitCount} rows={displayRows} getVal={r => r.unitCount} formatter={v => String(Math.round(v))} isDim />

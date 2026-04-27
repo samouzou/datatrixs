@@ -8,6 +8,8 @@ export type ForecastLabels = {
   scenarioGrowthLabel: string;
   scenarioNewUnitValueLabel: string;
   chartTitle: string;
+  rentLabel: string;
+  marketingLabel: string;
 };
 
 export type ScenarioDefault = {
@@ -15,6 +17,8 @@ export type ScenarioDefault = {
   newUnitsPerPeriod: number;
   cogsPct: number;
   laborPct: number;
+  rentPct: number;
+  marketingPct: number;
   opexPct: number;
   auv: number;
 };
@@ -103,12 +107,14 @@ const RETAIL_FORECAST_LABELS: ForecastLabels = {
   scenarioGrowthLabel: 'SSS Growth / Period',
   scenarioNewUnitValueLabel: 'AUV',
   chartTitle: 'Revenue & EBITDA Trajectory',
+  rentLabel: 'Rent & Occupancy %',
+  marketingLabel: 'Marketing %',
 };
 
 const RETAIL_SCENARIO_DEFAULTS: ScenarioDefaults = {
-  bear: { sssPct: -1.0, newUnitsPerPeriod: 0, cogsPct: 40, laborPct: 30, opexPct: 14, auv: 0 },
-  base: { sssPct:  3.0, newUnitsPerPeriod: 0, cogsPct: 38, laborPct: 28, opexPct: 12, auv: 0 },
-  bull: { sssPct:  7.0, newUnitsPerPeriod: 1, cogsPct: 36, laborPct: 26, opexPct: 11, auv: 0 },
+  bear: { sssPct: -1.0, newUnitsPerPeriod: 0, cogsPct: 40, laborPct: 30, rentPct: 10, marketingPct: 2, opexPct: 2, auv: 0 },
+  base: { sssPct:  3.0, newUnitsPerPeriod: 0, cogsPct: 38, laborPct: 28, rentPct:  8, marketingPct: 3, opexPct: 1, auv: 0 },
+  bull: { sssPct:  7.0, newUnitsPerPeriod: 1, cogsPct: 36, laborPct: 26, rentPct:  7, marketingPct: 3, opexPct: 1, auv: 0 },
 };
 
 const BIOTECH_FORECAST_LABELS: ForecastLabels = {
@@ -119,12 +125,14 @@ const BIOTECH_FORECAST_LABELS: ForecastLabels = {
   scenarioGrowthLabel: 'Revenue Growth / Period',
   scenarioNewUnitValueLabel: 'Milestone Value',
   chartTitle: 'Revenue & Operating Loss Trajectory',
+  rentLabel: 'Facilities & Equipment %',
+  marketingLabel: 'Clinical Partnerships %',
 };
 
 const BIOTECH_SCENARIO_DEFAULTS: ScenarioDefaults = {
-  bear: { sssPct: -15, newUnitsPerPeriod: 0, cogsPct: 0, laborPct: 65, opexPct: 25, auv:         0 },
-  base: { sssPct:   5, newUnitsPerPeriod: 0, cogsPct: 0, laborPct: 60, opexPct: 20, auv:         0 },
-  bull: { sssPct:  25, newUnitsPerPeriod: 1, cogsPct: 0, laborPct: 55, opexPct: 18, auv: 5_000_000 },
+  bear: { sssPct: -15, newUnitsPerPeriod: 0, cogsPct: 0, laborPct: 65, rentPct: 12, marketingPct:  8, opexPct: 5, auv:         0 },
+  base: { sssPct:   5, newUnitsPerPeriod: 0, cogsPct: 0, laborPct: 60, rentPct: 10, marketingPct:  7, opexPct: 3, auv:         0 },
+  bull: { sssPct:  25, newUnitsPerPeriod: 1, cogsPct: 0, laborPct: 55, rentPct:  8, marketingPct:  7, opexPct: 3, auv: 5_000_000 },
 };
 
 const RETAIL_PIPELINE_STAGES: PipelineStageDef[] = [
@@ -189,12 +197,50 @@ const HARDWARE_FORECAST_LABELS: ForecastLabels = {
   scenarioGrowthLabel: 'Revenue Growth / Period',
   scenarioNewUnitValueLabel: 'Product Line Revenue',
   chartTitle: 'Revenue & EBITDA Trajectory',
+  rentLabel: 'Facilities & Overhead %',
+  marketingLabel: 'Marketing & Sales %',
 };
 
 const HARDWARE_SCENARIO_DEFAULTS: ScenarioDefaults = {
-  bear: { sssPct:  -5, newUnitsPerPeriod: 0, cogsPct: 52, laborPct: 20, opexPct: 15, auv: 0 },
-  base: { sssPct:   8, newUnitsPerPeriod: 0, cogsPct: 48, laborPct: 18, opexPct: 12, auv: 0 },
-  bull: { sssPct:  18, newUnitsPerPeriod: 1, cogsPct: 44, laborPct: 15, opexPct: 10, auv: 0 },
+  bear: { sssPct:  -5, newUnitsPerPeriod: 0, cogsPct: 52, laborPct: 20, rentPct: 5, marketingPct: 5, opexPct: 5, auv: 0 },
+  base: { sssPct:   8, newUnitsPerPeriod: 0, cogsPct: 48, laborPct: 18, rentPct: 4, marketingPct: 5, opexPct: 3, auv: 0 },
+  bull: { sssPct:  18, newUnitsPerPeriod: 1, cogsPct: 44, laborPct: 15, rentPct: 3, marketingPct: 5, opexPct: 2, auv: 0 },
+};
+
+const SAAS_FORECAST_LABELS: ForecastLabels = {
+  growthRateLabel: 'ARR Growth %',
+  newUnitValueLabel: 'Target ARR / Client at Maturity',
+  profitLabel: 'EBITDA',
+  profitPctLabel: 'EBITDA %',
+  scenarioGrowthLabel: 'ARR Growth / Period',
+  scenarioNewUnitValueLabel: 'ACV',
+  chartTitle: 'ARR & EBITDA Trajectory',
+  rentLabel: 'Infrastructure & Hosting %',
+  marketingLabel: 'Sales & Marketing %',
+};
+
+const SAAS_SCENARIO_DEFAULTS: ScenarioDefaults = {
+  bear: { sssPct:  -5, newUnitsPerPeriod: 0, cogsPct: 25, laborPct: 30, rentPct: 12, marketingPct: 20, opexPct: 8, auv: 0 },
+  base: { sssPct:  15, newUnitsPerPeriod: 0, cogsPct: 20, laborPct: 28, rentPct: 10, marketingPct: 20, opexPct: 7, auv: 0 },
+  bull: { sssPct:  30, newUnitsPerPeriod: 1, cogsPct: 18, laborPct: 25, rentPct:  8, marketingPct: 18, opexPct: 6, auv: 0 },
+};
+
+const SERVICES_FORECAST_LABELS: ForecastLabels = {
+  growthRateLabel: 'Revenue Growth %',
+  newUnitValueLabel: 'Target Revenue / Engagement at Maturity',
+  profitLabel: 'EBITDA',
+  profitPctLabel: 'EBITDA %',
+  scenarioGrowthLabel: 'Revenue Growth / Period',
+  scenarioNewUnitValueLabel: 'Engagement Value',
+  chartTitle: 'Revenue & EBITDA Trajectory',
+  rentLabel: 'Facilities & Overhead %',
+  marketingLabel: 'Business Development %',
+};
+
+const SERVICES_SCENARIO_DEFAULTS: ScenarioDefaults = {
+  bear: { sssPct:  -3, newUnitsPerPeriod: 0, cogsPct: 5, laborPct: 65, rentPct: 8, marketingPct: 5, opexPct: 8, auv: 0 },
+  base: { sssPct:   5, newUnitsPerPeriod: 0, cogsPct: 5, laborPct: 60, rentPct: 6, marketingPct: 7, opexPct: 7, auv: 0 },
+  bull: { sssPct:  12, newUnitsPerPeriod: 1, cogsPct: 5, laborPct: 55, rentPct: 5, marketingPct: 8, opexPct: 7, auv: 0 },
 };
 
 const HARDWARE_PIPELINE_STAGES: PipelineStageDef[] = [
@@ -234,7 +280,21 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Label: 'Inventory Turn',
     kpi4Metric: 'inventory value',
     aiContext: 'a portfolio of retail locations managed by a private equity holding firm',
-    defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Operating Expenses', 'Inventory Value'],
+    defaultMetrics: [
+      'Revenue',
+      'COGS',
+      'Gross Profit',
+      'Gross Margin',
+      'Labor',
+      'Rent',
+      'Utilities',
+      'Marketing',
+      'Operating Expenses',
+      'EBITDA',
+      'Net Profit',
+      'Inventory Value',
+      'Shrinkage',
+    ],
     organizationLabel: 'Group',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,
@@ -251,7 +311,21 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Label: 'Gross Margin %',
     kpi4Metric: 'gross margin',
     aiContext: 'a hardware product and distribution business with multiple product lines',
-    defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Gross Margin', 'Inventory Value', 'Units Sold'],
+    defaultMetrics: [
+      'Revenue',
+      'COGS',
+      'Gross Profit',
+      'Gross Margin',
+      'Labor',
+      'R&D Expense',
+      'Warranty Expense',
+      'Freight & Logistics',
+      'Operating Expenses',
+      'EBITDA',
+      'Net Profit',
+      'Inventory Value',
+      'Units Sold',
+    ],
     organizationLabel: 'Division',
     bridgeLabel: 'EBITDA',
     pipelineStages: HARDWARE_PIPELINE_STAGES,
@@ -268,13 +342,30 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Label: 'Churn Rate',
     kpi4Metric: 'churn rate',
     aiContext: 'a SaaS business with recurring subscription revenue and multiple client accounts',
-    defaultMetrics: ['Revenue', 'Net Profit', 'MRR', 'ARR', 'Operating Expenses', 'Churn Rate', 'CAC'],
+    defaultMetrics: [
+      'Revenue',
+      'MRR',
+      'ARR',
+      'COGS',
+      'Gross Profit',
+      'Gross Margin',
+      'R&D Expense',
+      'Sales & Marketing',
+      'Customer Success',
+      'Operating Expenses',
+      'EBITDA',
+      'Net Profit',
+      'Churn Rate',
+      'NRR',
+      'CAC',
+      'LTV',
+    ],
     organizationLabel: 'Workspace',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,
     pipelineLabels: { ...RETAIL_PIPELINE_LABELS, investmentHint: 'Infrastructure, tooling & onboarding costs', maintenanceHint: 'Infrastructure & platform upkeep as % of revenue' },
-    forecastLabels: RETAIL_FORECAST_LABELS,
-    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
+    forecastLabels: SAAS_FORECAST_LABELS,
+    scenarioDefaults: SAAS_SCENARIO_DEFAULTS,
   },
   services: {
     id: 'services',
@@ -285,13 +376,27 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Label: 'Utilization Rate',
     kpi4Metric: 'utilization rate',
     aiContext: 'a professional services business with client engagements and project-based revenue',
-    defaultMetrics: ['Revenue', 'Net Profit', 'Operating Expenses', 'Gross Margin', 'Utilization Rate'],
+    defaultMetrics: [
+      'Revenue',
+      'COGS',
+      'Gross Profit',
+      'Gross Margin',
+      'Labor',
+      'Subcontractor Costs',
+      'Travel & Expenses',
+      'Operating Expenses',
+      'EBITDA',
+      'Net Profit',
+      'Billable Hours',
+      'Non-Billable Hours',
+      'Utilization Rate',
+    ],
     organizationLabel: 'Practice',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,
     pipelineLabels: { ...RETAIL_PIPELINE_LABELS, investmentHint: 'Talent acquisition, tooling & ramp costs', maintenanceHint: 'Overhead & tooling refresh as % of revenue' },
-    forecastLabels: RETAIL_FORECAST_LABELS,
-    scenarioDefaults: RETAIL_SCENARIO_DEFAULTS,
+    forecastLabels: SERVICES_FORECAST_LABELS,
+    scenarioDefaults: SERVICES_SCENARIO_DEFAULTS,
   },
   biotech: {
     id: 'biotech',
@@ -302,7 +407,23 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Label: 'R&D Burn Rate',
     kpi4Metric: 'r&d burn',
     aiContext: 'a biotech or life sciences company with research programs and product pipelines',
-    defaultMetrics: ['Revenue', 'R&D Expense', 'Clinical Trial Costs', 'SG&A Expense', 'Operating Income', 'COGS', 'Gross Margin', 'WIP Inventory'],
+    defaultMetrics: [
+      'Milestone Revenue',
+      'Grant Revenue',
+      'Revenue',
+      'COGS',
+      'Gross Profit',
+      'Gross Margin',
+      'R&D Expense',
+      'Clinical Trial Costs',
+      'SG&A Expense',
+      'Operating Income',
+      'Net Loss',
+      'Cash Burn',
+      'Runway (Months)',
+      'Headcount',
+      'WIP Inventory',
+    ],
     organizationLabel: 'Institute',
     bridgeLabel: 'Operating Loss',
     kpiCards: [
@@ -324,7 +445,16 @@ export const VERTICALS: Record<BusinessVertical, VerticalConfig> = {
     kpi4Label: 'Operating Margin',
     kpi4Metric: 'operating margin',
     aiContext: 'a diversified business portfolio',
-    defaultMetrics: ['Revenue', 'Net Profit', 'COGS', 'Operating Expenses', 'Gross Margin'],
+    defaultMetrics: [
+      'Revenue',
+      'COGS',
+      'Gross Profit',
+      'Gross Margin',
+      'Labor',
+      'Operating Expenses',
+      'EBITDA',
+      'Net Profit',
+    ],
     organizationLabel: 'Organization',
     bridgeLabel: 'EBITDA',
     pipelineStages: RETAIL_PIPELINE_STAGES,

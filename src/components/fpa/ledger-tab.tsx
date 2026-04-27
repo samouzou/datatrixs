@@ -91,14 +91,16 @@ function getRowDefs(vertical: VerticalConfig): LedgerRowDef[] {
     ]
   }
   return [
-    { key: 'Revenue',            label: 'Revenue',                              section: 'Revenue',            isHighlight: true, isEditable: true,  goodDirection: 'up'   },
-    { key: 'COGS',               label: 'COGS',                                 section: 'Cost of Revenue',    isEditable: true,                     goodDirection: 'down' },
-    { key: 'Gross Profit',       label: 'Gross Profit',                         section: 'Gross Profit',       isHighlight: true, isComputed: true,  goodDirection: 'up'   },
-    { key: 'Gross Margin %',     label: 'Gross Margin %',                       section: 'Gross Profit',       isPct: true, isDim: true, isComputed: true, goodDirection: 'up' },
-    { key: 'Labor',              label: 'Labor',                                section: 'Operating Expenses', isEditable: true,                     goodDirection: 'down' },
-    { key: 'Operating Expenses', label: 'OpEx',                                 section: 'Operating Expenses', isEditable: true,                     goodDirection: 'down' },
-    { key: 'Net Profit',         label: vertical.forecastLabels.profitLabel,    section: 'Bottom Line',        isHighlight: true, isEditable: true,  goodDirection: 'up'   },
-    { key: 'EBITDA %',           label: vertical.forecastLabels.profitPctLabel, section: 'Bottom Line',        isPct: true, isDim: true, isComputed: true, goodDirection: 'up' },
+    { key: 'Revenue',            label: 'Revenue',                                      section: 'Revenue',            isHighlight: true, isEditable: true,  goodDirection: 'up'   },
+    { key: 'COGS',               label: 'COGS',                                         section: 'Cost of Revenue',    isEditable: true,                     goodDirection: 'down' },
+    { key: 'Gross Profit',       label: 'Gross Profit',                                 section: 'Gross Profit',       isHighlight: true, isComputed: true,  goodDirection: 'up'   },
+    { key: 'Gross Margin %',     label: 'Gross Margin %',                               section: 'Gross Profit',       isPct: true, isDim: true, isComputed: true, goodDirection: 'up' },
+    { key: 'Labor',              label: 'Labor',                                        section: 'Operating Expenses', isEditable: true,                     goodDirection: 'down' },
+    { key: 'Rent',               label: vertical.forecastLabels.rentLabel.replace(' %', ''),      section: 'Operating Expenses', isEditable: true,                     goodDirection: 'down' },
+    { key: 'Marketing',          label: vertical.forecastLabels.marketingLabel.replace(' %', ''), section: 'Operating Expenses', isEditable: true,                     goodDirection: 'down' },
+    { key: 'Operating Expenses', label: 'G&A / Other',                                 section: 'Operating Expenses', isEditable: true,                     goodDirection: 'down' },
+    { key: 'Net Profit',         label: vertical.forecastLabels.profitLabel,            section: 'Bottom Line',        isHighlight: true, isEditable: true,  goodDirection: 'up'   },
+    { key: 'EBITDA %',           label: vertical.forecastLabels.profitPctLabel,         section: 'Bottom Line',        isPct: true, isDim: true, isComputed: true, goodDirection: 'up' },
   ]
 }
 
@@ -112,10 +114,12 @@ function getActual(recs: FinancialRecord[], key: string): number | null {
     case 'Gross Profit':   return rev || cogs ? gp : null
     case 'Gross Margin %': return rev > 0 ? (gp / rev) * 100 : null
     case 'EBITDA %': {
-      const labor  = sumR(recs, 'Labor', 'Payroll')
-      const opex   = sumR(recs, 'Operating Expenses', 'SG&A Expense')
-      const np     = sumR(recs, 'Net Profit')
-      const ebitda = np || (gp - labor - opex)
+      const labor    = sumR(recs, 'Labor', 'Payroll')
+      const rent     = sumR(recs, 'Rent', 'Rent & Occupancy')
+      const mktg     = sumR(recs, 'Marketing', 'Sales & Marketing', 'Business Development')
+      const opex     = sumR(recs, 'Operating Expenses', 'SG&A Expense')
+      const np       = sumR(recs, 'Net Profit')
+      const ebitda   = np || (gp - labor - rent - mktg - opex)
       return rev > 0 ? (ebitda / rev) * 100 : null
     }
     case 'Op. Income %': {
@@ -141,10 +145,12 @@ function getBudget(plans: FinancialPlan[], key: string): number | null {
     case 'Gross Profit':   return rev || cogs ? gp : null
     case 'Gross Margin %': return rev > 0 ? (gp / rev) * 100 : null
     case 'EBITDA %': {
-      const labor  = sumP(plans, 'Labor', 'Payroll')
-      const opex   = sumP(plans, 'Operating Expenses', 'SG&A Expense')
-      const np     = sumP(plans, 'Net Profit')
-      const ebitda = np || (gp - labor - opex)
+      const labor    = sumP(plans, 'Labor', 'Payroll')
+      const rent     = sumP(plans, 'Rent', 'Rent & Occupancy')
+      const mktg     = sumP(plans, 'Marketing', 'Sales & Marketing', 'Business Development')
+      const opex     = sumP(plans, 'Operating Expenses', 'SG&A Expense')
+      const np       = sumP(plans, 'Net Profit')
+      const ebitda   = np || (gp - labor - rent - mktg - opex)
       return rev > 0 ? (ebitda / rev) * 100 : null
     }
     case 'Op. Income %': {
@@ -244,16 +250,25 @@ export function LedgerTab({
       return { loc, share: locRev / totalRev }
     })
 
-    const allOps: Array<{ id: string; data: object }> = []
+    // Collect stale doc IDs to delete and new docs to write
+    const toDelete: string[] = []
+    const toWrite: Array<{ id: string; data: object }> = []
+
     for (const [key, rawVal] of Object.entries(pendingEdits)) {
-      const sepIdx     = key.indexOf('|')
-      const period     = key.slice(0, sepIdx)
-      const metricKey  = key.slice(sepIdx + 1)
+      const sepIdx      = key.indexOf('|')
+      const period      = key.slice(0, sepIdx)
+      const metricKey   = key.slice(sepIdx + 1)
       const totalBudget = parseBudgetInput(rawVal)
       if (totalBudget === null) continue
+
+      // Delete ALL existing plan records for this period/metric/version — regardless of ID format
+      versionPlans
+        .filter(p => p.period === period && p.metric.toLowerCase() === metricKey.toLowerCase())
+        .forEach(p => toDelete.push(p.id))
+
       for (const { loc, share } of locShares) {
         const planId = `${loc.id}_${slugify(period)}_${slugify(metricKey)}_${slugify(version)}`
-        allOps.push({
+        toWrite.push({
           id: planId,
           data: {
             id: planId, companyId: company.id,
@@ -267,10 +282,19 @@ export function LedgerTab({
       }
     }
 
+    const allOps = [
+      ...toDelete.map(id => ({ op: 'delete' as const, id })),
+      ...toWrite.map(w  => ({ op: 'write'  as const, ...w })),
+    ]
     for (let i = 0; i < allOps.length; i += 450) {
       const batch = writeBatch(firestore)
-      for (const op of allOps.slice(i, i + 450))
-        batch.set(doc(firestore, 'financial_plans', op.id), op.data as any, { merge: true })
+      for (const op of allOps.slice(i, i + 450)) {
+        if (op.op === 'delete') {
+          batch.delete(doc(firestore, 'financial_plans', op.id))
+        } else {
+          batch.set(doc(firestore, 'financial_plans', op.id), op.data as any)
+        }
+      }
       await batch.commit()
     }
     setPendingEdits({})
@@ -360,7 +384,7 @@ export function LedgerTab({
             {/* Header */}
             <thead>
               <tr className="bg-muted/60 border-b-2 border-border">
-                <th className="sticky left-0 z-20 bg-muted/80 backdrop-blur-sm px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-r-2 border-border min-w-[168px]">
+                <th className="sticky left-0 z-20 bg-muted px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-r-2 border-border min-w-[168px]">
                   Metric
                 </th>
                 {actualPeriods.map(p => (
@@ -385,7 +409,7 @@ export function LedgerTab({
                     <tr className="bg-muted/25 border-y border-border/40">
                       <td
                         colSpan={totalCols + 1}
-                        className="sticky left-0 px-4 py-1.5 bg-muted/25"
+                        className="sticky left-0 px-4 py-1.5 bg-muted"
                       >
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                           {section}
@@ -461,8 +485,8 @@ function LedgerRow({
       <td className={cn(
         "sticky left-0 z-10 px-4 py-2.5 text-xs border-r-2 border-border/60",
         row.isHighlight
-          ? "bg-primary/5 font-bold text-foreground group-hover:bg-primary/10"
-          : "bg-card text-muted-foreground group-hover:bg-muted/20",
+          ? "bg-muted font-bold text-foreground group-hover:bg-muted/80"
+          : "bg-card text-muted-foreground group-hover:bg-muted",
         row.isDim && "opacity-60",
       )}>
         {row.label}
