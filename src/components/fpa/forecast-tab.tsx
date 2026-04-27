@@ -219,7 +219,7 @@ function PnlRow({ label, baseValue, rows, getVal, formatter, isHighlight = false
 }) {
   return (
     <tr className={cn("border-b border-border/40", isHighlight && "bg-primary/5 font-bold", isDim && "opacity-60")}>
-      <td className={cn("px-4 py-2.5 text-xs sticky left-0 bg-card", isSubRow && "pl-8", isHighlight ? "text-foreground font-bold bg-primary/5" : "text-muted-foreground")}>
+      <td className={cn("px-4 py-2.5 text-xs sticky left-0 z-10", isSubRow && "pl-8", isHighlight ? "text-foreground font-bold bg-card" : "text-muted-foreground bg-card")}>
         {isSubRow && <span className="text-muted-foreground mr-1">↳</span>}
         {label}
       </td>
@@ -821,7 +821,7 @@ export function ForecastTab({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
-                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-36 sticky left-0 bg-muted/30">Metric</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-36 sticky left-0 z-10 bg-card">Metric</th>
                         <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40">
                           Actuals<br /><span className="font-normal normal-case">{fmtShortPeriod(basePeriod)}</span>
                         </th>

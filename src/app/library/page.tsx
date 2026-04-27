@@ -12,6 +12,7 @@ import {
   Trash2,
   Download,
   PackageOpen,
+  ScrollText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,11 +20,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase"
 import { query, collection, where, doc } from "firebase/firestore"
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { SavedReport, SavedAnalysis } from "@/lib/types"
+import { SavedReport, SavedAnalysis, FinancialRecord } from "@/lib/types"
+import { SavedDocument } from "@/lib/report-types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { SpreadsheetView } from "@/components/reports/spreadsheet-view"
 import { ChartView } from "@/components/analyst/chart-view"
+import { ReportDocument } from "@/components/analyst/report-document"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 function MarkdownTable({ content }: { content: string }) {
@@ -81,9 +84,30 @@ export default function LibraryPage() {
       collection(firestore, "saved_analysis"),
       where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
     );
-  }, [firestore, user?.uid, activeTab]); 
+  }, [firestore, user?.uid, activeTab]);
   const { data: rawAnalyses, isLoading: isLoadingAnalyses } = useCollection<SavedAnalysis>(analysesQuery);
   const analyses = React.useMemo(() => rawAnalyses?.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? null, [rawAnalyses]);
+
+  // Query Warren documents
+  const documentsQuery = useMemoFirebase(() => {
+    if (!firestore || !user || activeTab !== 'documents') return null;
+    return query(
+      collection(firestore, "report_documents"),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user?.uid, activeTab]);
+  const { data: rawDocuments, isLoading: isLoadingDocuments } = useCollection<SavedDocument>(documentsQuery);
+  const savedDocuments = React.useMemo(() => rawDocuments?.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? null, [rawDocuments]);
+
+  // Records for live chart rendering in saved documents
+  const recordsQuery = useMemoFirebase(() => {
+    if (!firestore || !user || activeTab !== 'documents') return null;
+    return query(
+      collection(firestore, "financial_records"),
+      where(`companyMembers.${user.uid}`, "in", ["admin", "member", true])
+    );
+  }, [firestore, user?.uid, activeTab]);
+  const { data: records } = useCollection<FinancialRecord>(recordsQuery);
 
   const handleDelete = (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -108,6 +132,9 @@ export default function LibraryPage() {
           <TabsTrigger value="exports" className="px-6 data-[state=active]:bg-primary h-10">Data Exports</TabsTrigger>
           <TabsTrigger value="packages" className="px-6 data-[state=active]:bg-primary h-10 gap-2">
             <PackageOpen className="size-4" /> Financial Packages
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="px-6 data-[state=active]:bg-primary h-10 gap-2">
+            <ScrollText className="size-4" /> Warren Documents
           </TabsTrigger>
           <TabsTrigger value="analysis" className="px-6 data-[state=active]:bg-primary h-10">Analyst Insights</TabsTrigger>
         </TabsList>
@@ -156,12 +183,27 @@ export default function LibraryPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="documents" className="animate-in fade-in duration-300">
+          <div className="space-y-6">
+            {savedDocuments?.map((doc) => (
+              <SavedDocumentCard
+                key={doc.id}
+                item={doc}
+                records={records ?? []}
+                onDelete={() => handleDelete("report_documents", doc.id)}
+              />
+            ))}
+            {!isLoadingDocuments && activeTab === 'documents' && !savedDocuments?.length && <EmptyState text="No Warren documents saved yet. Generate one from the Warren Report Studio." />}
+            {isLoadingDocuments && <LoadingState />}
+          </div>
+        </TabsContent>
+
         <TabsContent value="analysis" className="animate-in fade-in duration-300">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {analyses?.map((item) => (
-              <SavedAnalysisCard 
-                key={item.id} 
-                item={item} 
+              <SavedAnalysisCard
+                key={item.id}
+                item={item}
                 onDelete={() => handleDelete("saved_analysis", item.id)}
               />
             ))}
@@ -402,6 +444,60 @@ function SavedPackageCard({ item, onDelete }: { item: SavedReport; onDelete: () 
           </Button>
         </div>
       </CardContent>
+    </Card>
+  )
+}
+
+function SavedDocumentCard({ item, records, onDelete }: { item: SavedDocument; records: FinancialRecord[]; onDelete: () => void }) {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <Card className="bg-card/20 border-border hover:border-primary/50 hover:bg-card/40 transition-all group">
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-[10px] uppercase tracking-tight bg-primary/10 text-primary border-primary/20">
+              {item.template.replace('_', ' ')}
+            </Badge>
+            <span className="text-[10px] text-muted-foreground">
+              {new Date(item.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+          <Button variant="ghost" size="icon" className="size-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={onDelete}>
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+        <CardTitle className="text-sm mt-2 text-foreground font-medium leading-tight flex items-center gap-2">
+          <ScrollText className="size-4 text-primary shrink-0" />
+          <span>{item.title}</span>
+        </CardTitle>
+        {item.subtitle && <CardDescription className="text-xs">{item.subtitle}</CardDescription>}
+      </CardHeader>
+      <CardContent className="pt-0">
+        <Button variant="link" size="sm" className="p-0 h-auto text-xs text-primary/80 hover:text-primary" onClick={() => setOpen(true)}>
+          Open Document <ArrowRight className="ml-1 size-3" />
+        </Button>
+      </CardContent>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{item.title}</DialogTitle>
+            <DialogDescription>Generated {new Date(item.generatedAt).toLocaleString()}</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <ReportDocument
+              document={{
+                title: item.title,
+                subtitle: item.subtitle,
+                template: item.template,
+                generatedAt: item.generatedAt,
+                prompt: item.prompt,
+                sections: typeof item.sections === 'string' ? JSON.parse(item.sections) : item.sections,
+              }}
+              records={records}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

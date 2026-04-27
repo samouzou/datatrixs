@@ -139,6 +139,14 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (isCompanyAdmin(resource.data.companyMembers) || isAppAdmin());
     }
 
+    match /report_documents/{docId} {
+      allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) || isAppAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAppAdmin();
+    }
+
     match /unit_pipeline/{unitId} {
       allow list: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
       allow get: if isSignedIn() && (isCompanyMember(resource.data.companyMembers) || isAppAdmin());
